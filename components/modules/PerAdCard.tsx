@@ -1,0 +1,231 @@
+"use client";
+
+import { useState } from "react";
+import { Pencil, Check, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { AdCampaign } from "@/data/mock";
+
+// ────────────────────────────────────────────────────────────
+// Types
+// ────────────────────────────────────────────────────────────
+
+interface PerAdCardProps {
+  campaign: AdCampaign;
+  cog: number;
+  onCogChange: (id: string, newCog: number) => void;
+  currency?: string;
+}
+
+// ────────────────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────────────────
+
+const marketColors: Record<AdCampaign["market"], string> = {
+  AU: "bg-accent-amber/15 text-accent-amber",
+  UK: "bg-accent-emerald/15 text-accent-emerald",
+  USA: "bg-accent-indigo/15 text-accent-indigo",
+};
+
+function formatCurrency(
+  value: number,
+  currency: string,
+  decimals?: number
+): string {
+  const abs = Math.abs(value);
+  const formatted = abs.toLocaleString("en-GB", {
+    minimumFractionDigits: decimals ?? 0,
+    maximumFractionDigits: decimals ?? 0,
+  });
+  return `${value < 0 ? "-" : ""}${currency}${formatted}`;
+}
+
+function roasColor(roas: number): string {
+  if (roas < 1) return "text-accent-red";
+  if (roas <= 2) return "text-accent-amber";
+  return "text-accent-emerald";
+}
+
+// ────────────────────────────────────────────────────────────
+// Component
+// ────────────────────────────────────────────────────────────
+
+export function PerAdCard({
+  campaign,
+  cog,
+  onCogChange,
+  currency = "$",
+}: PerAdCardProps) {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(cog);
+
+  const { product, market, revenue, spend, orders, roas, profit, cpc } =
+    campaign;
+
+  const metrics: {
+    label: string;
+    value: string;
+    colorClass?: string;
+  }[] = [
+    {
+      label: "Revenue",
+      value: formatCurrency(revenue, currency),
+    },
+    {
+      label: "Ad Spend",
+      value: formatCurrency(spend, currency),
+    },
+    {
+      label: "Orders",
+      value: orders.toLocaleString("en-GB"),
+    },
+    {
+      label: "ROAS",
+      value: roas.toFixed(2),
+      colorClass: roasColor(roas),
+    },
+    {
+      label: "Profit",
+      value: formatCurrency(profit, currency),
+      colorClass: profit < 0 ? "text-accent-red" : undefined,
+    },
+    {
+      label: "CPC",
+      value: formatCurrency(cpc, currency, 2),
+    },
+  ];
+
+  function handleSave() {
+    onCogChange(campaign.id, editValue);
+    setEditing(false);
+  }
+
+  function handleCancel() {
+    setEditValue(cog);
+    setEditing(false);
+  }
+
+  return (
+    <div className="card p-4 flex flex-col gap-3">
+      {/* ── Header: Product Name + Market Badge ─────────────── */}
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-syne font-semibold text-text-primary leading-snug truncate">
+          {product}
+        </h3>
+        <span
+          className={cn(
+            "inline-flex items-center rounded-full px-2 py-0.5",
+            "text-[10px] font-medium tracking-wide shrink-0",
+            marketColors[market]
+          )}
+        >
+          {market}
+        </span>
+      </div>
+
+      {/* ── Metrics Grid (2 cols x 3 rows) ──────────────────── */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+        {metrics.map((m) => (
+          <div key={m.label} className="flex flex-col gap-0.5">
+            <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium leading-none">
+              {m.label}
+            </span>
+            <span
+              className={cn(
+                "text-[13px] font-jetbrains text-text-primary tabular-nums leading-tight",
+                m.colorClass
+              )}
+            >
+              {m.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── COG Section ─────────────────────────────────────── */}
+      <div className="border-t border-subtle pt-3 mt-auto">
+        {!editing ? (
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium leading-none">
+                COG
+              </span>
+              <span className="text-[13px] font-jetbrains text-text-primary tabular-nums leading-tight">
+                {formatCurrency(cog, currency, 2)}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setEditValue(cog);
+                setEditing(true);
+              }}
+              className={cn(
+                "inline-flex items-center gap-1",
+                "text-[10px] font-medium",
+                "text-accent-indigo hover:text-accent-indigo-hover",
+                "transition-colors duration-150"
+              )}
+            >
+              <Pencil size={10} strokeWidth={2} />
+              Edit
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium leading-none">
+              COG
+            </span>
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-text-muted font-jetbrains pointer-events-none">
+                {currency}
+              </span>
+              <input
+                type="number"
+                value={editValue}
+                onChange={(e) => setEditValue(Number(e.target.value))}
+                className={cn(
+                  "w-full rounded-md border border-subtle bg-white/[0.04]",
+                  "pl-7 pr-3 py-1.5 text-[13px] font-jetbrains text-text-primary tabular-nums",
+                  "focus:outline-none focus:ring-1 focus:ring-accent-indigo/50",
+                  "placeholder:text-text-muted"
+                )}
+                min={0}
+                step={0.01}
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSave}
+                className={cn(
+                  "inline-flex items-center gap-1",
+                  "px-2.5 py-1 rounded-md text-[10px] font-medium",
+                  "bg-accent-indigo/15 text-accent-indigo",
+                  "hover:bg-accent-indigo/25 transition-colors duration-150"
+                )}
+              >
+                <Check size={10} strokeWidth={2.5} />
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={handleCancel}
+                className={cn(
+                  "inline-flex items-center gap-1",
+                  "px-2.5 py-1 rounded-md text-[10px] font-medium",
+                  "text-text-secondary hover:text-text-primary",
+                  "bg-white/[0.04] hover:bg-white/[0.06]",
+                  "transition-colors duration-150"
+                )}
+              >
+                <X size={10} strokeWidth={2.5} />
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
