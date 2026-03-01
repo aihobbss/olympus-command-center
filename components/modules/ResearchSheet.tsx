@@ -1,45 +1,28 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ExternalLink, Upload, Check } from "lucide-react";
-import { useResearchStore } from "@/lib/store";
+import { Upload, Check } from "lucide-react";
+import { useResearchStore, useStoreContext } from "@/lib/store";
 import { type SheetProduct } from "@/data/mock";
 import { cn } from "@/lib/utils";
 
-// ── Status badge for the sheet ─────────────────────────────
-
-const statusConfig: Record<
-  SheetProduct["testingStatus"],
-  { label: string; variant: string }
-> = {
-  "": { label: "—", variant: "text-text-muted" },
-  Queued: { label: "Queued", variant: "text-amber-400 bg-amber-400/10" },
-  Imported: { label: "Imported", variant: "text-sky-400 bg-sky-400/10" },
-  Scheduled: { label: "Scheduled", variant: "text-violet-400 bg-violet-400/10" },
-  Live: { label: "Live", variant: "text-accent-emerald bg-accent-emerald/10" },
-  Killed: { label: "Killed", variant: "text-accent-red bg-accent-red/10" },
-};
-
-function SheetStatusBadge({ status }: { status: SheetProduct["testingStatus"] }) {
-  const cfg = statusConfig[status];
-  if (!status) return <span className="text-text-muted text-xs">—</span>;
-  return (
-    <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-full", cfg.variant)}>
-      {cfg.label}
-    </span>
-  );
-}
-
-// ── Inline editable cell ───────────────────────────────────
+// ── Inline editable text/number cell ───────────────────────
 
 type EditableCellProps = {
   value: string | number | null;
   type?: "text" | "number";
   placeholder?: string;
+  prefix?: string;
   onSave: (value: string) => void;
 };
 
-function EditableCell({ value, type = "text", placeholder = "—", onSave }: EditableCellProps) {
+function EditableCell({
+  value,
+  type = "text",
+  placeholder = "—",
+  prefix,
+  onSave,
+}: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value?.toString() ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -54,6 +37,7 @@ function EditableCell({ value, type = "text", placeholder = "—", onSave }: Edi
   }
 
   if (!editing) {
+    const display = value != null && value !== "" ? value : null;
     return (
       <button
         onClick={() => {
@@ -63,32 +47,114 @@ function EditableCell({ value, type = "text", placeholder = "—", onSave }: Edi
         className={cn(
           "w-full text-left text-xs px-2 py-1 rounded",
           "hover:bg-white/[0.04] transition-colors duration-100 cursor-text",
-          value != null && value !== "" ? "text-text-primary" : "text-text-muted"
+          display != null ? "text-text-primary" : "text-text-muted"
         )}
       >
-        {value != null && value !== "" ? value : placeholder}
+        {display != null ? (
+          <>
+            {prefix && <span className="text-text-muted">{prefix}</span>}
+            {display}
+          </>
+        ) : (
+          placeholder
+        )}
       </button>
     );
   }
 
   return (
-    <input
-      ref={inputRef}
-      type={type}
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") commit();
-        if (e.key === "Escape") setEditing(false);
-      }}
-      className={cn(
-        "w-full text-xs px-2 py-1 rounded",
-        "bg-bg-elevated border border-accent-indigo/40 outline-none",
-        "text-text-primary placeholder:text-text-muted"
+    <div className="flex items-center">
+      {prefix && (
+        <span className="text-text-muted text-xs pl-2 pr-0.5">{prefix}</span>
       )}
-      placeholder={placeholder}
-    />
+      <input
+        ref={inputRef}
+        type={type}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") setEditing(false);
+        }}
+        className={cn(
+          "w-full text-xs py-1 rounded",
+          prefix ? "px-1" : "px-2",
+          "bg-bg-elevated border border-accent-indigo/40 outline-none",
+          "text-text-primary placeholder:text-text-muted"
+        )}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
+
+// ── Status dropdown / Import button ────────────────────────
+
+const STATUS_OPTIONS: { value: SheetProduct["testingStatus"]; label: string }[] = [
+  { value: "Queued", label: "Queued" },
+  { value: "Imported", label: "Imported" },
+  { value: "Scheduled", label: "Scheduled" },
+  { value: "Live", label: "Live" },
+  { value: "Killed", label: "Killed" },
+];
+
+const statusColors: Record<string, string> = {
+  Queued: "text-amber-400",
+  Imported: "text-sky-400",
+  Scheduled: "text-violet-400",
+  Live: "text-accent-emerald",
+  Killed: "text-accent-red",
+};
+
+function StatusCell({
+  status,
+  onChange,
+}: {
+  status: SheetProduct["testingStatus"];
+  onChange: (s: SheetProduct["testingStatus"]) => void;
+}) {
+  // Blank status → show Import button
+  if (!status) {
+    return (
+      <button
+        onClick={() => onChange("Queued")}
+        className={cn(
+          "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium",
+          "bg-accent-indigo/15 text-accent-indigo",
+          "hover:bg-accent-indigo/25 transition-colors duration-150"
+        )}
+      >
+        <Upload size={12} />
+        Import
+      </button>
+    );
+  }
+
+  return (
+    <select
+      value={status}
+      onChange={(e) =>
+        onChange(e.target.value as SheetProduct["testingStatus"])
+      }
+      className={cn(
+        "text-[11px] font-medium px-2 py-1 rounded-lg",
+        "bg-bg-elevated border border-subtle outline-none cursor-pointer",
+        "hover:border-[var(--border-hover)] transition-colors duration-150",
+        "appearance-none bg-[length:12px] bg-[right_6px_center] bg-no-repeat",
+        "pr-6",
+        statusColors[status] ?? "text-text-primary"
+      )}
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+      }}
+    >
+      {STATUS_OPTIONS.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -119,7 +185,8 @@ function CreativeToggle({
 // ── Main sheet component ───────────────────────────────────
 
 export function ResearchSheet() {
-  const { sheetProducts, updateSheetProduct, queueForImport } = useResearchStore();
+  const { sheetProducts, updateSheetProduct } = useResearchStore();
+  const { selectedStore } = useStoreContext();
 
   if (sheetProducts.length === 0) {
     return (
@@ -137,7 +204,7 @@ export function ResearchSheet() {
 
   return (
     <div className="overflow-x-auto scrollbar-hide -mx-1">
-      <table className="w-full min-w-[900px] text-left">
+      <table className="w-full min-w-[960px] text-left">
         <thead>
           <tr className="border-b border-subtle">
             {[
@@ -149,7 +216,6 @@ export function ResearchSheet() {
               "COG",
               "Price",
               "Notes",
-              "Actions",
             ].map((h) => (
               <th
                 key={h}
@@ -169,49 +235,50 @@ export function ResearchSheet() {
                 product.testingStatus === "Killed" && "opacity-40"
               )}
             >
-              {/* Product name */}
-              <td className="px-3 py-2.5">
-                <span className="text-sm font-medium text-text-primary">
-                  {product.productName}
-                </span>
+              {/* Product name — editable */}
+              <td className="px-3 py-2.5 min-w-[160px]">
+                <EditableCell
+                  value={product.productName}
+                  placeholder="Product name"
+                  onSave={(v) =>
+                    updateSheetProduct(product.id, { productName: v })
+                  }
+                />
               </td>
 
-              {/* Ad link */}
-              <td className="px-3 py-2.5">
-                <a
-                  href={product.adLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-accent-indigo hover:text-accent-indigo/80 transition-colors"
-                >
-                  <ExternalLink size={12} />
-                  View
-                </a>
+              {/* Ad link — editable */}
+              <td className="px-3 py-2.5 min-w-[100px]">
+                <EditableCell
+                  value={product.adLink}
+                  placeholder="Ad link"
+                  onSave={(v) =>
+                    updateSheetProduct(product.id, { adLink: v })
+                  }
+                />
               </td>
 
-              {/* Store link */}
-              <td className="px-3 py-2.5">
-                {product.storeLink ? (
-                  <a
-                    href={product.storeLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-accent-emerald hover:text-accent-emerald/80 transition-colors"
-                  >
-                    <ExternalLink size={12} />
-                    Store
-                  </a>
-                ) : (
-                  <span className="text-xs text-text-muted">Not imported</span>
-                )}
+              {/* Store link — editable */}
+              <td className="px-3 py-2.5 min-w-[100px]">
+                <EditableCell
+                  value={product.storeLink}
+                  placeholder="Not imported"
+                  onSave={(v) =>
+                    updateSheetProduct(product.id, { storeLink: v })
+                  }
+                />
               </td>
 
-              {/* Testing status */}
+              {/* Testing status — dropdown or Import button */}
               <td className="px-3 py-2.5">
-                <SheetStatusBadge status={product.testingStatus} />
+                <StatusCell
+                  status={product.testingStatus}
+                  onChange={(s) =>
+                    updateSheetProduct(product.id, { testingStatus: s })
+                  }
+                />
               </td>
 
-              {/* Creative saved */}
+              {/* Creative saved — toggle */}
               <td className="px-3 py-2.5">
                 <CreativeToggle
                   saved={product.creativeSaved}
@@ -221,12 +288,13 @@ export function ResearchSheet() {
                 />
               </td>
 
-              {/* COG — inline editable */}
+              {/* COG — editable, always $ */}
               <td className="px-3 py-2.5 w-20">
                 <EditableCell
                   value={product.cog}
                   type="number"
                   placeholder="—"
+                  prefix="$"
                   onSave={(v) =>
                     updateSheetProduct(product.id, {
                       cog: v ? parseFloat(v) : null,
@@ -235,12 +303,13 @@ export function ResearchSheet() {
                 />
               </td>
 
-              {/* Pricing — inline editable */}
+              {/* Pricing — editable, store currency */}
               <td className="px-3 py-2.5 w-20">
                 <EditableCell
                   value={product.pricing}
                   type="number"
                   placeholder="—"
+                  prefix={selectedStore.currency}
                   onSave={(v) =>
                     updateSheetProduct(product.id, {
                       pricing: v ? parseFloat(v) : null,
@@ -249,7 +318,7 @@ export function ResearchSheet() {
                 />
               </td>
 
-              {/* Notes — inline editable */}
+              {/* Notes — editable */}
               <td className="px-3 py-2.5 min-w-[160px]">
                 <EditableCell
                   value={product.notes}
@@ -258,23 +327,6 @@ export function ResearchSheet() {
                     updateSheetProduct(product.id, { notes: v })
                   }
                 />
-              </td>
-
-              {/* Actions */}
-              <td className="px-3 py-2.5">
-                {!product.testingStatus && (
-                  <button
-                    onClick={() => queueForImport(product.id)}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium",
-                      "bg-accent-indigo/15 text-accent-indigo",
-                      "hover:bg-accent-indigo/25 transition-colors duration-150"
-                    )}
-                  >
-                    <Upload size={12} />
-                    Queue Import
-                  </button>
-                )}
               </td>
             </tr>
           ))}

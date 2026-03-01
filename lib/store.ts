@@ -66,7 +66,6 @@ interface ResearchStore {
   // Research Sheet tab
   sheetProducts: SheetProduct[];
   updateSheetProduct: (id: string, updates: Partial<SheetProduct>) => void;
-  queueForImport: (id: string) => void;
 }
 
 export const useResearchStore = create<ResearchStore>((set, get) => ({
@@ -111,13 +110,6 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
     set((s) => ({
       sheetProducts: s.sheetProducts.map((p) =>
         p.id === id ? { ...p, ...updates } : p
-      ),
-    })),
-
-  queueForImport: (id) =>
-    set((s) => ({
-      sheetProducts: s.sheetProducts.map((p) =>
-        p.id === id ? { ...p, testingStatus: "Queued" as const } : p
       ),
     })),
 }));
