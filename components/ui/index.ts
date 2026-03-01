@@ -34,6 +34,9 @@ export type {
 export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps } from "./EmptyState";
 
+// ─── Auth ────────────────────────────────────────────────
+export { LoginScreen } from "./LoginScreen";
+
 // ─── Demo Mode ──────────────────────────────────────────
 export { DemoBanner } from "./DemoBanner";
 export { TourOverlay } from "./TourOverlay";

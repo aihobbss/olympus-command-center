@@ -3,10 +3,10 @@
 import { useRef, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Bell, ChevronDown, Compass, ShieldCheck } from "lucide-react";
+import { Bell, ChevronDown, Compass, ShieldCheck, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { mockStores } from "@/lib/navigation";
-import { useStoreContext, useDemoStore } from "@/lib/store";
+import { useStoreContext, useDemoStore, useAuthStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const marketColors: Record<string, string> = {
@@ -25,8 +25,16 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
   const isCoachView = pathname === "/coach-view";
   const { selectedStore, setSelectedStore } = useStoreContext();
   const { startTour } = useDemoStore();
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Only show stores the current user has access to
+  const userStores = mockStores.filter(
+    (s) => user?.storeIds.includes(s.id)
+  );
+  const hasMultipleStores = userStores.length > 1;
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -68,10 +76,11 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
         {/* Store selector */}
         <div className="relative" ref={dropdownRef}>
           <button
-            onClick={() => setDropdownOpen(!dropdownOpen)}
+            onClick={() => hasMultipleStores && setDropdownOpen(!dropdownOpen)}
             className={cn(
               "flex items-center gap-2.5 px-3 py-2 rounded-lg",
-              "hover:bg-white/[0.04] transition-colors duration-150"
+              "transition-colors duration-150",
+              hasMultipleStores ? "hover:bg-white/[0.04] cursor-pointer" : "cursor-default"
             )}
           >
             {/* Market color dot */}
@@ -104,13 +113,15 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
               {selectedStore.market}
             </span>
 
-            <ChevronDown
-              size={14}
-              className={cn(
-                "text-text-muted transition-transform duration-200",
-                dropdownOpen && "rotate-180"
-              )}
-            />
+            {hasMultipleStores && (
+              <ChevronDown
+                size={14}
+                className={cn(
+                  "text-text-muted transition-transform duration-200",
+                  dropdownOpen && "rotate-180"
+                )}
+              />
+            )}
           </button>
 
           {/* Dropdown */}
@@ -123,7 +134,7 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
                 transition={{ duration: 0.15 }}
                 className="absolute top-full left-0 mt-1.5 w-60 rounded-xl bg-bg-card border border-subtle shadow-2xl shadow-black/50 py-1.5 z-50"
               >
-                {mockStores.map((store) => (
+                {userStores.map((store) => (
                   <button
                     key={store.id}
                     onClick={() => {
@@ -181,19 +192,21 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
 
         <div className="hidden sm:block w-px h-5 bg-[var(--border-subtle)]" />
 
-        {/* Coach View toggle */}
-        <Link
-          href={isCoachView ? "/research" : "/coach-view"}
-          className={cn(
-            "hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors duration-150",
-            isCoachView
-              ? "bg-accent-indigo/15 text-accent-indigo"
-              : "text-text-muted hover:text-text-secondary hover:bg-white/[0.04]"
-          )}
-        >
-          <ShieldCheck size={13} strokeWidth={2} />
-          {isCoachView ? "Coach Mode" : "Coach View"}
-        </Link>
+        {/* Coach View toggle — only for coaches */}
+        {user?.role === "coach" && (
+          <Link
+            href={isCoachView ? "/research" : "/coach-view"}
+            className={cn(
+              "hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors duration-150",
+              isCoachView
+                ? "bg-accent-indigo/15 text-accent-indigo"
+                : "text-text-muted hover:text-text-secondary hover:bg-white/[0.04]"
+            )}
+          >
+            <ShieldCheck size={13} strokeWidth={2} />
+            {isCoachView ? "Coach Mode" : "Coach View"}
+          </Link>
+        )}
 
         {/* Notification bell */}
         <button
@@ -213,17 +226,35 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
 
         {/* User avatar */}
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-indigo to-accent-indigo/40 flex items-center justify-center ring-2 ring-accent-indigo/20">
-            <span className="text-white text-xs font-bold">S</span>
+          <div className={cn(
+            "w-8 h-8 rounded-full bg-gradient-to-br flex items-center justify-center ring-2",
+            user?.avatarGradient,
+            user?.role === "coach" ? "ring-accent-indigo/20" : "ring-accent-emerald/20"
+          )}>
+            <span className="text-white text-xs font-bold">{user?.initials}</span>
           </div>
           <div className="hidden sm:block">
             <div className="text-sm font-medium text-text-primary leading-tight">
-              Simo
+              {user?.name}
             </div>
-            <div className="text-[10px] text-text-muted leading-tight">
-              {isCoachView ? "Coach" : "Owner"}
+            <div className="text-[10px] text-text-muted leading-tight capitalize">
+              {user?.role === "coach"
+                ? isCoachView ? "Coach" : "Owner"
+                : "Owner"}
             </div>
           </div>
+          {/* Logout */}
+          <button
+            onClick={logout}
+            className={cn(
+              "w-8 h-8 rounded-lg flex items-center justify-center",
+              "text-text-muted hover:text-accent-red hover:bg-accent-red/10",
+              "transition-colors duration-150"
+            )}
+            title="Sign out"
+          >
+            <LogOut size={15} strokeWidth={1.8} />
+          </button>
         </div>
       </div>
     </header>

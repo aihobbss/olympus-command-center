@@ -19,9 +19,132 @@ function hoursAgo(n: number): string {
 }
 
 // ============================================================
-// 1. Research Products (8 items)
+// 1a. Discovery Products (pool for "Run Research")
 // ============================================================
 
+export type DiscoveryProduct = {
+  id: string;
+  productName: string;
+  adLink: string;
+  storeLink: string;
+  spend: number;
+  activeAds: number;
+  lastSeen: string;
+  brandsRunning: number;
+  placeholderGradient: string;
+};
+
+const gradients = [
+  "from-indigo-600 to-purple-500",
+  "from-emerald-600 to-teal-500",
+  "from-amber-500 to-orange-500",
+  "from-rose-600 to-pink-500",
+  "from-cyan-500 to-blue-500",
+  "from-violet-600 to-fuchsia-500",
+  "from-lime-500 to-green-500",
+  "from-sky-500 to-indigo-500",
+  "from-red-500 to-amber-500",
+  "from-teal-500 to-emerald-500",
+  "from-fuchsia-500 to-rose-500",
+  "from-blue-600 to-cyan-500",
+  "from-orange-500 to-yellow-500",
+  "from-pink-500 to-violet-500",
+  "from-green-500 to-lime-500",
+];
+
+export const discoveryPool: DiscoveryProduct[] = [
+  { id: "dp-001", productName: "Harrington Trainers", adLink: "https://facebook.com/ads/library/?id=100001", storeLink: "https://competitor-a.myshopify.com", spend: 12400, activeAds: 18, lastSeen: "1d ago", brandsRunning: 5, placeholderGradient: gradients[0] },
+  { id: "dp-002", productName: "Durango Road Sneakers", adLink: "https://facebook.com/ads/library/?id=100002", storeLink: "https://competitor-b.myshopify.com", spend: 8200, activeAds: 11, lastSeen: "2d ago", brandsRunning: 4, placeholderGradient: gradients[1] },
+  { id: "dp-003", productName: "Maven Bomber Jacket", adLink: "https://facebook.com/ads/library/?id=100003", storeLink: "https://competitor-c.myshopify.com", spend: 6800, activeAds: 9, lastSeen: "3d ago", brandsRunning: 3, placeholderGradient: gradients[2] },
+  { id: "dp-004", productName: "Matteo Cotton Pants", adLink: "https://facebook.com/ads/library/?id=100004", storeLink: "https://competitor-d.myshopify.com", spend: 4500, activeAds: 7, lastSeen: "1d ago", brandsRunning: 3, placeholderGradient: gradients[3] },
+  { id: "dp-005", productName: "Haldrin Layered Shirt", adLink: "https://facebook.com/ads/library/?id=100005", storeLink: "https://competitor-e.myshopify.com", spend: 19200, activeAds: 22, lastSeen: "4h ago", brandsRunning: 5, placeholderGradient: gradients[4] },
+  { id: "dp-006", productName: "Enzo Suede Loafers", adLink: "https://facebook.com/ads/library/?id=100006", storeLink: "https://competitor-f.myshopify.com", spend: 11300, activeAds: 14, lastSeen: "6h ago", brandsRunning: 4, placeholderGradient: gradients[5] },
+  { id: "dp-007", productName: "Avalon Puffer Vest", adLink: "https://facebook.com/ads/library/?id=100007", storeLink: "https://competitor-g.myshopify.com", spend: 24600, activeAds: 26, lastSeen: "12h ago", brandsRunning: 6, placeholderGradient: gradients[6] },
+  { id: "dp-008", productName: "Kensington Wool Overcoat", adLink: "https://facebook.com/ads/library/?id=100008", storeLink: "https://competitor-h.myshopify.com", spend: 5100, activeAds: 8, lastSeen: "2d ago", brandsRunning: 3, placeholderGradient: gradients[7] },
+  { id: "dp-009", productName: "Arden Cargo Joggers", adLink: "https://facebook.com/ads/library/?id=100009", storeLink: "https://competitor-i.myshopify.com", spend: 15700, activeAds: 20, lastSeen: "3h ago", brandsRunning: 7, placeholderGradient: gradients[8] },
+  { id: "dp-010", productName: "Beckett Chelsea Boots", adLink: "https://facebook.com/ads/library/?id=100010", storeLink: "https://competitor-j.myshopify.com", spend: 9400, activeAds: 13, lastSeen: "1d ago", brandsRunning: 4, placeholderGradient: gradients[9] },
+  { id: "dp-011", productName: "Weston Knit Polo", adLink: "https://facebook.com/ads/library/?id=100011", storeLink: "https://competitor-k.myshopify.com", spend: 7800, activeAds: 10, lastSeen: "5h ago", brandsRunning: 3, placeholderGradient: gradients[10] },
+  { id: "dp-012", productName: "Langley Trench Coat", adLink: "https://facebook.com/ads/library/?id=100012", storeLink: "https://competitor-l.myshopify.com", spend: 21000, activeAds: 24, lastSeen: "8h ago", brandsRunning: 5, placeholderGradient: gradients[11] },
+  { id: "dp-013", productName: "Rhodes Track Jacket", adLink: "https://facebook.com/ads/library/?id=100013", storeLink: "https://competitor-m.myshopify.com", spend: 3200, activeAds: 5, lastSeen: "3d ago", brandsRunning: 2, placeholderGradient: gradients[12] },
+  { id: "dp-014", productName: "Carter Slim Chinos", adLink: "https://facebook.com/ads/library/?id=100014", storeLink: "https://competitor-n.myshopify.com", spend: 16500, activeAds: 19, lastSeen: "2h ago", brandsRunning: 6, placeholderGradient: gradients[13] },
+  { id: "dp-015", productName: "Novak Quilted Gilet", adLink: "https://facebook.com/ads/library/?id=100015", storeLink: "https://competitor-o.myshopify.com", spend: 10800, activeAds: 15, lastSeen: "1d ago", brandsRunning: 4, placeholderGradient: gradients[14] },
+];
+
+// ============================================================
+// 1b. Research Sheet Products (products that passed discovery)
+// ============================================================
+
+export type SheetProduct = {
+  id: string;
+  productName: string;
+  adLink: string;
+  storeLink: string;
+  testingStatus: "" | "Queued" | "Imported" | "Scheduled" | "Live" | "Killed";
+  creativeSaved: boolean;
+  cog: number | null;
+  pricing: number | null;
+  notes: string;
+};
+
+export const initialSheetProducts: SheetProduct[] = [
+  {
+    id: "sp-001",
+    productName: "Maven Bomber Jacket",
+    adLink: "https://facebook.com/ads/library/?id=100003",
+    storeLink: "https://olympus-london.myshopify.com/products/maven-bomber-jacket",
+    testingStatus: "Live",
+    creativeSaved: true,
+    cog: 18,
+    pricing: 59.99,
+    notes: "Strong ATC, scaling AU",
+  },
+  {
+    id: "sp-002",
+    productName: "Haldrin Layered Shirt",
+    adLink: "https://facebook.com/ads/library/?id=100005",
+    storeLink: "https://olympus-london.myshopify.com/products/haldrin-layered-shirt",
+    testingStatus: "Scheduled",
+    creativeSaved: true,
+    cog: 12,
+    pricing: 44.99,
+    notes: "Testing UK market first",
+  },
+  {
+    id: "sp-003",
+    productName: "Harrington Trainers",
+    adLink: "https://facebook.com/ads/library/?id=100001",
+    storeLink: "https://olympus-london.myshopify.com/products/harrington-trainers",
+    testingStatus: "Imported",
+    creativeSaved: false,
+    cog: 22,
+    pricing: 74.99,
+    notes: "",
+  },
+  {
+    id: "sp-004",
+    productName: "Enzo Suede Loafers",
+    adLink: "https://facebook.com/ads/library/?id=100006",
+    storeLink: "",
+    testingStatus: "Queued",
+    creativeSaved: false,
+    cog: null,
+    pricing: null,
+    notes: "Waiting on supplier confirmation",
+  },
+  {
+    id: "sp-005",
+    productName: "Avalon Puffer Vest",
+    adLink: "https://facebook.com/ads/library/?id=100007",
+    storeLink: "https://olympus-london.myshopify.com/products/avalon-puffer-vest",
+    testingStatus: "Killed",
+    creativeSaved: true,
+    cog: 24,
+    pricing: 69.99,
+    notes: "CPC too high, poor ATC",
+  },
+];
+
+// Keep legacy type for backwards compatibility with api-interfaces
 export type ResearchProduct = {
   id: string;
   productName: string;
@@ -34,96 +157,7 @@ export type ResearchProduct = {
   status: "Queued" | "Testing" | "Killed" | "Imported";
 };
 
-export const researchProducts: ResearchProduct[] = [
-  {
-    id: "rp-001",
-    productName: "Harrington Trainers",
-    competitorLink: "https://competitor-a.myshopify.com/products/harrington-trainers",
-    adLink: "https://facebook.com/ads/library/?id=100001",
-    storeLink: "https://competitor-a.myshopify.com",
-    brandsRunning: 5,
-    daysActive: 12,
-    creativesCount: 18,
-    status: "Testing",
-  },
-  {
-    id: "rp-002",
-    productName: "Durango Road Sneakers",
-    competitorLink: "https://competitor-b.myshopify.com/products/durango-road-sneakers",
-    adLink: "https://facebook.com/ads/library/?id=100002",
-    storeLink: "https://competitor-b.myshopify.com",
-    brandsRunning: 4,
-    daysActive: 8,
-    creativesCount: 11,
-    status: "Testing",
-  },
-  {
-    id: "rp-003",
-    productName: "Maven Bomber Jacket",
-    competitorLink: "https://competitor-c.myshopify.com/products/maven-bomber-jacket",
-    adLink: "https://facebook.com/ads/library/?id=100003",
-    storeLink: "https://competitor-c.myshopify.com",
-    brandsRunning: 3,
-    daysActive: 6,
-    creativesCount: 9,
-    status: "Imported",
-  },
-  {
-    id: "rp-004",
-    productName: "Matteo Cotton Pants",
-    competitorLink: "https://competitor-d.myshopify.com/products/matteo-cotton-pants",
-    adLink: "https://facebook.com/ads/library/?id=100004",
-    storeLink: "https://competitor-d.myshopify.com",
-    brandsRunning: 3,
-    daysActive: 4,
-    creativesCount: 7,
-    status: "Queued",
-  },
-  {
-    id: "rp-005",
-    productName: "Haldrin Layered Shirt",
-    competitorLink: "https://competitor-e.myshopify.com/products/haldrin-layered-shirt",
-    adLink: "https://facebook.com/ads/library/?id=100005",
-    storeLink: "https://competitor-e.myshopify.com",
-    brandsRunning: 5,
-    daysActive: 15,
-    creativesCount: 22,
-    status: "Imported",
-  },
-  {
-    id: "rp-006",
-    productName: "Enzo Suede Loafers",
-    competitorLink: "https://competitor-f.myshopify.com/products/enzo-suede-loafers",
-    adLink: "https://facebook.com/ads/library/?id=100006",
-    storeLink: "https://competitor-f.myshopify.com",
-    brandsRunning: 4,
-    daysActive: 10,
-    creativesCount: 14,
-    status: "Queued",
-  },
-  {
-    id: "rp-007",
-    productName: "Avalon Puffer Vest",
-    competitorLink: "https://competitor-g.myshopify.com/products/avalon-puffer-vest",
-    adLink: "https://facebook.com/ads/library/?id=100007",
-    storeLink: "https://competitor-g.myshopify.com",
-    brandsRunning: 6,
-    daysActive: 18,
-    creativesCount: 26,
-    status: "Killed",
-  },
-  {
-    id: "rp-008",
-    productName: "Kensington Wool Overcoat",
-    competitorLink: "https://competitor-h.myshopify.com/products/kensington-wool-overcoat",
-    adLink: "https://facebook.com/ads/library/?id=100008",
-    storeLink: "https://competitor-h.myshopify.com",
-    brandsRunning: 3,
-    daysActive: 5,
-    creativesCount: 8,
-    status: "Queued",
-  },
-];
+export const researchProducts: ResearchProduct[] = [];
 
 // ============================================================
 // 2. Ad Campaigns (4 items)

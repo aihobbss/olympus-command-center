@@ -6,12 +6,19 @@ import { TopBar } from "./TopBar";
 import { MobileNav } from "./MobileNav";
 import { DemoBanner } from "./DemoBanner";
 import { TourOverlay, TOUR_STEPS } from "./TourOverlay";
-import { useDemoStore } from "@/lib/store";
+import { LoginScreen } from "./LoginScreen";
+import { useDemoStore, useAuthStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const { bannerVisible, tourActive, tourStep } = useDemoStore();
+  const user = useAuthStore((s) => s.user);
+
+  // Show login screen if no user is logged in
+  if (!user) {
+    return <LoginScreen />;
+  }
 
   const bannerOffset = bannerVisible ? 32 : 0;
   const highlightedNavId = tourActive ? TOUR_STEPS[tourStep].navId : null;

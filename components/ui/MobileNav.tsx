@@ -3,10 +3,17 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { navItems } from "@/lib/navigation";
+import { useAuthStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 export function MobileNav() {
   const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
+
+  // Filter out admin-only nav items for non-coach users
+  const visibleNavItems = navItems.filter(
+    (item) => item.group !== "admin" || user?.role === "coach"
+  );
 
   return (
     <nav
@@ -17,7 +24,7 @@ export function MobileNav() {
       )}
     >
       <div className="flex w-full overflow-x-auto scrollbar-hide">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const isActive =
             pathname === item.href ||
             (item.href !== "/" && pathname.startsWith(item.href));

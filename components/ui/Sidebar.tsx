@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
 import { navItems } from "@/lib/navigation";
+import { useAuthStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 type SidebarProps = {
@@ -32,6 +33,12 @@ const itemVariants = {
 
 export function Sidebar({ collapsed, onToggle, bannerOffset = 0, highlightedNavId }: SidebarProps) {
   const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
+
+  // Filter out admin-only nav items for non-coach users
+  const visibleNavItems = navItems.filter(
+    (item) => item.group !== "admin" || user?.role === "coach"
+  );
 
   return (
     <aside
@@ -81,7 +88,7 @@ export function Sidebar({ collapsed, onToggle, bannerOffset = 0, highlightedNavI
         animate="visible"
       >
         <div className="space-y-0.5">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.href !== "/" && pathname.startsWith(item.href));
