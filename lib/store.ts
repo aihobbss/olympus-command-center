@@ -2,8 +2,10 @@ import { create } from "zustand";
 import {
   discoveryPool,
   initialSheetProducts,
+  initialCopyProducts,
   type DiscoveryProduct,
   type SheetProduct,
+  type ProductCopy,
 } from "@/data/mock";
 import { mockStores, type MockStore } from "@/lib/navigation";
 
@@ -112,6 +114,54 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
         p.id === id ? { ...p, ...updates } : p
       ),
     })),
+}));
+
+// ─── Product Copy Store ─────────────────────────────────
+// Manages the Product Creation / Copy Generation sheet.
+
+interface ProductCopyStore {
+  copyProducts: ProductCopy[];
+  updateCopyProduct: (id: string, updates: Partial<ProductCopy>) => void;
+  generateCopy: (id: string) => void;
+}
+
+const MOCK_SHOPIFY = "Timeless Style Meets Modern Craft\n\nElevate your wardrobe with a versatile piece designed for everyday confidence. Premium materials and refined details make this a go-to for any occasion.\n\n\u2022 Quality Construction: Built to last with premium stitching\n\u2022 Modern Fit: Tailored silhouette flatters every frame\n\u2022 Versatile Design: Pairs effortlessly with any outfit\n\nDesigned for those who value style and substance.";
+
+const MOCK_FACEBOOK = "Step Into Effortless Style\n\nPremium quality meets everyday wearability. This versatile piece was designed to elevate your look without trying too hard.\n\nClean. Confident. Versatile.\n\nFree Shipping\nShop now";
+
+export const useProductCopyStore = create<ProductCopyStore>((set) => ({
+  copyProducts: initialCopyProducts.map((p) => ({ ...p })),
+
+  updateCopyProduct: (id, updates) =>
+    set((s) => ({
+      copyProducts: s.copyProducts.map((p) =>
+        p.id === id ? { ...p, ...updates } : p
+      ),
+    })),
+
+  generateCopy: (id) => {
+    // Set to Generating immediately
+    set((s) => ({
+      copyProducts: s.copyProducts.map((p) =>
+        p.id === id ? { ...p, status: "Generating" as const } : p
+      ),
+    }));
+    // Simulate generation after 2s
+    setTimeout(() => {
+      set((s) => ({
+        copyProducts: s.copyProducts.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                status: "Completed" as const,
+                shopifyDescription: p.shopifyDescription || MOCK_SHOPIFY,
+                facebookCopy: p.facebookCopy || MOCK_FACEBOOK,
+              }
+            : p
+        ),
+      }));
+    }, 2000);
+  },
 }));
 
 // ─── Store Context ──────────────────────────────────────

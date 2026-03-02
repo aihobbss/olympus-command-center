@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Upload, Check } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Upload, Check, Search, SlidersHorizontal } from "lucide-react";
 import { useResearchStore, useStoreContext } from "@/lib/store";
 import { type SheetProduct } from "@/data/mock";
 import { cn } from "@/lib/utils";
@@ -182,11 +182,45 @@ function CreativeToggle({
   );
 }
 
+// ── Filter types ──────────────────────────────────────────────
+
+type TestingStatusFilter =
+  | "All"
+  | "Blank"
+  | "Queued"
+  | "Imported"
+  | "Scheduled"
+  | "Live"
+  | "Killed";
+
 // ── Main sheet component ───────────────────────────────────
 
 export function ResearchSheet() {
   const { sheetProducts, updateSheetProduct } = useResearchStore();
   const { selectedStore } = useStoreContext();
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<TestingStatusFilter>("All");
+
+  const filtered = useMemo(() => {
+    let items = sheetProducts;
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      items = items.filter((p) =>
+        p.productName.toLowerCase().includes(q)
+      );
+    }
+
+    if (statusFilter !== "All") {
+      if (statusFilter === "Blank") {
+        items = items.filter((p) => !p.testingStatus);
+      } else {
+        items = items.filter((p) => p.testingStatus === statusFilter);
+      }
+    }
+
+    return items;
+  }, [sheetProducts, search, statusFilter]);
 
   if (sheetProducts.length === 0) {
     return (
@@ -203,6 +237,62 @@ export function ResearchSheet() {
   }
 
   return (
+    <div>
+      {/* ── Search + Filter bar ── */}
+      <div className="flex items-center gap-3 flex-wrap mb-4">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+          />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search products..."
+            className={cn(
+              "w-full pl-9 pr-3 py-2 rounded-lg text-xs",
+              "bg-bg-elevated border border-subtle outline-none",
+              "text-text-primary placeholder:text-text-muted",
+              "focus:border-accent-indigo/40 transition-colors duration-150"
+            )}
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal size={13} className="text-text-muted" />
+          <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value as TestingStatusFilter)
+            }
+            className={cn(
+              "text-xs px-3 py-2 rounded-lg",
+              "bg-bg-elevated border border-subtle outline-none cursor-pointer",
+              "text-text-primary",
+              "hover:border-[var(--border-hover)] transition-colors duration-150",
+              "appearance-none bg-[length:12px] bg-[right_8px_center] bg-no-repeat pr-7"
+            )}
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+            }}
+          >
+            <option value="All">All Status</option>
+            <option value="Blank">Not Imported</option>
+            <option value="Queued">Queued</option>
+            <option value="Imported">Imported</option>
+            <option value="Scheduled">Scheduled</option>
+            <option value="Live">Live</option>
+            <option value="Killed">Killed</option>
+          </select>
+        </div>
+
+        <span className="text-[11px] text-text-muted font-jetbrains ml-auto">
+          {filtered.length} of {sheetProducts.length}
+        </span>
+      </div>
+
+      {/* ── Table ── */}
     <div className="overflow-x-auto scrollbar-hide -mx-1">
       <table className="w-full min-w-[960px] text-left">
         <thead>
@@ -227,7 +317,7 @@ export function ResearchSheet() {
           </tr>
         </thead>
         <tbody>
-          {sheetProducts.map((product) => (
+          {filtered.map((product) => (
             <tr
               key={product.id}
               className={cn(
@@ -332,6 +422,17 @@ export function ResearchSheet() {
           ))}
         </tbody>
       </table>
+    </div>
+
+      {/* No results */}
+      {filtered.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <p className="text-sm text-text-secondary mb-1">No matching products</p>
+          <p className="text-xs text-text-muted">
+            Try adjusting your search or filter
+          </p>
+        </div>
+      )}
     </div>
   );
 }

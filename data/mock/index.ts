@@ -171,6 +171,68 @@ export type ResearchProduct = {
 export const researchProducts: ResearchProduct[] = [];
 
 // ============================================================
+// 1c. Product Copy Creation
+// ============================================================
+
+export type ProductCopy = {
+  id: string;
+  productUrl: string;
+  productName: string;
+  imageUrl: string;
+  shopifyDescription: string;
+  facebookCopy: string;
+  status: "" | "Pending" | "Generating" | "Completed";
+};
+
+export const initialCopyProducts: ProductCopy[] = [
+  {
+    id: "pc-001",
+    productName: "Aymbr Sweater",
+    productUrl: "https://vantagemelbourne.com/products/aymbr",
+    imageUrl: "http://vantagemelbourne.com/cdn/shop/files/britt_wit_1_1_720x.jpg",
+    shopifyDescription: "Modern Edge Meets Everyday Comfort\n\nElevate your seasonal wardrobe with a statement knit designed to turn heads. The Aymbr Sweater features distinctive openwork detail and a relaxed silhouette that flatters while keeping things effortlessly stylish.\n\n\u2022 Knitted Design: Cozy construction combines warmth with everyday refinement\n\u2022 Openwork Details: Intricate patterns bring depth and modern flair\n\u2022 Relaxed Fit: Slightly oversized shape with dropped shoulders for easy layering\n\u2022 Round Neck: Classic crew neckline complements any outfit\n\nDesigned in Melbourne by Vantage for timeless versatility.",
+    facebookCopy: "Slide Into Textured Sophistication with the Aymbr Sweater\n\nPlayful structure meets confident style in this relaxed must-have. The Aymbr Sweater\u2019s openwork detail and patchwork texture bring effortless elegance to your rotation.\n\nRelaxed. Intricate. Versatile.\n\nhttps://vantagemelbourne.com/products/aymbr\nAymbr Sweater\nFree Shipping in Australia\nShop now",
+    status: "Completed",
+  },
+  {
+    id: "pc-002",
+    productName: "All-Terrain Canvas Sneaker",
+    productUrl: "https://vantagemelbourne.com/products/all-terrain-canvas-sneaker",
+    imageUrl: "http://vantagemelbourne.com/cdn/shop/files/S6dba56a87e254678.webp",
+    shopifyDescription: "Warm-Weather Function Meets Everyday Utility\n\nCrafted for comfort and ease, the All-Terrain Canvas Sneaker is ready for anything from daily errands to weekend adventures. The breathable upper and flexible sole support natural movement.\n\n\u2022 Low-Top Construction: Relaxed silhouette with casual styling appeal\n\u2022 Lace-Up Front: Metal eyelets provide secure fit and utility edge\n\u2022 Slip-Resistant Tread: Durable outsole provides reliable traction\n\u2022 Textured Details: Visible stitching and panel design add structure\n\nDesigned in Melbourne by Vantage for modern versatility.",
+    facebookCopy: "Slide Into Everyday Motion with the All-Terrain Canvas Sneaker\n\nBuilt to keep pace with your routine, the All-Terrain Canvas Sneaker delivers breathable comfort, structured support, and rugged traction in one easygoing package.\n\nPractical. Breathable. Grounded.\n\nhttps://vantagemelbourne.com/products/all-terrain-canvas-sneaker\nAll-Terrain Canvas Sneaker\nFree Shipping in Australia\nShop now",
+    status: "Completed",
+  },
+  {
+    id: "pc-003",
+    productName: "Maven Bomber Jacket",
+    productUrl: "https://olympus-london.myshopify.com/products/maven-bomber-jacket",
+    imageUrl: "",
+    shopifyDescription: "",
+    facebookCopy: "",
+    status: "Generating",
+  },
+  {
+    id: "pc-004",
+    productName: "Harrington Trainers",
+    productUrl: "https://olympus-london.myshopify.com/products/harrington-trainers",
+    imageUrl: "",
+    shopifyDescription: "",
+    facebookCopy: "",
+    status: "Pending",
+  },
+  {
+    id: "pc-005",
+    productName: "Haldrin Layered Shirt",
+    productUrl: "https://olympus-london.myshopify.com/products/haldrin-layered-shirt",
+    imageUrl: "",
+    shopifyDescription: "",
+    facebookCopy: "",
+    status: "",
+  },
+];
+
+// ============================================================
 // 2. Ad Campaigns (4 items)
 // ============================================================
 
