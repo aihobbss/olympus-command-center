@@ -155,11 +155,12 @@ function CopyStatusCell({
         statusColors[status] ?? "text-text-primary"
       )}
       style={{
+        backgroundColor: "#1A1A24",
         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
       }}
     >
-      <option value="Pending" className="bg-[#1A1A24] text-[#F1F1F3]">Pending</option>
-      <option value="Completed" className="bg-[#1A1A24] text-[#F1F1F3]">Completed</option>
+      <option value="Pending">Pending</option>
+      <option value="Completed">Completed</option>
     </select>
   );
 }
@@ -309,14 +310,16 @@ export function ProductCopySheet() {
               "appearance-none bg-[length:12px] bg-[right_8px_center] bg-no-repeat pr-7"
             )}
             style={{
+              color: "#F1F1F3",
+              backgroundColor: "#1A1A24",
               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
             }}
           >
-            <option value="All" className="bg-[#1A1A24] text-[#F1F1F3]">All Status</option>
-            <option value="Blank" className="bg-[#1A1A24] text-[#F1F1F3]">No Status</option>
-            <option value="Pending" className="bg-[#1A1A24] text-[#F1F1F3]">Pending</option>
-            <option value="Generating" className="bg-[#1A1A24] text-[#F1F1F3]">Generating</option>
-            <option value="Completed" className="bg-[#1A1A24] text-[#F1F1F3]">Completed</option>
+            <option value="All">All Status</option>
+            <option value="Blank">No Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Generating">Generating</option>
+            <option value="Completed">Completed</option>
           </select>
         </div>
 
