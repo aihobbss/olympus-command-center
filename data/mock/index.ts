@@ -339,6 +339,26 @@ export const adCampaigns: AdCampaign[] = [
       { budgetPerDay: 30, status: "current", spend: 22, revenue: 0, orders: 0, profit: -22, roas: 0, cpc: 1.34, atc: 0 },
     ],
   },
+  {
+    id: "ac-005",
+    campaignName: "Haldrin Layered Shirt",
+    product: "Haldrin Layered Shirt",
+    spend: 174,
+    budget: 120,
+    cpc: 0.65,
+    atc: 22,
+    roas: 2.78,
+    revenue: 484,
+    orders: 14,
+    profit: 148,
+    status: "Scaling",
+    recommendation: "ROAS above 2.5 across all tiers — SOP: Continue scaling",
+    budgetHistory: [
+      { budgetPerDay: 30, status: "historical", spend: 128, revenue: 342, orders: 9, profit: 102, roas: 2.67, cpc: 0.71, atc: 10 },
+      { budgetPerDay: 60, status: "historical", spend: 246, revenue: 658, orders: 18, profit: 196, roas: 2.67, cpc: 0.68, atc: 18 },
+      { budgetPerDay: 120, status: "current", spend: 174, revenue: 484, orders: 14, profit: 148, roas: 2.78, cpc: 0.65, atc: 22 },
+    ],
+  },
 ];
 
 // ============================================================

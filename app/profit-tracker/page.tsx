@@ -39,6 +39,7 @@ const DEFAULT_COGS: Record<string, number> = {
   "ac-002": 15.0,
   "ac-003": 20.0,
   "ac-004": 12.0,
+  "ac-005": 12.0,
 };
 
 const PERIOD_LABEL: Record<TimePeriod, string> = {
