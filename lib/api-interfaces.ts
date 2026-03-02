@@ -33,6 +33,19 @@ export interface ResearchProduct {
   status: "Queued" | "Testing" | "Killed" | "Imported";
 }
 
+/** Performance snapshot at a specific daily budget level. */
+export interface BudgetTierSnapshot {
+  budgetPerDay: number;
+  status: "current" | "historical";
+  spend: number;
+  revenue: number;
+  orders: number;
+  profit: number;
+  roas: number;
+  cpc: number;
+  atc: number;
+}
+
 /** A single Facebook / TikTok ad campaign row. */
 export interface AdCampaign {
   id: string;
@@ -48,6 +61,7 @@ export interface AdCampaign {
   profit: number;
   status: "Scaling" | "Kill" | "Watch";
   recommendation: string;
+  budgetHistory?: BudgetTierSnapshot[];
 }
 
 /** Daily profit-tracker row. */

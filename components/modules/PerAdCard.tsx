@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Pencil, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { AdCampaign } from "@/data/mock";
 
 // ────────────────────────────────────────────────────────────
@@ -15,6 +16,8 @@ interface PerAdCardProps {
   onCogChange: (id: string, newCog: number) => void;
   storeCurrency: string;
   toUsd: (localAmount: number) => number;
+  tierIndicator?: "current" | "scaled";
+  scaledToBudget?: number;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -50,6 +53,8 @@ export function PerAdCard({
   onCogChange,
   storeCurrency,
   toUsd,
+  tierIndicator,
+  scaledToBudget,
 }: PerAdCardProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(cog);
@@ -85,7 +90,7 @@ export function PerAdCard({
       label: "Profit",
       value: formatCurrency(profit, storeCurrency),
       subtitle: `$${toUsd(profit).toLocaleString("en-GB")} USD`,
-      colorClass: profit < 0 ? "text-accent-red" : undefined,
+      colorClass: profit < 0 ? "text-accent-red" : profit > 0 ? "text-accent-emerald" : undefined,
     },
     {
       label: "CPC",
@@ -109,10 +114,18 @@ export function PerAdCard({
 
   return (
     <div className="card p-4 flex flex-col gap-3">
-      {/* ── Header: Product Name ──────────────────────────── */}
-      <h3 className="text-sm font-syne font-semibold text-text-primary leading-snug truncate">
-        {product}
-      </h3>
+      {/* ── Header: Product Name + Tier Indicator ────────── */}
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-syne font-semibold text-text-primary leading-snug truncate">
+          {product}
+        </h3>
+        {tierIndicator === "current" && (
+          <StatusBadge status="Current" variant="success" size="sm" className="shrink-0" />
+        )}
+        {tierIndicator === "scaled" && scaledToBudget && (
+          <StatusBadge status={`Scaled to $${scaledToBudget}/day`} variant="warning" size="sm" className="shrink-0" />
+        )}
+      </div>
 
       {/* ── Metrics Grid (2 cols) ─────────────────────────── */}
       <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">

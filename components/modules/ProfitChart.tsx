@@ -19,6 +19,7 @@ import type { ProfitLog } from "@/data/mock";
 interface ProfitChartProps {
   logs: ProfitLog[];
   currency?: string;
+  title?: string;
 }
 
 interface ChartRow {
@@ -91,6 +92,7 @@ function ChartTooltip({
 export default function ProfitChart({
   logs,
   currency = "£",
+  title,
 }: ProfitChartProps) {
   const chartData = useMemo<ChartRow[]>(() => {
     if (!logs || logs.length === 0) return [];
@@ -110,7 +112,7 @@ export default function ProfitChart({
     return (
       <div className="card p-5">
         <h3 className="text-sm font-syne font-semibold text-text-primary mb-4">
-          Revenue vs Profit — 14 Days
+          {title ?? "Revenue vs Profit"}
         </h3>
         <p className="text-text-muted text-xs">No data available.</p>
       </div>
@@ -120,7 +122,7 @@ export default function ProfitChart({
   return (
     <div className="card p-5">
       <h3 className="text-sm font-syne font-semibold text-text-primary mb-4">
-        Revenue vs Profit — 14 Days
+        {title ?? "Revenue vs Profit"}
       </h3>
 
       {/* ---- Chart ---- */}

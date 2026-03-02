@@ -236,6 +236,18 @@ export const initialCopyProducts: ProductCopy[] = [
 // 2. Ad Campaigns (4 items)
 // ============================================================
 
+export type BudgetTierSnapshot = {
+  budgetPerDay: number;
+  status: "current" | "historical";
+  spend: number;
+  revenue: number;
+  orders: number;
+  profit: number;
+  roas: number;
+  cpc: number;
+  atc: number;
+};
+
 export type AdCampaign = {
   id: string;
   campaignName: string;
@@ -250,6 +262,7 @@ export type AdCampaign = {
   profit: number;
   status: "Scaling" | "Kill" | "Watch";
   recommendation: string;
+  budgetHistory?: BudgetTierSnapshot[];
 };
 
 export const adCampaigns: AdCampaign[] = [
@@ -267,6 +280,10 @@ export const adCampaigns: AdCampaign[] = [
     profit: 58,
     status: "Scaling",
     recommendation: "ROAS above 2.0 with strong ATC — SOP: Scale +100%",
+    budgetHistory: [
+      { budgetPerDay: 30, status: "historical", spend: 145, revenue: 380, orders: 10, profit: 95, roas: 2.62, cpc: 0.68, atc: 12 },
+      { budgetPerDay: 60, status: "current", spend: 87, revenue: 210, orders: 6, profit: 58, roas: 2.41, cpc: 0.72, atc: 14 },
+    ],
   },
   {
     id: "ac-002",
@@ -282,6 +299,9 @@ export const adCampaigns: AdCampaign[] = [
     profit: -18,
     status: "Kill",
     recommendation: "$34 spent, CPC > $1, only 2 ATC — SOP: Kill",
+    budgetHistory: [
+      { budgetPerDay: 30, status: "current", spend: 34, revenue: 31, orders: 1, profit: -18, roas: 0.9, cpc: 1.12, atc: 2 },
+    ],
   },
   {
     id: "ac-003",
@@ -297,6 +317,9 @@ export const adCampaigns: AdCampaign[] = [
     profit: 12,
     status: "Watch",
     recommendation: "$61 spent, ROAS under 2.0 but ATC promising — SOP: Watch",
+    budgetHistory: [
+      { budgetPerDay: 30, status: "current", spend: 61, revenue: 119, orders: 3, profit: 12, roas: 1.95, cpc: 0.88, atc: 9 },
+    ],
   },
   {
     id: "ac-004",
@@ -312,11 +335,14 @@ export const adCampaigns: AdCampaign[] = [
     profit: -22,
     status: "Kill",
     recommendation: "$22 spent, CPC > $1, 0 ATC — SOP: Kill",
+    budgetHistory: [
+      { budgetPerDay: 30, status: "current", spend: 22, revenue: 0, orders: 0, profit: -22, roas: 0, cpc: 1.34, atc: 0 },
+    ],
   },
 ];
 
 // ============================================================
-// 3. Profit Logs (14 days)
+// 3. Profit Logs (~60 days, 2 months)
 // ============================================================
 
 export type ProfitLog = {
@@ -471,6 +497,54 @@ export const profitLogs: ProfitLog[] = [
     roas: 3.06,
     profitPercent: 41.4,
   },
+  // ── Feb 2026 data (daysAgo 14–41) ──
+  { date: daysAgo(14), revenue: 389, cog: 80, adSpend: 148, transactionFee: 19.45, profit: 141.55, roas: 2.63, profitPercent: 36.4 },
+  { date: daysAgo(15), revenue: 275, cog: 56, adSpend: 120, transactionFee: 13.75, profit: 85.25, roas: 2.29, profitPercent: 31.0 },
+  { date: daysAgo(16), revenue: 523, cog: 108, adSpend: 185, transactionFee: 26.15, profit: 203.85, roas: 2.83, profitPercent: 39.0 },
+  { date: daysAgo(17), revenue: 105, cog: 24, adSpend: 82, transactionFee: 5.25, profit: -6.25, roas: 1.28, profitPercent: -6.0 },
+  { date: daysAgo(18), revenue: 462, cog: 96, adSpend: 170, transactionFee: 23.1, profit: 172.9, roas: 2.72, profitPercent: 37.4 },
+  { date: daysAgo(19), revenue: 334, cog: 68, adSpend: 132, transactionFee: 16.7, profit: 117.3, roas: 2.53, profitPercent: 35.1 },
+  { date: daysAgo(20), revenue: 91, cog: 20, adSpend: 78, transactionFee: 4.55, profit: -11.55, roas: 1.17, profitPercent: -12.7 },
+  { date: daysAgo(21), revenue: 548, cog: 114, adSpend: 190, transactionFee: 27.4, profit: 216.6, roas: 2.88, profitPercent: 39.5 },
+  { date: daysAgo(22), revenue: 412, cog: 84, adSpend: 155, transactionFee: 20.6, profit: 152.4, roas: 2.66, profitPercent: 37.0 },
+  { date: daysAgo(23), revenue: 178, cog: 38, adSpend: 98, transactionFee: 8.9, profit: 33.1, roas: 1.82, profitPercent: 18.6 },
+  { date: daysAgo(24), revenue: 496, cog: 102, adSpend: 175, transactionFee: 24.8, profit: 194.2, roas: 2.83, profitPercent: 39.2 },
+  { date: daysAgo(25), revenue: 230, cog: 48, adSpend: 115, transactionFee: 11.5, profit: 55.5, roas: 2.0, profitPercent: 24.1 },
+  { date: daysAgo(26), revenue: 367, cog: 76, adSpend: 140, transactionFee: 18.35, profit: 132.65, roas: 2.62, profitPercent: 36.1 },
+  { date: daysAgo(27), revenue: 582, cog: 120, adSpend: 195, transactionFee: 29.1, profit: 237.9, roas: 2.98, profitPercent: 40.9 },
+  { date: daysAgo(28), revenue: 145, cog: 32, adSpend: 92, transactionFee: 7.25, profit: 13.75, roas: 1.58, profitPercent: 9.5 },
+  { date: daysAgo(29), revenue: 438, cog: 90, adSpend: 162, transactionFee: 21.9, profit: 164.1, roas: 2.7, profitPercent: 37.5 },
+  { date: daysAgo(30), revenue: 301, cog: 62, adSpend: 125, transactionFee: 15.05, profit: 98.95, roas: 2.41, profitPercent: 32.9 },
+  { date: daysAgo(31), revenue: 76, cog: 18, adSpend: 72, transactionFee: 3.8, profit: -17.8, roas: 1.06, profitPercent: -23.4 },
+  { date: daysAgo(32), revenue: 415, cog: 86, adSpend: 158, transactionFee: 20.75, profit: 150.25, roas: 2.63, profitPercent: 36.2 },
+  { date: daysAgo(33), revenue: 289, cog: 60, adSpend: 118, transactionFee: 14.45, profit: 96.55, roas: 2.45, profitPercent: 33.4 },
+  { date: daysAgo(34), revenue: 507, cog: 104, adSpend: 180, transactionFee: 25.35, profit: 197.65, roas: 2.82, profitPercent: 39.0 },
+  { date: daysAgo(35), revenue: 168, cog: 36, adSpend: 95, transactionFee: 8.4, profit: 28.6, roas: 1.77, profitPercent: 17.0 },
+  { date: daysAgo(36), revenue: 453, cog: 94, adSpend: 168, transactionFee: 22.65, profit: 168.35, roas: 2.7, profitPercent: 37.2 },
+  { date: daysAgo(37), revenue: 124, cog: 28, adSpend: 86, transactionFee: 6.2, profit: 3.8, roas: 1.44, profitPercent: 3.1 },
+  { date: daysAgo(38), revenue: 378, cog: 78, adSpend: 142, transactionFee: 18.9, profit: 139.1, roas: 2.66, profitPercent: 36.8 },
+  { date: daysAgo(39), revenue: 541, cog: 112, adSpend: 188, transactionFee: 27.05, profit: 213.95, roas: 2.88, profitPercent: 39.5 },
+  { date: daysAgo(40), revenue: 203, cog: 42, adSpend: 108, transactionFee: 10.15, profit: 42.85, roas: 1.88, profitPercent: 21.1 },
+  { date: daysAgo(41), revenue: 467, cog: 96, adSpend: 172, transactionFee: 23.35, profit: 175.65, roas: 2.72, profitPercent: 37.6 },
+  // ── Jan 2026 data (daysAgo 42–59) ──
+  { date: daysAgo(42), revenue: 345, cog: 72, adSpend: 135, transactionFee: 17.25, profit: 120.75, roas: 2.56, profitPercent: 35.0 },
+  { date: daysAgo(43), revenue: 88, cog: 20, adSpend: 74, transactionFee: 4.4, profit: -10.4, roas: 1.19, profitPercent: -11.8 },
+  { date: daysAgo(44), revenue: 512, cog: 106, adSpend: 182, transactionFee: 25.6, profit: 198.4, roas: 2.81, profitPercent: 38.7 },
+  { date: daysAgo(45), revenue: 256, cog: 54, adSpend: 112, transactionFee: 12.8, profit: 77.2, roas: 2.29, profitPercent: 30.2 },
+  { date: daysAgo(46), revenue: 430, cog: 88, adSpend: 160, transactionFee: 21.5, profit: 160.5, roas: 2.69, profitPercent: 37.3 },
+  { date: daysAgo(47), revenue: 158, cog: 34, adSpend: 94, transactionFee: 7.9, profit: 22.1, roas: 1.68, profitPercent: 14.0 },
+  { date: daysAgo(48), revenue: 395, cog: 82, adSpend: 150, transactionFee: 19.75, profit: 143.25, roas: 2.63, profitPercent: 36.3 },
+  { date: daysAgo(49), revenue: 573, cog: 118, adSpend: 192, transactionFee: 28.65, profit: 234.35, roas: 2.98, profitPercent: 40.9 },
+  { date: daysAgo(50), revenue: 110, cog: 26, adSpend: 80, transactionFee: 5.5, profit: -1.5, roas: 1.38, profitPercent: -1.4 },
+  { date: daysAgo(51), revenue: 482, cog: 100, adSpend: 176, transactionFee: 24.1, profit: 181.9, roas: 2.74, profitPercent: 37.7 },
+  { date: daysAgo(52), revenue: 319, cog: 66, adSpend: 128, transactionFee: 15.95, profit: 109.05, roas: 2.49, profitPercent: 34.2 },
+  { date: daysAgo(53), revenue: 68, cog: 16, adSpend: 68, transactionFee: 3.4, profit: -19.4, roas: 1.0, profitPercent: -28.5 },
+  { date: daysAgo(54), revenue: 447, cog: 92, adSpend: 165, transactionFee: 22.35, profit: 167.65, roas: 2.71, profitPercent: 37.5 },
+  { date: daysAgo(55), revenue: 195, cog: 42, adSpend: 102, transactionFee: 9.75, profit: 41.25, roas: 1.91, profitPercent: 21.2 },
+  { date: daysAgo(56), revenue: 528, cog: 110, adSpend: 186, transactionFee: 26.4, profit: 205.6, roas: 2.84, profitPercent: 38.9 },
+  { date: daysAgo(57), revenue: 282, cog: 58, adSpend: 122, transactionFee: 14.1, profit: 87.9, roas: 2.31, profitPercent: 31.2 },
+  { date: daysAgo(58), revenue: 401, cog: 82, adSpend: 152, transactionFee: 20.05, profit: 146.95, roas: 2.64, profitPercent: 36.6 },
+  { date: daysAgo(59), revenue: 136, cog: 30, adSpend: 90, transactionFee: 6.8, profit: 9.2, roas: 1.51, profitPercent: 6.8 },
 ];
 
 // ============================================================
