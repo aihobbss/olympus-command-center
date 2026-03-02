@@ -150,7 +150,7 @@ function StatusCell({
       }}
     >
       {STATUS_OPTIONS.map((opt) => (
-        <option key={opt.value} value={opt.value}>
+        <option key={opt.value} value={opt.value} className="bg-[#1A1A24] text-[#F1F1F3]">
           {opt.label}
         </option>
       ))}
@@ -277,13 +277,13 @@ export function ResearchSheet() {
               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
             }}
           >
-            <option value="All">All Status</option>
-            <option value="Blank">Not Imported</option>
-            <option value="Queued">Queued</option>
-            <option value="Imported">Imported</option>
-            <option value="Scheduled">Scheduled</option>
-            <option value="Live">Live</option>
-            <option value="Killed">Killed</option>
+            <option value="All" className="bg-[#1A1A24] text-[#F1F1F3]">All Status</option>
+            <option value="Blank" className="bg-[#1A1A24] text-[#F1F1F3]">Not Imported</option>
+            <option value="Queued" className="bg-[#1A1A24] text-[#F1F1F3]">Queued</option>
+            <option value="Imported" className="bg-[#1A1A24] text-[#F1F1F3]">Imported</option>
+            <option value="Scheduled" className="bg-[#1A1A24] text-[#F1F1F3]">Scheduled</option>
+            <option value="Live" className="bg-[#1A1A24] text-[#F1F1F3]">Live</option>
+            <option value="Killed" className="bg-[#1A1A24] text-[#F1F1F3]">Killed</option>
           </select>
         </div>
 

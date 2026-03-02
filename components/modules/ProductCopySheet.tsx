@@ -48,7 +48,7 @@ function EditableCell({
         }}
         className={cn(
           "w-full text-left text-xs px-2 py-1 rounded",
-          "hover:bg-white/[0.04] transition-colors duration-100 cursor-text",
+          "hover:bg-white/[0.04] transition-colors duration-100 cursor-text truncate block",
           display != null ? "text-text-primary" : "text-text-muted",
           multiline && display && "line-clamp-2"
         )}
@@ -158,8 +158,8 @@ function CopyStatusCell({
         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
       }}
     >
-      <option value="Pending">Pending</option>
-      <option value="Completed">Completed</option>
+      <option value="Pending" className="bg-[#1A1A24] text-[#F1F1F3]">Pending</option>
+      <option value="Completed" className="bg-[#1A1A24] text-[#F1F1F3]">Completed</option>
     </select>
   );
 }
@@ -312,11 +312,11 @@ export function ProductCopySheet() {
               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
             }}
           >
-            <option value="All">All Status</option>
-            <option value="Blank">No Status</option>
-            <option value="Pending">Pending</option>
-            <option value="Generating">Generating</option>
-            <option value="Completed">Completed</option>
+            <option value="All" className="bg-[#1A1A24] text-[#F1F1F3]">All Status</option>
+            <option value="Blank" className="bg-[#1A1A24] text-[#F1F1F3]">No Status</option>
+            <option value="Pending" className="bg-[#1A1A24] text-[#F1F1F3]">Pending</option>
+            <option value="Generating" className="bg-[#1A1A24] text-[#F1F1F3]">Generating</option>
+            <option value="Completed" className="bg-[#1A1A24] text-[#F1F1F3]">Completed</option>
           </select>
         </div>
 
@@ -328,7 +328,16 @@ export function ProductCopySheet() {
 
       {/* ── Table ── */}
       <div className="overflow-x-auto scrollbar-hide -mx-1">
-        <table className="w-full min-w-[900px] text-left">
+        <table className="w-full min-w-[1100px] text-left table-fixed">
+          <colgroup>
+            <col className="w-[14%]" />
+            <col className="w-[18%]" />
+            <col className="w-[18%]" />
+            <col className="w-[17%]" />
+            <col className="w-[17%]" />
+            <col className="w-[12%]" />
+            <col className="w-[4%]" />
+          </colgroup>
           <thead>
             <tr className="border-b border-subtle">
               {[
@@ -356,7 +365,7 @@ export function ProductCopySheet() {
                 className="border-b border-subtle/50 hover:bg-white/[0.02] transition-colors duration-100"
               >
                 {/* Product Name */}
-                <td className="px-3 py-2.5 min-w-[160px]">
+                <td className="px-3 py-2.5 overflow-hidden">
                   <EditableCell
                     value={product.productName}
                     placeholder="Product name"
@@ -367,7 +376,7 @@ export function ProductCopySheet() {
                 </td>
 
                 {/* Product URL */}
-                <td className="px-3 py-2.5 min-w-[120px] max-w-[180px]">
+                <td className="px-3 py-2.5 overflow-hidden">
                   <EditableCell
                     value={product.productUrl}
                     placeholder="Product URL"
@@ -378,7 +387,7 @@ export function ProductCopySheet() {
                 </td>
 
                 {/* Image URL */}
-                <td className="px-3 py-2.5 min-w-[120px] max-w-[180px]">
+                <td className="px-3 py-2.5 overflow-hidden">
                   <EditableCell
                     value={product.imageUrl}
                     placeholder="Image URL"
@@ -389,7 +398,7 @@ export function ProductCopySheet() {
                 </td>
 
                 {/* Shopify Description */}
-                <td className="px-3 py-2.5 min-w-[180px] max-w-[240px]">
+                <td className="px-3 py-2.5 overflow-hidden">
                   <EditableCell
                     value={product.shopifyDescription}
                     placeholder="Generate to fill..."
@@ -403,7 +412,7 @@ export function ProductCopySheet() {
                 </td>
 
                 {/* Facebook Copy */}
-                <td className="px-3 py-2.5 min-w-[180px] max-w-[240px]">
+                <td className="px-3 py-2.5 overflow-hidden">
                   <EditableCell
                     value={product.facebookCopy}
                     placeholder="Generate to fill..."

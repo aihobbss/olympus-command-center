@@ -210,7 +210,7 @@ export const initialCopyProducts: ProductCopy[] = [
     imageUrl: "",
     shopifyDescription: "",
     facebookCopy: "",
-    status: "Generating",
+    status: "Pending",
   },
   {
     id: "pc-004",
