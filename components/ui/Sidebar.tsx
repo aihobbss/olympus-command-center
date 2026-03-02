@@ -5,7 +5,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
 import { navItems } from "@/lib/navigation";
-import { useAuthStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 type SidebarProps = {
@@ -33,12 +32,7 @@ const itemVariants = {
 
 export function Sidebar({ collapsed, onToggle, bannerOffset = 0, highlightedNavId }: SidebarProps) {
   const pathname = usePathname();
-  const user = useAuthStore((s) => s.user);
-
-  // Filter out admin-only nav items for non-coach users
-  const visibleNavItems = navItems.filter(
-    (item) => item.group !== "admin" || user?.role === "coach"
-  );
+  const visibleNavItems = navItems;
 
   return (
     <aside
@@ -93,15 +87,9 @@ export function Sidebar({ collapsed, onToggle, bannerOffset = 0, highlightedNavI
               pathname === item.href ||
               (item.href !== "/" && pathname.startsWith(item.href));
             const Icon = item.icon;
-            const isAdmin = item.group === "admin";
 
             return (
               <motion.div key={item.id} variants={itemVariants}>
-                {/* Divider before admin section */}
-                {isAdmin && (
-                  <div className="mx-2 my-3 h-px bg-[var(--border-subtle)]" />
-                )}
-
                 <Link
                   href={item.href}
                   data-tour-id={item.id}

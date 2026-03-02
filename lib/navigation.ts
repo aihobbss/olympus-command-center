@@ -69,11 +69,11 @@ export const navItems: NavItem[] = [
     group: "main",
   },
   {
-    id: "coach-view",
-    label: "Coach View",
-    href: "/coach-view",
+    id: "collaborators",
+    label: "Collaborators",
+    href: "/collaborators",
     icon: Users,
-    group: "admin",
+    group: "main",
   },
 ];
 

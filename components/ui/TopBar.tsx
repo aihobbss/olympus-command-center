@@ -1,9 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
-import Link from "next/link";
-import { Bell, ChevronDown, Compass, ShieldCheck, LogOut } from "lucide-react";
+import { Bell, ChevronDown, Compass, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { mockStores } from "@/lib/navigation";
 import { useStoreContext, useDemoStore, useAuthStore } from "@/lib/store";
@@ -21,8 +19,6 @@ type TopBarProps = {
 };
 
 export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
-  const pathname = usePathname();
-  const isCoachView = pathname === "/coach-view";
   const { selectedStore, setSelectedStore } = useStoreContext();
   const { startTour } = useDemoStore();
   const user = useAuthStore((s) => s.user);
@@ -192,22 +188,6 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
 
         <div className="hidden sm:block w-px h-5 bg-[var(--border-subtle)]" />
 
-        {/* Coach View toggle — only for coaches */}
-        {user?.role === "coach" && (
-          <Link
-            href={isCoachView ? "/research" : "/coach-view"}
-            className={cn(
-              "hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors duration-150",
-              isCoachView
-                ? "bg-accent-indigo/15 text-accent-indigo"
-                : "text-text-muted hover:text-text-secondary hover:bg-white/[0.04]"
-            )}
-          >
-            <ShieldCheck size={13} strokeWidth={2} />
-            {isCoachView ? "Coach Mode" : "Coach View"}
-          </Link>
-        )}
-
         {/* Notification bell */}
         <button
           className={cn(
@@ -238,9 +218,7 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
               {user?.name}
             </div>
             <div className="text-[10px] text-text-muted leading-tight capitalize">
-              {user?.role === "coach"
-                ? isCoachView ? "Coach" : "Owner"
-                : "Owner"}
+              {user?.role ?? "Owner"}
             </div>
           </div>
           {/* Logout */}

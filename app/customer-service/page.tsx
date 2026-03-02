@@ -58,7 +58,7 @@ const PRODUCT_PRICES: Record<string, number> = {
   "Avalon Puffer Vest": 55,
 };
 
-type RefundType = "30%" | "50%" | "full";
+type RefundType = "30%" | "50%" | "70%" | "store-credit";
 type Tab = "inbox" | "templates";
 
 const TAB_OPTIONS: { key: Tab; label: string }[] = [
@@ -170,7 +170,8 @@ export default function CustomerServicePage() {
       let amount: number;
       if (type === "30%") amount = Math.round(price * 0.3 * 100) / 100;
       else if (type === "50%") amount = Math.round(price * 0.5 * 100) / 100;
-      else amount = price;
+      else if (type === "70%") amount = Math.round(price * 0.7 * 100) / 100;
+      else amount = price; // store-credit = full price
 
       setRefundModal({
         open: true,
@@ -551,9 +552,9 @@ export default function CustomerServicePage() {
                       50% Refund
                     </button>
 
-                    {/* Full Refund */}
+                    {/* 70% Refund */}
                     <button
-                      onClick={() => handleOpenRefund("full")}
+                      onClick={() => handleOpenRefund("70%")}
                       disabled={isResolved(selectedCase.id)}
                       className={cn(
                         "px-3 py-2 rounded-lg text-[12px] font-medium transition-colors",
@@ -562,7 +563,21 @@ export default function CustomerServicePage() {
                           : "bg-accent-red/10 text-accent-red hover:bg-accent-red/20"
                       )}
                     >
-                      Full Refund
+                      70% Refund
+                    </button>
+
+                    {/* 100% Store Credit */}
+                    <button
+                      onClick={() => handleOpenRefund("store-credit")}
+                      disabled={isResolved(selectedCase.id)}
+                      className={cn(
+                        "px-3 py-2 rounded-lg text-[12px] font-medium transition-colors",
+                        isResolved(selectedCase.id)
+                          ? "bg-white/[0.03] text-text-muted cursor-not-allowed"
+                          : "bg-accent-emerald/10 text-accent-emerald hover:bg-accent-emerald/20"
+                      )}
+                    >
+                      100% Store Credit
                     </button>
 
                     {/* Spacer */}
@@ -608,9 +623,17 @@ export default function CustomerServicePage() {
           setRefundModal((prev) => ({ ...prev, open: false }))
         }
         onConfirm={handleConfirmRefund}
-        title={`Issue ${refundModal.type === "full" ? "full" : refundModal.type} refund?`}
-        description={`Issue £${refundModal.amount.toFixed(2)} refund to ${refundModal.customerName}. This will be processed via Shopify and cannot be undone.`}
-        confirmLabel={`Refund £${refundModal.amount.toFixed(2)}`}
+        title={refundModal.type === "store-credit" ? "Issue 100% store credit?" : `Issue ${refundModal.type} refund?`}
+        description={
+          refundModal.type === "store-credit"
+            ? `Issue £${refundModal.amount.toFixed(2)} store credit to ${refundModal.customerName}. This will be added to their account and cannot be undone.`
+            : `Issue £${refundModal.amount.toFixed(2)} refund to ${refundModal.customerName}. This will be processed via Shopify and cannot be undone.`
+        }
+        confirmLabel={
+          refundModal.type === "store-credit"
+            ? `Credit £${refundModal.amount.toFixed(2)}`
+            : `Refund £${refundModal.amount.toFixed(2)}`
+        }
         variant="danger"
       />
     </div>

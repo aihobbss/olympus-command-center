@@ -967,3 +967,178 @@ export const studentStores: StudentStore[] = [
     status: "At Risk",
   },
 ];
+
+// ============================================================
+// 6. Collaborators (Requests + Access)
+// ============================================================
+
+// Incoming collaboration requests — someone requesting access to YOUR store
+export type CollabRequest = {
+  id: string;
+  requesterId: string;
+  requesterName: string;
+  requesterInitials: string;
+  targetStoreId: string;
+  sentAt: string; // ISO
+  status: "pending" | "approved" | "denied";
+};
+
+// A store where YOU have been approved as a collaborator
+export type CollabAccess = {
+  id: string;
+  storeId: string;
+  storeName: string;
+  ownerName: string;
+  ownerInitials: string;
+  market: "UK" | "AU" | "USA";
+  currency: string;
+  revenue: number;
+  adSpend: number;
+  profit: number;
+  roas: number;
+  status: "Active" | "Struggling" | "At Risk";
+  addedAt: string; // ISO
+};
+
+// Sent collaboration requests — requests YOU have sent to access someone else's store
+export type SentCollabRequest = {
+  id: string;
+  targetStoreName: string;
+  targetOwnerName: string;
+  sentAt: string; // ISO
+  status: "pending" | "approved" | "denied";
+};
+
+// Incoming requests to Jake's store (Vantage Melbourne)
+// Keyed by userId so each user sees the right set of requests
+export const INCOMING_COLLAB_REQUESTS: Record<string, CollabRequest[]> = {
+  jake: [
+    {
+      id: "req-001",
+      requesterId: "simo",
+      requesterName: "Simo",
+      requesterInitials: "S",
+      targetStoreId: "vantage-melbourne",
+      sentAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      status: "pending",
+    },
+    {
+      id: "req-002",
+      requesterId: "aidan",
+      requesterName: "Aidan",
+      requesterInitials: "A",
+      targetStoreId: "vantage-melbourne",
+      sentAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      status: "pending",
+    },
+  ],
+  simo: [],
+};
+
+// Stores where the user has approved collaborator access
+export const MY_COLLAB_ACCESS: Record<string, CollabAccess[]> = {
+  simo: [
+    {
+      id: "ca-001",
+      storeId: "vantage-melbourne",
+      storeName: "Vantage Melbourne",
+      ownerName: "Jake",
+      ownerInitials: "J",
+      market: "AU",
+      currency: "A$",
+      revenue: 4210,
+      adSpend: 1840,
+      profit: 892,
+      roas: 2.29,
+      status: "Active",
+      addedAt: "2025-10-15T09:00:00.000Z",
+    },
+    {
+      id: "ca-002",
+      storeId: "harlow-co",
+      storeName: "Harlow & Co",
+      ownerName: "Maya",
+      ownerInitials: "M",
+      market: "UK",
+      currency: "£",
+      revenue: 2890,
+      adSpend: 1340,
+      profit: 430,
+      roas: 2.16,
+      status: "Active",
+      addedAt: "2025-11-01T09:00:00.000Z",
+    },
+    {
+      id: "ca-003",
+      storeId: "norcroft-studio",
+      storeName: "Norcroft Studio",
+      ownerName: "Tom",
+      ownerInitials: "T",
+      market: "UK",
+      currency: "£",
+      revenue: 980,
+      adSpend: 640,
+      profit: -120,
+      roas: 1.53,
+      status: "Struggling",
+      addedAt: "2025-12-10T09:00:00.000Z",
+    },
+    {
+      id: "ca-004",
+      storeId: "elara-fashion",
+      storeName: "Elara Fashion",
+      ownerName: "Priya",
+      ownerInitials: "P",
+      market: "UK",
+      currency: "£",
+      revenue: 210,
+      adSpend: 340,
+      profit: -280,
+      roas: 0.62,
+      status: "At Risk",
+      addedAt: "2026-01-20T09:00:00.000Z",
+    },
+  ],
+  jake: [],
+};
+
+// Sent requests — what you've sent out (for the "Request Access" section)
+export const SENT_COLLAB_REQUESTS: Record<string, SentCollabRequest[]> = {
+  simo: [
+    {
+      id: "sr-001",
+      targetStoreName: "Vantage Melbourne",
+      targetOwnerName: "Jake",
+      sentAt: "2025-10-13T09:00:00.000Z",
+      status: "approved",
+    },
+    {
+      id: "sr-002",
+      targetStoreName: "Harlow & Co",
+      targetOwnerName: "Maya",
+      sentAt: "2025-10-29T09:00:00.000Z",
+      status: "approved",
+    },
+    {
+      id: "sr-003",
+      targetStoreName: "Norcroft Studio",
+      targetOwnerName: "Tom",
+      sentAt: "2025-12-08T09:00:00.000Z",
+      status: "approved",
+    },
+    {
+      id: "sr-004",
+      targetStoreName: "Elara Fashion",
+      targetOwnerName: "Priya",
+      sentAt: "2026-01-18T09:00:00.000Z",
+      status: "approved",
+    },
+  ],
+  jake: [],
+};
+
+// Store IDs for the "share your store ID" helper text
+export const USER_STORE_IDS: Record<string, string> = {
+  jake: "OLY-VMB-001",
+  simo: "OLY-LDN-000",
+};
