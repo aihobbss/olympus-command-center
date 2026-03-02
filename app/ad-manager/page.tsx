@@ -8,6 +8,7 @@ import { CampaignCard } from "@/components/modules/CampaignCard";
 import { AdActionPanel } from "@/components/modules/AdActionPanel";
 import { AdCharts } from "@/components/modules/AdCharts";
 import { adCampaigns, type AdCampaign } from "@/data/mock";
+import { useStoreContext } from "@/lib/store";
 
 // ─── Period scaling factors ─────────────────────────────────
 // Multipliers that simulate how aggregated numbers change
@@ -29,35 +30,37 @@ function jitter(base: number, seed: number): number {
 
 // ─── Compute recommendation from scaled data ────────────────
 
+// ─── Exchange rates (store currency → USD) ─────────────────
+const STORE_TO_USD: Record<string, number> = { UK: 1.27, AU: 0.63 };
+
 function computeRecommendation(c: {
   spend: number;
   cpc: number;
   atc: number;
   roas: number;
-  currency: string;
 }): { status: AdCampaign["status"]; recommendation: string } {
   if (c.spend >= 10 && c.cpc > 1 && c.atc === 0) {
     return {
       status: "Kill",
-      recommendation: `${c.currency}${Math.round(c.spend)} spent, CPC > ${c.currency}1, 0 ATC — SOP: Kill`,
+      recommendation: `$${Math.round(c.spend)} spent, CPC > $1, 0 ATC — SOP: Kill`,
     };
   }
   if (c.roas >= 2.0 && c.atc >= 5) {
     return {
       status: "Scaling",
-      recommendation: `ROAS above 2.0 with strong ATC — SOP: Scale +50%`,
+      recommendation: `ROAS above 2.0 with strong ATC — SOP: Scale +100%`,
     };
   }
   if (c.roas >= 1.0 && c.roas < 2.0) {
     return {
       status: "Watch",
-      recommendation: `${c.currency}${Math.round(c.spend)} spent, ROAS under 2.0 but ATC promising — SOP: Watch`,
+      recommendation: `$${Math.round(c.spend)} spent, ROAS under 2.0 but ATC promising — SOP: Watch`,
     };
   }
   if (c.spend >= 10 && c.cpc > 1 && c.atc <= 2) {
     return {
       status: "Kill",
-      recommendation: `${c.currency}${Math.round(c.spend)} spent, CPC > ${c.currency}1, only ${c.atc} ATC — SOP: Kill`,
+      recommendation: `$${Math.round(c.spend)} spent, CPC > $1, only ${c.atc} ATC — SOP: Kill`,
     };
   }
   return {
@@ -73,6 +76,14 @@ export default function AdManagerPage() {
   const [selectedCampaign, setSelectedCampaign] =
     useState<AdCampaign | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+
+  const { selectedStore } = useStoreContext();
+  const storeCurrency = selectedStore.currency;
+  const rate = STORE_TO_USD[selectedStore.market] ?? 1;
+  const toUsd = useCallback(
+    (localAmount: number) => Math.round(localAmount * rate),
+    [rate]
+  );
 
   // ── Scale campaigns by period factor ──
 
@@ -94,7 +105,6 @@ export default function AdManagerPage() {
         cpc,
         atc,
         roas,
-        currency: c.currency,
       });
 
       return {
@@ -188,19 +198,21 @@ export default function AdManagerPage() {
           label="Total Spend"
           value={totals.spend}
           format="currency"
-          currency="£"
+          currency="$"
         />
         <MetricCard
           label="Revenue"
           value={totals.revenue}
           format="currency"
-          currency="£"
+          currency={storeCurrency}
+          subtitle={`$${toUsd(totals.revenue).toLocaleString("en-GB")} USD`}
         />
         <MetricCard
           label="Profit"
           value={totals.profit}
           format="currency"
-          currency="£"
+          currency={storeCurrency}
+          subtitle={`$${toUsd(totals.profit).toLocaleString("en-GB")} USD`}
         />
         <MetricCard label="Orders" value={totals.orders} format="number" />
         <MetricCard
@@ -218,6 +230,8 @@ export default function AdManagerPage() {
             key={campaign.id}
             campaign={campaign}
             onClick={handleCardClick}
+            storeCurrency={storeCurrency}
+            toUsd={toUsd}
           />
         ))}
       </div>
@@ -233,6 +247,8 @@ export default function AdManagerPage() {
         onScale={handleScale}
         onKill={handleKill}
         onPass={handlePass}
+        storeCurrency={storeCurrency}
+        toUsd={toUsd}
       />
     </div>
   );

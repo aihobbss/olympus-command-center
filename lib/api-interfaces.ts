@@ -38,8 +38,8 @@ export interface AdCampaign {
   id: string;
   campaignName: string;
   product: string;
-  market: "AU" | "UK" | "USA";
   spend: number;
+  budget: number;
   cpc: number;
   atc: number;
   roas: number;
@@ -48,7 +48,6 @@ export interface AdCampaign {
   profit: number;
   status: "Scaling" | "Kill" | "Watch";
   recommendation: string;
-  currency: "£" | "$";
 }
 
 /** Daily profit-tracker row. */
@@ -244,8 +243,6 @@ export interface ResearchApi {
 
 /** Filters accepted by the campaign listing endpoint. */
 export interface FetchCampaignsParams {
-  /** Filter by market geo. */
-  market?: AdCampaign["market"];
   /** Filter by SOP recommendation status. */
   status?: AdCampaign["status"];
   /** Only show campaigns for a specific product. */

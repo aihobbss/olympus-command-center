@@ -240,8 +240,8 @@ export type AdCampaign = {
   id: string;
   campaignName: string;
   product: string;
-  market: "AU" | "UK" | "USA";
   spend: number;
+  budget: number;
   cpc: number;
   atc: number;
   roas: number;
@@ -250,16 +250,15 @@ export type AdCampaign = {
   profit: number;
   status: "Scaling" | "Kill" | "Watch";
   recommendation: string;
-  currency: "£" | "$";
 };
 
 export const adCampaigns: AdCampaign[] = [
   {
     id: "ac-001",
-    campaignName: "Harrington Trainers — AU",
+    campaignName: "Harrington Trainers",
     product: "Harrington Trainers",
-    market: "AU",
     spend: 87,
+    budget: 60,
     cpc: 0.72,
     atc: 14,
     roas: 2.41,
@@ -267,15 +266,14 @@ export const adCampaigns: AdCampaign[] = [
     orders: 6,
     profit: 58,
     status: "Scaling",
-    recommendation: "ROAS above 2.0 with strong ATC — SOP: Scale +50%",
-    currency: "£",
+    recommendation: "ROAS above 2.0 with strong ATC — SOP: Scale +100%",
   },
   {
     id: "ac-002",
-    campaignName: "Durango Road Sneakers — UK",
+    campaignName: "Durango Road Sneakers",
     product: "Durango Road Sneakers",
-    market: "UK",
     spend: 34,
+    budget: 30,
     cpc: 1.12,
     atc: 2,
     roas: 0.9,
@@ -283,15 +281,14 @@ export const adCampaigns: AdCampaign[] = [
     orders: 1,
     profit: -18,
     status: "Kill",
-    recommendation: "£34 spent, CPC > £1, only 2 ATC — SOP: Kill",
-    currency: "£",
+    recommendation: "$34 spent, CPC > $1, only 2 ATC — SOP: Kill",
   },
   {
     id: "ac-003",
-    campaignName: "Maven Bomber Jacket — AU",
+    campaignName: "Maven Bomber Jacket",
     product: "Maven Bomber Jacket",
-    market: "AU",
     spend: 61,
+    budget: 30,
     cpc: 0.88,
     atc: 9,
     roas: 1.95,
@@ -299,15 +296,14 @@ export const adCampaigns: AdCampaign[] = [
     orders: 3,
     profit: 12,
     status: "Watch",
-    recommendation: "£61 spent, ROAS under 2.0 but ATC promising — SOP: Watch",
-    currency: "£",
+    recommendation: "$61 spent, ROAS under 2.0 but ATC promising — SOP: Watch",
   },
   {
     id: "ac-004",
-    campaignName: "Matteo Cotton Pants — USA",
+    campaignName: "Matteo Cotton Pants",
     product: "Matteo Cotton Pants",
-    market: "USA",
     spend: 22,
+    budget: 30,
     cpc: 1.34,
     atc: 0,
     roas: 0,
@@ -316,7 +312,6 @@ export const adCampaigns: AdCampaign[] = [
     profit: -22,
     status: "Kill",
     recommendation: "$22 spent, CPC > $1, 0 ATC — SOP: Kill",
-    currency: "£",
   },
 ];
 

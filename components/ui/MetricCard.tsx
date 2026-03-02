@@ -12,6 +12,7 @@ export interface MetricCardProps {
   deltaType?: "up" | "down";
   format?: "currency" | "percent" | "number";
   currency?: string;
+  subtitle?: string;
   className?: string;
 }
 
@@ -54,6 +55,7 @@ export function MetricCard({
   deltaType,
   format = "number",
   currency = "£",
+  subtitle,
   className,
 }: MetricCardProps) {
   const [display, setDisplay] = useState(0);
@@ -77,9 +79,16 @@ export function MetricCard({
         {label}
       </div>
       <div className="flex items-end justify-between gap-3">
-        <span className="text-[26px] font-jetbrains font-semibold text-text-primary leading-none tracking-tight">
-          {formatDisplay(display, format, currency)}
-        </span>
+        <div className="flex flex-col">
+          <span className="text-[26px] font-jetbrains font-semibold text-text-primary leading-none tracking-tight">
+            {formatDisplay(display, format, currency)}
+          </span>
+          {subtitle && (
+            <span className="text-[12px] font-jetbrains text-text-secondary mt-1">
+              {subtitle}
+            </span>
+          )}
+        </div>
 
         {delta !== undefined && deltaType && (
           <div

@@ -13,18 +13,13 @@ interface PerAdCardProps {
   campaign: AdCampaign;
   cog: number;
   onCogChange: (id: string, newCog: number) => void;
-  currency?: string;
+  storeCurrency: string;
+  toUsd: (localAmount: number) => number;
 }
 
 // ────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────
-
-const marketColors: Record<AdCampaign["market"], string> = {
-  AU: "bg-accent-amber/15 text-accent-amber",
-  UK: "bg-accent-emerald/15 text-accent-emerald",
-  USA: "bg-accent-indigo/15 text-accent-indigo",
-};
 
 function formatCurrency(
   value: number,
@@ -53,26 +48,29 @@ export function PerAdCard({
   campaign,
   cog,
   onCogChange,
-  currency = "$",
+  storeCurrency,
+  toUsd,
 }: PerAdCardProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(cog);
 
-  const { product, market, revenue, spend, orders, roas, profit, cpc } =
+  const { product, revenue, spend, orders, roas, profit, cpc, budget } =
     campaign;
 
   const metrics: {
     label: string;
     value: string;
+    subtitle?: string;
     colorClass?: string;
   }[] = [
     {
       label: "Revenue",
-      value: formatCurrency(revenue, currency),
+      value: formatCurrency(revenue, storeCurrency),
+      subtitle: `$${toUsd(revenue).toLocaleString("en-GB")} USD`,
     },
     {
       label: "Ad Spend",
-      value: formatCurrency(spend, currency),
+      value: formatCurrency(spend, "$"),
     },
     {
       label: "Orders",
@@ -85,12 +83,17 @@ export function PerAdCard({
     },
     {
       label: "Profit",
-      value: formatCurrency(profit, currency),
+      value: formatCurrency(profit, storeCurrency),
+      subtitle: `$${toUsd(profit).toLocaleString("en-GB")} USD`,
       colorClass: profit < 0 ? "text-accent-red" : undefined,
     },
     {
       label: "CPC",
-      value: formatCurrency(cpc, currency, 2),
+      value: formatCurrency(cpc, "$", 2),
+    },
+    {
+      label: "Budget",
+      value: `${formatCurrency(budget, "$")}/day`,
     },
   ];
 
@@ -106,23 +109,12 @@ export function PerAdCard({
 
   return (
     <div className="card p-4 flex flex-col gap-3">
-      {/* ── Header: Product Name + Market Badge ─────────────── */}
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-syne font-semibold text-text-primary leading-snug truncate">
-          {product}
-        </h3>
-        <span
-          className={cn(
-            "inline-flex items-center rounded-full px-2 py-0.5",
-            "text-[10px] font-medium tracking-wide shrink-0",
-            marketColors[market]
-          )}
-        >
-          {market}
-        </span>
-      </div>
+      {/* ── Header: Product Name ──────────────────────────── */}
+      <h3 className="text-sm font-syne font-semibold text-text-primary leading-snug truncate">
+        {product}
+      </h3>
 
-      {/* ── Metrics Grid (2 cols x 3 rows) ──────────────────── */}
+      {/* ── Metrics Grid (2 cols) ─────────────────────────── */}
       <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
         {metrics.map((m) => (
           <div key={m.label} className="flex flex-col gap-0.5">
@@ -137,11 +129,16 @@ export function PerAdCard({
             >
               {m.value}
             </span>
+            {m.subtitle && (
+              <span className="text-[10px] font-jetbrains text-text-secondary leading-none">
+                {m.subtitle}
+              </span>
+            )}
           </div>
         ))}
       </div>
 
-      {/* ── COG Section ─────────────────────────────────────── */}
+      {/* ── COG Section ───────────────────────────────────── */}
       <div className="border-t border-subtle pt-3 mt-auto">
         {!editing ? (
           <div className="flex items-center justify-between">
@@ -150,7 +147,7 @@ export function PerAdCard({
                 COG
               </span>
               <span className="text-[13px] font-jetbrains text-text-primary tabular-nums leading-tight">
-                {formatCurrency(cog, currency, 2)}
+                {formatCurrency(cog, "$", 2)}
               </span>
             </div>
             <button
@@ -177,7 +174,7 @@ export function PerAdCard({
             </span>
             <div className="relative">
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-text-muted font-jetbrains pointer-events-none">
-                {currency}
+                $
               </span>
               <input
                 type="number"

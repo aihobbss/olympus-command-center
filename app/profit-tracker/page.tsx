@@ -13,10 +13,12 @@ import ProfitChart from "@/components/modules/ProfitChart";
 import { PerAdCard } from "@/components/modules/PerAdCard";
 import { profitLogs, adCampaigns } from "@/data/mock";
 import { cn } from "@/lib/utils";
+import { useStoreContext } from "@/lib/store";
 
 // ─── Constants ──────────────────────────────────────────────
 
 const GBP_TO_USD = 1.27;
+const STORE_TO_USD: Record<string, number> = { UK: 1.27, AU: 0.63 };
 
 type View = "store-logs" | "per-ad";
 
@@ -63,6 +65,14 @@ export default function ProfitTrackerPage() {
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState(() => new Date());
   const [cogs, setCogs] = useState<Record<string, number>>(DEFAULT_COGS);
+
+  const { selectedStore } = useStoreContext();
+  const storeCurrency = selectedStore.currency;
+  const ptRate = STORE_TO_USD[selectedStore.market] ?? 1;
+  const toUsd = useCallback(
+    (localAmount: number) => Math.round(localAmount * ptRate),
+    [ptRate]
+  );
 
   // ── Aggregated totals ──
 
@@ -346,7 +356,8 @@ export default function ProfitTrackerPage() {
               campaign={campaign}
               cog={cogs[campaign.id] ?? 0}
               onCogChange={handleCogChange}
-              currency="£"
+              storeCurrency={storeCurrency}
+              toUsd={toUsd}
             />
           ))}
         </div>

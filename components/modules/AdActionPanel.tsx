@@ -15,18 +15,11 @@ interface AdActionPanelProps {
   onScale: (id: string, newBudget: number) => void;
   onKill: (id: string) => void;
   onPass: (id: string) => void;
+  storeCurrency: string;
+  toUsd: (localAmount: number) => number;
 }
 
 // ─── Helpers ────────────────────────────────────────────────
-
-const marketConfig: Record<
-  AdCampaign["market"],
-  { bg: string; text: string }
-> = {
-  AU: { bg: "bg-accent-amber/15", text: "text-accent-amber" },
-  UK: { bg: "bg-accent-emerald/15", text: "text-accent-emerald" },
-  USA: { bg: "bg-accent-indigo/15", text: "text-accent-indigo" },
-};
 
 const statusVariant: Record<
   AdCampaign["status"],
@@ -61,6 +54,8 @@ export function AdActionPanel({
   onScale,
   onKill,
   onPass,
+  storeCurrency,
+  toUsd,
 }: AdActionPanelProps) {
   const [showScaleInput, setShowScaleInput] = useState(false);
   const [scaleBudget, setScaleBudget] = useState(0);
@@ -71,13 +66,11 @@ export function AdActionPanel({
     setShowScaleInput(false);
     setShowKillConfirm(false);
     if (campaign) {
-      setScaleBudget(Math.round(campaign.spend * 1.5));
+      setScaleBudget(Math.round(campaign.budget * 2));
     }
   }, [campaign]);
 
   if (!campaign) return null;
-
-  const { bg: marketBg, text: marketText } = marketConfig[campaign.market];
 
   return (
     <>
@@ -88,25 +81,14 @@ export function AdActionPanel({
       >
         {/* ── Campaign Summary ────────────────────────────── */}
         <div className="space-y-4">
-          {/* Name + Product + Market */}
+          {/* Name + Product */}
           <div>
             <h4 className="font-syne text-lg font-semibold text-text-primary leading-tight">
               {campaign.campaignName}
             </h4>
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-sm text-text-secondary">
-                {campaign.product}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
-                  marketBg,
-                  marketText
-                )}
-              >
-                {campaign.market}
-              </span>
-            </div>
+            <span className="text-sm text-text-secondary mt-1 block">
+              {campaign.product}
+            </span>
           </div>
 
           {/* Status */}
@@ -116,7 +98,7 @@ export function AdActionPanel({
             size="md"
           />
 
-          {/* Metrics 2x2 Grid */}
+          {/* Metrics Grid */}
           <div className="grid grid-cols-2 gap-3">
             {/* Spend */}
             <div className="rounded-lg border border-subtle bg-white/[0.03] p-3">
@@ -124,17 +106,20 @@ export function AdActionPanel({
                 Spend
               </div>
               <div className="font-jetbrains text-sm font-semibold text-text-primary">
-                {formatCurrency(campaign.spend, campaign.currency)}
+                {formatCurrency(campaign.spend, "$")}
               </div>
             </div>
 
-            {/* Revenue */}
+            {/* Revenue — dual currency */}
             <div className="rounded-lg border border-subtle bg-white/[0.03] p-3">
               <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-1">
                 Revenue
               </div>
               <div className="font-jetbrains text-sm font-semibold text-text-primary">
-                {formatCurrency(campaign.revenue, campaign.currency)}
+                {formatCurrency(campaign.revenue, storeCurrency)}
+              </div>
+              <div className="font-jetbrains text-[11px] text-text-secondary mt-0.5">
+                ${toUsd(campaign.revenue).toLocaleString("en-GB")} USD
               </div>
             </div>
 
@@ -157,7 +142,7 @@ export function AdActionPanel({
               </div>
             </div>
 
-            {/* Profit */}
+            {/* Profit — dual currency */}
             <div className="rounded-lg border border-subtle bg-white/[0.03] p-3">
               <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-1">
                 Profit
@@ -170,7 +155,30 @@ export function AdActionPanel({
                     : "text-text-primary"
                 )}
               >
-                {formatCurrency(campaign.profit, campaign.currency)}
+                {formatCurrency(campaign.profit, storeCurrency)}
+              </div>
+              <div className="font-jetbrains text-[11px] text-text-secondary mt-0.5">
+                ${toUsd(campaign.profit).toLocaleString("en-GB")} USD
+              </div>
+            </div>
+
+            {/* Budget */}
+            <div className="rounded-lg border border-subtle bg-white/[0.03] p-3">
+              <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-1">
+                Budget
+              </div>
+              <div className="font-jetbrains text-sm font-semibold text-text-primary">
+                {formatCurrency(campaign.budget, "$")}/day
+              </div>
+            </div>
+
+            {/* CPC */}
+            <div className="rounded-lg border border-subtle bg-white/[0.03] p-3">
+              <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-1">
+                CPC
+              </div>
+              <div className="font-jetbrains text-sm font-semibold text-text-primary">
+                ${campaign.cpc.toFixed(2)}
               </div>
             </div>
           </div>
@@ -213,7 +221,7 @@ export function AdActionPanel({
                 </span>
                 <div className="relative mt-1.5">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted font-jetbrains">
-                    {campaign.currency}
+                    $
                   </span>
                   <input
                     type="number"

@@ -13,6 +13,8 @@ import type { AdCampaign } from "@/data/mock";
 interface CampaignCardProps {
   campaign: AdCampaign;
   onClick: (campaign: AdCampaign) => void;
+  storeCurrency: string;
+  toUsd: (localAmount: number) => number;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -26,12 +28,6 @@ const statusVariantMap: Record<
   Scaling: "success",
   Kill: "danger",
   Watch: "warning",
-};
-
-const marketColors: Record<AdCampaign["market"], string> = {
-  AU: "bg-accent-amber/15 text-accent-amber ring-1 ring-accent-amber/20",
-  UK: "bg-accent-emerald/15 text-accent-emerald ring-1 ring-accent-emerald/20",
-  USA: "bg-accent-indigo/15 text-accent-indigo ring-1 ring-accent-indigo/20",
 };
 
 function formatCurrency(
@@ -65,12 +61,17 @@ function roasColor(roas: number): string {
 // Component
 // ────────────────────────────────────────────────────────────
 
-export function CampaignCard({ campaign, onClick }: CampaignCardProps) {
+export function CampaignCard({
+  campaign,
+  onClick,
+  storeCurrency,
+  toUsd,
+}: CampaignCardProps) {
   const {
     campaignName,
     product,
-    market,
     spend,
+    budget,
     cpc,
     atc,
     roas,
@@ -78,21 +79,25 @@ export function CampaignCard({ campaign, onClick }: CampaignCardProps) {
     profit,
     status,
     recommendation,
-    currency,
   } = campaign;
 
   const metrics: {
     label: string;
     value: string;
+    subtitle?: string;
     colorClass?: string;
   }[] = [
     {
       label: "Spend",
-      value: formatCurrency(spend, currency),
+      value: formatCurrency(spend, "$"),
+    },
+    {
+      label: "Budget",
+      value: `${formatCurrency(budget, "$")}/day`,
     },
     {
       label: "CPC",
-      value: formatCurrency(cpc, currency, 2),
+      value: formatCurrency(cpc, "$", 2),
     },
     {
       label: "ATC",
@@ -105,12 +110,18 @@ export function CampaignCard({ campaign, onClick }: CampaignCardProps) {
     },
     {
       label: "Revenue",
-      value: formatCurrency(revenue, currency),
+      value: formatCurrency(revenue, storeCurrency),
+      subtitle: `$${toUsd(revenue).toLocaleString("en-GB")} USD`,
     },
     {
       label: "Profit",
-      value: formatCurrency(profit, currency),
+      value: formatCurrency(profit, storeCurrency),
+      subtitle: `$${toUsd(profit).toLocaleString("en-GB")} USD`,
       colorClass: profit < 0 ? "text-accent-red" : undefined,
+    },
+    {
+      label: "Orders",
+      value: campaign.orders.toLocaleString("en-GB"),
     },
   ];
 
@@ -152,21 +163,10 @@ export function CampaignCard({ campaign, onClick }: CampaignCardProps) {
           />
         </div>
 
-        {/* Product + Market */}
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] text-text-secondary truncate">
-            {product}
-          </span>
-          <span
-            className={cn(
-              "inline-flex items-center rounded-full px-2 py-0.5",
-              "text-[10px] font-medium tracking-wide shrink-0",
-              marketColors[market]
-            )}
-          >
-            {market}
-          </span>
-        </div>
+        {/* Product */}
+        <span className="text-[12px] text-text-secondary truncate">
+          {product}
+        </span>
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-3 gap-x-3 gap-y-2.5 pt-1">
@@ -183,6 +183,11 @@ export function CampaignCard({ campaign, onClick }: CampaignCardProps) {
               >
                 {m.value}
               </span>
+              {m.subtitle && (
+                <span className="text-[10px] font-jetbrains text-text-secondary leading-none">
+                  {m.subtitle}
+                </span>
+              )}
             </div>
           ))}
         </div>
