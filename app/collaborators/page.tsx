@@ -657,12 +657,14 @@ export default function CollaboratorsPage() {
                 </h3>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart
-                    data={scaledAccessList.map((s) => ({
-                      name: s.storeName.split(" ")[0],
-                      Revenue: s.revenue,
-                      "Ad Spend": s.adSpend,
-                      Profit: s.profit,
-                    }))}
+                    data={[
+                      {
+                        name: "Totals",
+                        Revenue: totals.revenue,
+                        "Ad Spend": totals.adSpend,
+                        Profit: totals.profit,
+                      },
+                    ]}
                     margin={{ top: 0, right: 0, left: -10, bottom: 0 }}
                     barCategoryGap="28%"
                     barGap={3}
