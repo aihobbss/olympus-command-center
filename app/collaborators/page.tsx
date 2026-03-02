@@ -14,7 +14,20 @@ import {
   BarChart3,
   ArrowLeft,
   AlertTriangle,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 import { MetricCard, StatusBadge, ConfirmModal, TimePeriodSelector } from "@/components/ui";
 import type { TimePeriod } from "@/components/ui";
 import {
@@ -166,6 +179,17 @@ export default function CollaboratorsPage() {
   );
   const [period, setPeriod] = useState<TimePeriod>("7d");
   const [overlayStore, setOverlayStore] = useState<CollabAccess | null>(null);
+  const [sortKey, setSortKey] = useState<string>("revenue");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const handleSort = useCallback((key: string) => {
+    setSortKey((prev) => {
+      if (prev === key) return prev;
+      setSortDir("desc");
+      return key;
+    });
+    setSortDir((prev) => (sortKey === key ? (prev === "asc" ? "desc" : "asc") : "desc"));
+  }, [sortKey]);
 
   const scaledAccessList = useMemo(() => {
     const f = PERIOD_FACTOR[period];
@@ -175,11 +199,21 @@ export default function CollaboratorsPage() {
         const adSpend = Math.round(s.adSpend * f);
         const profit = Math.round(s.profit * f);
         const roas = adSpend > 0 ? parseFloat((revenue / adSpend).toFixed(2)) : 0;
-        return { ...s, revenue, adSpend, profit, roas };
+        const profitPercent = revenue > 0 ? parseFloat(((profit / revenue) * 100).toFixed(1)) : 0;
+        return { ...s, revenue, adSpend, profit, roas, profitPercent };
       })
-      .sort((a, b) => b.revenue - a.revenue)
+      .sort((a, b) => {
+        const aVal = (a as Record<string, unknown>)[sortKey];
+        const bVal = (b as Record<string, unknown>)[sortKey];
+        if (typeof aVal === "string" && typeof bVal === "string") {
+          return sortDir === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+        const an = aVal as number;
+        const bn = bVal as number;
+        return sortDir === "asc" ? an - bn : bn - an;
+      })
       .map((s, idx) => ({ ...s, rank: idx + 1 }));
-  }, [accessList, period]);
+  }, [accessList, period, sortKey, sortDir]);
 
   const totals = useMemo(() => {
     let revenue = 0, adSpend = 0, profit = 0;
@@ -616,35 +650,120 @@ export default function CollaboratorsPage() {
                 />
               </div>
 
+              {/* ── Performance chart ── */}
+              <div className="card p-5 mb-6">
+                <h3 className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-4">
+                  Revenue · Ad Spend · Profit by Store
+                </h3>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart
+                    data={scaledAccessList.map((s) => ({
+                      name: s.storeName.split(" ")[0],
+                      Revenue: s.revenue,
+                      "Ad Spend": s.adSpend,
+                      Profit: s.profit,
+                    }))}
+                    margin={{ top: 0, right: 0, left: -10, bottom: 0 }}
+                    barCategoryGap="28%"
+                    barGap={3}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(255,255,255,0.05)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fill: "#8A8A9B", fontSize: 11, fontFamily: "Inter" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: "#8A8A9B", fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(v: number) =>
+                        v >= 1000 ? `£${(v / 1000).toFixed(1)}k` : `£${v}`
+                      }
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(255,255,255,0.03)" }}
+                      contentStyle={{
+                        background: "#1A1A24",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        borderRadius: 10,
+                        padding: "10px 14px",
+                        fontFamily: "JetBrains Mono, monospace",
+                        fontSize: 12,
+                        color: "#F1F1F3",
+                      }}
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      formatter={(value: any) => [`£${Number(value).toLocaleString("en-GB")}`]}
+                    />
+                    <Legend
+                      iconType="circle"
+                      iconSize={7}
+                      wrapperStyle={{ fontSize: 11, color: "#8A8A9B", paddingTop: 12 }}
+                    />
+                    <Bar dataKey="Revenue" fill="#6C63FF" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="Ad Spend" fill="#F59E0B" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="Profit" fill="#10B981" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
               {/* ── Stores table ── */}
               <div className="overflow-x-auto rounded-xl border border-subtle bg-bg-card">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-subtle">
+                      {/* Non-sortable rank */}
                       <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-center w-12">
                         #
                       </th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-left">
-                        Store
-                      </th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-left hidden sm:table-cell">
-                        Owner
-                      </th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-right">
-                        Revenue
-                      </th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-right hidden md:table-cell">
-                        Ad Spend
-                      </th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-right">
-                        Profit
-                      </th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-right hidden lg:table-cell">
-                        ROAS
-                      </th>
-                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-center">
-                        Status
-                      </th>
+                      {/* Sortable columns */}
+                      {(
+                        [
+                          { key: "storeName", label: "Store", align: "left", cls: "" },
+                          { key: "ownerName", label: "Owner", align: "left", cls: "hidden sm:table-cell" },
+                          { key: "revenue", label: "Revenue", align: "right", cls: "" },
+                          { key: "adSpend", label: "Ad Spend", align: "right", cls: "hidden md:table-cell" },
+                          { key: "profit", label: "Profit", align: "right", cls: "" },
+                          { key: "profitPercent", label: "Profit %", align: "right", cls: "hidden md:table-cell" },
+                          { key: "roas", label: "ROAS", align: "right", cls: "hidden lg:table-cell" },
+                          { key: "status", label: "Status", align: "center", cls: "" },
+                        ] as const
+                      ).map((col) => {
+                        const active = sortKey === col.key;
+                        const Icon = active
+                          ? sortDir === "desc"
+                            ? ArrowDown
+                            : ArrowUp
+                          : ArrowUpDown;
+                        return (
+                          <th
+                            key={col.key}
+                            onClick={() => handleSort(col.key)}
+                            className={cn(
+                              "px-4 py-3 text-[11px] font-semibold uppercase tracking-wider cursor-pointer select-none",
+                              "transition-colors duration-150 hover:text-text-secondary",
+                              active ? "text-accent-indigo" : "text-text-muted",
+                              col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left",
+                              col.cls
+                            )}
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              {col.align === "right" && (
+                                <Icon size={11} strokeWidth={2} className="opacity-60" />
+                              )}
+                              {col.label}
+                              {col.align !== "right" && (
+                                <Icon size={11} strokeWidth={2} className="opacity-60" />
+                              )}
+                            </span>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
@@ -678,13 +797,23 @@ export default function CollaboratorsPage() {
                         <td
                           className={cn(
                             "px-4 py-3 text-right font-jetbrains font-medium tabular-nums",
-                            store.profit >= 0
-                              ? "text-accent-emerald"
-                              : "text-accent-red"
+                            store.profit >= 0 ? "text-accent-emerald" : "text-accent-red"
                           )}
                         >
                           {store.profit < 0 ? "-" : ""}{store.currency}
                           {Math.abs(store.profit).toLocaleString("en-GB")}
+                        </td>
+                        <td
+                          className={cn(
+                            "px-4 py-3 text-right font-jetbrains font-medium tabular-nums hidden md:table-cell",
+                            store.profitPercent >= 20
+                              ? "text-accent-emerald"
+                              : store.profitPercent >= 0
+                                ? "text-accent-amber"
+                                : "text-accent-red"
+                          )}
+                        >
+                          {store.profitPercent.toFixed(1)}%
                         </td>
                         <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums hidden lg:table-cell">
                           {store.roas.toFixed(2)}
