@@ -69,7 +69,7 @@ export default function ProfitTrackerPage() {
   const { selectedStore } = useStoreContext();
   const storeCurrency = selectedStore.currency;
   const ptRate = STORE_TO_USD[selectedStore.market] ?? 1;
-  const toUsd = useCallback(
+  const convertToUsd = useCallback(
     (localAmount: number) => Math.round(localAmount * ptRate),
     [ptRate]
   );
@@ -357,7 +357,7 @@ export default function ProfitTrackerPage() {
               cog={cogs[campaign.id] ?? 0}
               onCogChange={handleCogChange}
               storeCurrency={storeCurrency}
-              toUsd={toUsd}
+              toUsd={convertToUsd}
             />
           ))}
         </div>
