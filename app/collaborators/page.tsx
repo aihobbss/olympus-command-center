@@ -15,7 +15,8 @@ import {
   ArrowLeft,
   AlertTriangle,
 } from "lucide-react";
-import { MetricCard, StatusBadge, ConfirmModal } from "@/components/ui";
+import { MetricCard, StatusBadge, ConfirmModal, TimePeriodSelector } from "@/components/ui";
+import type { TimePeriod } from "@/components/ui";
 import {
   INCOMING_COLLAB_REQUESTS,
   MY_COLLAB_ACCESS,
@@ -65,6 +66,14 @@ const SENT_STATUS_STYLE: Record<
     text: "text-accent-red",
     label: "Denied",
   },
+};
+
+const PERIOD_FACTOR: Record<TimePeriod, number> = {
+  today: 0.14,
+  "3d": 0.4,
+  "7d": 1.0,
+  "30d": 3.2,
+  all: 5.5,
 };
 
 const OVERLAY_SECTIONS = [
@@ -155,7 +164,32 @@ export default function CollaboratorsPage() {
     () => MY_COLLAB_ACCESS[userId] ?? [],
     [userId]
   );
+  const [period, setPeriod] = useState<TimePeriod>("7d");
   const [overlayStore, setOverlayStore] = useState<CollabAccess | null>(null);
+
+  const scaledAccessList = useMemo(() => {
+    const f = PERIOD_FACTOR[period];
+    return accessList
+      .map((s) => {
+        const revenue = Math.round(s.revenue * f);
+        const adSpend = Math.round(s.adSpend * f);
+        const profit = Math.round(s.profit * f);
+        const roas = adSpend > 0 ? parseFloat((revenue / adSpend).toFixed(2)) : 0;
+        return { ...s, revenue, adSpend, profit, roas };
+      })
+      .sort((a, b) => b.revenue - a.revenue)
+      .map((s, idx) => ({ ...s, rank: idx + 1 }));
+  }, [accessList, period]);
+
+  const totals = useMemo(() => {
+    let revenue = 0, adSpend = 0, profit = 0;
+    for (const s of scaledAccessList) {
+      revenue += s.revenue;
+      adSpend += s.adSpend;
+      profit += s.profit;
+    }
+    return { revenue, adSpend, profit, activeStudents: scaledAccessList.length };
+  }, [scaledAccessList]);
 
   // ── Derived ──
   const pendingRequests = useMemo(
@@ -549,88 +583,125 @@ export default function CollaboratorsPage() {
               </div>
             </div>
           ) : (
-            /* Store grid */
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {accessList.map((store) => (
-                <motion.div
-                  key={store.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="card p-5 flex flex-col gap-4"
-                >
-                  {/* Store header */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-accent-indigo/10 flex items-center justify-center shrink-0 text-sm font-semibold text-accent-indigo">
-                        {store.ownerInitials}
-                      </div>
-                      <div>
-                        <p className="text-sm font-syne font-semibold text-text-primary">
-                          {store.storeName}
-                        </p>
-                        <p className="text-[12px] text-text-muted">
-                          {store.ownerName} &middot; {store.market} &middot;{" "}
-                          {store.currency}
-                        </p>
-                      </div>
-                    </div>
-                    <StatusBadge
-                      status={store.status}
-                      variant={STATUS_VARIANT[store.status]}
-                      size="sm"
-                    />
-                  </div>
+            <>
+              {/* ── Period selector ── */}
+              <div className="flex items-center justify-end mb-5">
+                <TimePeriodSelector value={period} onChange={setPeriod} />
+              </div>
 
-                  {/* Metrics row */}
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      {
-                        label: "Revenue",
-                        value: `${store.currency}${store.revenue.toLocaleString("en-GB")}`,
-                      },
-                      {
-                        label: "Ad Spend",
-                        value: `${store.currency}${store.adSpend.toLocaleString("en-GB")}`,
-                      },
-                      {
-                        label: "Profit",
-                        value: `${store.profit < 0 ? "-" : ""}${store.currency}${Math.abs(store.profit).toLocaleString("en-GB")}`,
-                        negative: store.profit < 0,
-                      },
-                      {
-                        label: "ROAS",
-                        value: store.roas.toFixed(2),
-                      },
-                    ].map((m) => (
-                      <div key={m.label} className="text-center">
-                        <p className="text-[10px] text-text-muted uppercase tracking-wider mb-0.5">
-                          {m.label}
-                        </p>
-                        <p
+              {/* ── Aggregate metric cards ── */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                <MetricCard
+                  label="Total Revenue"
+                  value={totals.revenue}
+                  format="currency"
+                  currency="£"
+                />
+                <MetricCard
+                  label="Total Ad Spend"
+                  value={totals.adSpend}
+                  format="currency"
+                  currency="£"
+                />
+                <MetricCard
+                  label="Total Profit"
+                  value={totals.profit}
+                  format="currency"
+                  currency="£"
+                />
+                <MetricCard
+                  label="Active Stores"
+                  value={totals.activeStudents}
+                  format="number"
+                />
+              </div>
+
+              {/* ── Stores table ── */}
+              <div className="overflow-x-auto rounded-xl border border-subtle bg-bg-card">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-subtle">
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-center w-12">
+                        #
+                      </th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-left">
+                        Store
+                      </th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-left hidden sm:table-cell">
+                        Owner
+                      </th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-right">
+                        Revenue
+                      </th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-right hidden md:table-cell">
+                        Ad Spend
+                      </th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-right">
+                        Profit
+                      </th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-right hidden lg:table-cell">
+                        ROAS
+                      </th>
+                      <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted text-center">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scaledAccessList.map((store) => (
+                      <tr
+                        key={store.id}
+                        onClick={() => setOverlayStore(store)}
+                        className="border-b border-subtle last:border-b-0 cursor-pointer hover:bg-white/[0.02] transition-colors duration-100"
+                      >
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-[12px] font-jetbrains text-text-muted tabular-nums">
+                            {store.rank}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-medium text-text-primary">
+                            {store.storeName}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 hidden sm:table-cell">
+                          <span className="text-text-secondary">
+                            {store.ownerName}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
+                          {store.currency}{store.revenue.toLocaleString("en-GB")}
+                        </td>
+                        <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums hidden md:table-cell">
+                          {store.currency}{store.adSpend.toLocaleString("en-GB")}
+                        </td>
+                        <td
                           className={cn(
-                            "text-sm font-jetbrains font-medium tabular-nums",
-                            m.negative
-                              ? "text-accent-red"
-                              : "text-text-primary"
+                            "px-4 py-3 text-right font-jetbrains font-medium tabular-nums",
+                            store.profit >= 0
+                              ? "text-accent-emerald"
+                              : "text-accent-red"
                           )}
                         >
-                          {m.value}
-                        </p>
-                      </div>
+                          {store.profit < 0 ? "-" : ""}{store.currency}
+                          {Math.abs(store.profit).toLocaleString("en-GB")}
+                        </td>
+                        <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums hidden lg:table-cell">
+                          {store.roas.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <StatusBadge
+                            status={store.status}
+                            variant={STATUS_VARIANT[store.status]}
+                            size="sm"
+                          />
+                        </td>
+                      </tr>
                     ))}
-                  </div>
-
-                  {/* Action */}
-                  <button
-                    onClick={() => setOverlayStore(store)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-accent-indigo/10 text-accent-indigo hover:bg-accent-indigo/20 transition-colors"
-                  >
-                    <Eye size={15} strokeWidth={2} />
-                    View Store
-                  </button>
-                </motion.div>
-              ))}
-            </div>
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}
