@@ -571,6 +571,30 @@ export const profitLogs: ProfitLog[] = [
 // 4. Customer Service Cases (5 items)
 // ============================================================
 
+export type CaseMessage = {
+  id: string;
+  sender: "customer" | "agent";
+  senderName: string;
+  body: string;
+  sentAt: string;
+};
+
+export type SOPTemplateCategory =
+  | "Quality Issue"
+  | "Sizing"
+  | "Wrong Item"
+  | "Delivery"
+  | "Trustpilot";
+
+export type SOPTemplate = {
+  id: string;
+  category: SOPTemplateCategory;
+  name: string;
+  subject: string;
+  body: string;
+  isDefault: boolean;
+};
+
 export type CustomerCase = {
   id: string;
   customerName: string;
@@ -585,8 +609,7 @@ export type CustomerCase = {
   orderCount: number;
   previousRefunds: string;
   messagePreview: string;
-  fullMessage: string;
-  suggestedResponse: string;
+  messages: CaseMessage[];
   receivedAt: string;
   isRepeatClaimer: boolean;
 };
@@ -606,10 +629,36 @@ export const customerCases: CustomerCase[] = [
     orderCount: 2,
     previousRefunds: "None",
     messagePreview: "Hi, I bought the Maven Bomber Jacket and after wearing it twice the stitching on the left sleeve...",
-    fullMessage:
-      "Hi,\n\nI bought the Maven Bomber Jacket and after wearing it twice the stitching on the left sleeve has started to come undone. I really like the jacket and was hoping for better quality. Could you help me resolve this?\n\nThanks,\nJames",
-    suggestedResponse:
-      "Hi James,\n\nThank you for reaching out and I'm sorry to hear about the stitching issue with your Maven Bomber Jacket. That's certainly not the quality we aim for.\n\nI'd like to offer you a 30% partial refund to account for the inconvenience, and you're welcome to keep the jacket. If you'd prefer a full replacement instead, just let me know and I'll arrange that right away.\n\nApologies again for the trouble.\n\nBest regards,\nOlympus London",
+    messages: [
+      {
+        id: "msg-001-1",
+        sender: "customer",
+        senderName: "James Mitchell",
+        body: "Hi,\n\nI bought the Maven Bomber Jacket and after wearing it twice the stitching on the left sleeve has started to come undone. I really like the jacket and was hoping for better quality. Could you help me resolve this?\n\nThanks,\nJames",
+        sentAt: hoursAgo(3),
+      },
+      {
+        id: "msg-001-2",
+        sender: "agent",
+        senderName: "Claire from Olympus",
+        body: "Hi James,\n\nThank you for reaching out. I'm really sorry to hear you're not fully satisfied with your order \u2014 I'll do everything I can to turn this around and ensure your experience with us ends on a much better note.\n\nWe'd love to help resolve this in a way that's as smooth and stress-free as possible.\n\nHere are a few options we can offer:\n\n\u2022 A 30% refund, processed immediately \u2014 no need to send the product back.\n\u2022 Return the product via Royal Mail Special Delivery Guaranteed. Once we receive and inspect it to ensure it's unused and in original condition, we'll issue a refund minus a 30% restocking fee. Return shipping is at your cost.\n\u2022 A full 100% store credit so you can pick a different item or size.\n\u2022 A free replacement \u2014 no need to return the original item.\n\nPlease let me know which option works best for you \u2014 I'll make sure to have it processed for you as smoothly as possible.\n\nWe're more than willing to help however we can, and our goal is always to ensure you feel fully supported and cared for throughout your experience with us.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+        sentAt: hoursAgo(2.5),
+      },
+      {
+        id: "msg-001-3",
+        sender: "customer",
+        senderName: "James Mitchell",
+        body: "Hi Claire,\n\nThanks for getting back to me so quickly. I'll take the 30% refund option please \u2014 I'd like to keep the jacket as I do really like it otherwise.\n\nCheers,\nJames",
+        sentAt: hoursAgo(1.5),
+      },
+      {
+        id: "msg-001-4",
+        sender: "agent",
+        senderName: "Claire from Olympus",
+        body: "Hi James,\n\nThank you for your response. I've now processed your 30% refund as agreed \u2014 it should appear in your account within a few business days depending on your card provider.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+        sentAt: hoursAgo(1),
+      },
+    ],
     receivedAt: hoursAgo(3),
     isRepeatClaimer: false,
   },
@@ -625,12 +674,38 @@ export const customerCases: CustomerCase[] = [
     trackingStatus: "Delivered",
     lifetimeValue: 234,
     orderCount: 3,
-    previousRefunds: "1 prior refund — 30% issued 3 months ago",
+    previousRefunds: "1 prior refund \u2014 30% issued 3 months ago",
     messagePreview: "Hello, I ordered the Harrington Trainers in black but I received a navy pair instead...",
-    fullMessage:
-      "Hello,\n\nI ordered the Harrington Trainers in black but I received a navy pair instead. This is quite disappointing as I specifically needed black for an event this weekend. Can you please send me the correct colour or issue a refund?\n\nSophie",
-    suggestedResponse:
-      "Hi Sophie,\n\nI sincerely apologise for the mix-up with your Harrington Trainers order. I can see you ordered black and completely understand the frustration of receiving the wrong colour.\n\nI've arranged for the correct black pair to be sent out to you as a priority. You should receive tracking details within 24 hours. Please keep the navy pair as well — consider it on us for the inconvenience.\n\nSorry again, and I hope you enjoy them at your event!\n\nBest,\nOlympus London",
+    messages: [
+      {
+        id: "msg-002-1",
+        sender: "customer",
+        senderName: "Sophie Turner",
+        body: "Hello,\n\nI ordered the Harrington Trainers in black but I received a navy pair instead. This is quite disappointing as I specifically needed black for an event this weekend. Can you please send me the correct colour or issue a refund?\n\nSophie",
+        sentAt: hoursAgo(7),
+      },
+      {
+        id: "msg-002-2",
+        sender: "agent",
+        senderName: "Claire from Olympus",
+        body: "Hi Sophie,\n\nI'm really sorry to hear that you received the wrong item.\n\nWe can offer two solutions:\n\n1. Resend the correct item to you free of charge.\n2. Offer a 50% refund if you prefer not to wait for the replacement.\n\nPlease let me know which option you'd prefer, and we'll take care of it right away.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+        sentAt: hoursAgo(6),
+      },
+      {
+        id: "msg-002-3",
+        sender: "customer",
+        senderName: "Sophie Turner",
+        body: "Hi,\n\nPlease resend the correct black pair. I need them as soon as possible for this weekend.\n\nThanks,\nSophie",
+        sentAt: hoursAgo(5),
+      },
+      {
+        id: "msg-002-4",
+        sender: "agent",
+        senderName: "Claire from Olympus",
+        body: "Hi Sophie,\n\nApologies again for the mix-up! I've now arranged for the correct item to be sent to you free of charge and you should receive it within the next 7 Business Days.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+        sentAt: hoursAgo(4.5),
+      },
+    ],
     receivedAt: hoursAgo(7),
     isRepeatClaimer: true,
   },
@@ -648,10 +723,15 @@ export const customerCases: CustomerCase[] = [
     orderCount: 1,
     previousRefunds: "None",
     messagePreview: "Hi there, the Haldrin Layered Shirt in size L is way too tight across the chest...",
-    fullMessage:
-      "Hi there,\n\nThe Haldrin Layered Shirt in size L is way too tight across the chest and shoulders. I normally wear L in most brands. Is it possible to exchange for an XL?\n\nCheers,\nDaniel",
-    suggestedResponse:
-      "Hi Daniel,\n\nThanks for letting us know — I'm sorry the sizing wasn't right on the Haldrin Layered Shirt. Some of our pieces do run slightly smaller than standard UK sizing.\n\nI'll send out an XL for you straight away, no need to return the L. You should receive your new tracking number within 24 hours.\n\nAppreciate your patience!\n\nBest,\nOlympus London",
+    messages: [
+      {
+        id: "msg-003-1",
+        sender: "customer",
+        senderName: "Daniel Okafor",
+        body: "Hi there,\n\nThe Haldrin Layered Shirt in size L is way too tight across the chest and shoulders. I normally wear L in most brands. Is it possible to exchange for an XL?\n\nCheers,\nDaniel",
+        sentAt: hoursAgo(12),
+      },
+    ],
     receivedAt: hoursAgo(12),
     isRepeatClaimer: false,
   },
@@ -664,15 +744,20 @@ export const customerCases: CustomerCase[] = [
     orderNumber: "OL-4798",
     product: "Durango Road Sneakers",
     orderDate: daysAgo(16),
-    trackingStatus: "In Transit — last scan 5 days ago",
+    trackingStatus: "In Transit \u2014 last scan 5 days ago",
     lifetimeValue: 189,
     orderCount: 2,
     previousRefunds: "None",
     messagePreview: "Hi, I placed my order over two weeks ago and it still hasn't arrived. The tracking hasn't updated...",
-    fullMessage:
-      "Hi,\n\nI placed my order over two weeks ago and it still hasn't arrived. The tracking hasn't updated in 5 days and just says 'in transit'. I'm getting quite worried now. Can you look into this for me?\n\nThanks,\nEmma",
-    suggestedResponse:
-      "Hi Emma,\n\nI completely understand your concern — a 14-day wait with stalled tracking is not acceptable.\n\nI've escalated this with our shipping partner and will have an update for you within 24 hours. If the parcel can't be located, I'll send out a replacement immediately at no extra cost.\n\nThank you for your patience and I'll be in touch very shortly.\n\nBest regards,\nOlympus London",
+    messages: [
+      {
+        id: "msg-004-1",
+        sender: "customer",
+        senderName: "Emma Walsh",
+        body: "Hi,\n\nI placed my order over two weeks ago and it still hasn't arrived. The tracking hasn't updated in 5 days and just says 'in transit'. I'm getting quite worried now. Can you look into this for me?\n\nThanks,\nEmma",
+        sentAt: hoursAgo(18),
+      },
+    ],
     receivedAt: hoursAgo(18),
     isRepeatClaimer: false,
   },
@@ -688,14 +773,135 @@ export const customerCases: CustomerCase[] = [
     trackingStatus: "Delivered",
     lifetimeValue: 312,
     orderCount: 4,
-    previousRefunds: "1 prior refund — 50% issued 6 months ago",
+    previousRefunds: "1 prior refund \u2014 50% issued 6 months ago",
     messagePreview: "Hey, just received the Avalon Puffer Vest and the main zip is completely stuck...",
-    fullMessage:
-      "Hey,\n\nJust received the Avalon Puffer Vest and the main zip is completely stuck and won't budge. Tried working it gently but it's defective. Pretty gutted as I was looking forward to wearing it.\n\nCan I get a replacement or refund?\n\nRyan",
-    suggestedResponse:
-      "Hi Ryan,\n\nSorry to hear about the zip issue on your Avalon Puffer Vest — that's definitely a manufacturing defect and shouldn't have made it through our quality checks.\n\nAs a valued repeat customer, I'd like to offer you a full replacement shipped out today, plus a 15% discount code for your next order as an apology. You don't need to return the faulty one.\n\nLet me know if you'd prefer a refund instead.\n\nBest,\nOlympus London",
+    messages: [
+      {
+        id: "msg-005-1",
+        sender: "customer",
+        senderName: "Ryan Clarke",
+        body: "Hey,\n\nJust received the Avalon Puffer Vest and the main zip is completely stuck and won't budge. Tried working it gently but it's defective. Pretty gutted as I was looking forward to wearing it.\n\nCan I get a replacement or refund?\n\nRyan",
+        sentAt: hoursAgo(1),
+      },
+    ],
     receivedAt: hoursAgo(1),
     isRepeatClaimer: true,
+  },
+];
+
+// ============================================================
+// 4b. SOP Email Templates (from Returns & Refunds SOP)
+// ============================================================
+
+export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
+  // ── Quality Issue ──
+  {
+    id: "sop-001",
+    category: "Quality Issue",
+    name: "Initial Offer",
+    subject: "Let's Fix This Together",
+    body: "Hi [Customer's Name],\n\nThank you for reaching out. I'm really sorry to hear you're not fully satisfied with your order \u2014 I'll do everything I can to turn this around and ensure your experience with us ends on a much better note.\n\nWe'd love to help resolve this in a way that's as smooth and stress-free as possible.\n\nHere are a few options we can offer:\n\n\u2022 A 30% refund, processed immediately \u2014 no need to send the product back.\n\u2022 Return the product via Royal Mail Special Delivery Guaranteed. Once we receive and inspect it to ensure it's unused and in original condition, we'll issue a refund minus a 30% restocking fee. Return shipping is at your cost.\n\u2022 A full 100% store credit so you can pick a different item or size.\n\u2022 A free replacement \u2014 no need to return the original item.\n\nPlease let me know which option works best for you \u2014 I'll make sure to have it processed for you as smoothly as possible.\n\nWe're more than willing to help however we can, and our goal is always to ensure you feel fully supported and cared for throughout your experience with us.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
+  },
+  {
+    id: "sop-002",
+    category: "Quality Issue",
+    name: "30% Refund Accepted",
+    subject: "Refund Confirmation",
+    body: "Hi [Customer's Name],\n\nThank you for your response. I've now processed your 30% refund as agreed \u2014 it should appear in your account within a few business days depending on your card provider.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
+  },
+  {
+    id: "sop-003",
+    category: "Quality Issue",
+    name: "Escalation 50% Offer",
+    subject: "Final Refund Offer",
+    body: "Hi [Customer's Name],\n\nI completely understand your concerns and I've double-checked with our management team. As a final gesture, we can offer a 50% refund, which would be the maximum possible on our end.\n\nPlease let me know how you'd like to proceed \u2014 I'll make sure to have it processed for you as smoothly as possible.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
+  },
+  {
+    id: "sop-004",
+    category: "Quality Issue",
+    name: "Return Instructions",
+    subject: "Return Instructions",
+    body: "Hi [Customer's Name],\n\nThank you for letting me know, I can process the return if none of the other options works for you. Please make sure to use Royal Mail Special Delivery Guaranteed only when sending it back \u2014 this is important for tracking and insurance purposes, we won't be able to process the return if a different shipping method is used.\n\nYou can send your return to:\n\nOlympus London\n71 Shelton Street\nCovent Garden, London, WC2H 9JQ\nUnited Kingdom\n\nOnce we receive the package, we'll inspect the item to confirm it is unused and in original condition. If everything checks out, we'll process your refund minus the 30% restocking fee as per our policy. The inspection process may take a few days.\n\nCan you please share your proof of postage and tracking number in this email? That would be great!\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
+  },
+  // ── Sizing ──
+  {
+    id: "sop-005",
+    category: "Sizing",
+    name: "Initial Offer",
+    subject: "Let's Fix the Sizing Issue",
+    body: "Hi [Customer's Name],\n\nThank you for your message. I'm sorry to hear that the size wasn't quite right \u2014 we always strive to make sure every customer feels confident and happy with their purchase.\n\nWe'd love to help make this right in a way that's as smooth and helpful as possible.\n\nHere are a few options:\n\n\u2022 A 50% discount on a new order in the correct size.\n\u2022 A full store credit for the amount you paid, so you can choose a different item or size.\n\u2022 A free size replacement \u2014 no need to return the original item.\n\nJust let me know which option works best for you \u2014 I'll make sure we get it sorted as smoothly as possible.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
+  },
+  {
+    id: "sop-006",
+    category: "Sizing",
+    name: "50% Discount Accepted",
+    subject: "Exclusive Discount for Size Exchange",
+    body: "Hi [Customer's Name],\n\nThanks again! I've now created your 50% discount code: [CODE] \u2014 you can apply it at checkout for your new order.\n\nIf you need help selecting the right size, feel free to ask.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
+  },
+  {
+    id: "sop-007",
+    category: "Sizing",
+    name: "Store Credit Accepted",
+    subject: "Store Credit Issued",
+    body: "Hi [Customer's Name],\n\nThanks for confirming! I've just issued a store credit for the full amount of your original order. You're welcome to use it anytime to pick something else you love.\n\nLet me know if you need help browsing or with sizing \u2014 I'm here for you!\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
+  },
+  {
+    id: "sop-008",
+    category: "Sizing",
+    name: "Free Replacement Accepted",
+    subject: "Size Replacement Sent",
+    body: "Hi [Customer's Name],\n\nI've just sent out a new size for your order \u2014 no need to return the original. You'll get a tracking number shortly so you can keep an eye on delivery.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
+  },
+  // ── Wrong Item ──
+  {
+    id: "sop-009",
+    category: "Wrong Item",
+    name: "Initial Offer",
+    subject: "Let's Make It Right",
+    body: "Hi [Customer's Name],\n\nI'm really sorry to hear that you received the wrong item.\n\nWe can offer two solutions:\n\n1. Resend the correct item to you free of charge.\n2. Offer a 50% refund if you prefer not to wait for the replacement.\n\nPlease let me know which option you'd prefer, and we'll take care of it right away.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
+  },
+  {
+    id: "sop-010",
+    category: "Wrong Item",
+    name: "Reshipment Chosen",
+    subject: "Replacement on the Way",
+    body: "Hi [Customer's Name],\n\nApologies again for the mix-up! I've now arranged for the correct item to be sent to you free of charge and you should receive it within the next 7 Business Days.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
+  },
+  {
+    id: "sop-011",
+    category: "Wrong Item",
+    name: "50% Refund Chosen",
+    subject: "Refund Processed \u2013 Wrong Item",
+    body: "Hi [Customer's Name],\n\nThank you for your understanding. I've just processed your 50% refund for the order \u2014 it should reflect on your account shortly.\n\nIf you don't mind me asking, how would you rate your experience with our support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
+  },
+  // ── Delivery ──
+  {
+    id: "sop-012",
+    category: "Delivery",
+    name: "Initial Response",
+    subject: "We're Looking Into It",
+    body: "Hi [Customer's Name],\n\nThank you for reaching out. I completely understand how frustrating it must be to wait this long for your order \u2014 I'll look into this right away.\n\nI've escalated this with our shipping partner and will have an update for you within 24 hours. If the parcel can't be located, I'll arrange for a replacement to be sent to you immediately at no extra cost.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
+  },
+  // ── Trustpilot ──
+  {
+    id: "sop-013",
+    category: "Trustpilot",
+    name: "5-Star Follow-Up",
+    subject: "Thanks Again \u2013 One Last Favour",
+    body: "Hi [Customer's Name],\n\nThat's wonderful to hear \u2014 thank you so much for the 5-star feedback!\n\nIf you have a moment, we'd be incredibly grateful if you could share your experience in a short review on Trustpilot. It really helps a small business like ours grow and continue improving.\n\nYou can leave your review here:\nhttps://www.trustpilot.com/review/olympuslondon.com\n\nThanks again for your support \u2014 it means the world to us!\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    isDefault: true,
   },
 ];
 

@@ -76,6 +76,25 @@ export interface ProfitLog {
   profitPercent: number;
 }
 
+/** A single message in a customer service conversation thread. */
+export interface CaseMessage {
+  id: string;
+  sender: "customer" | "agent";
+  senderName: string;
+  body: string;
+  sentAt: string;
+}
+
+/** An SOP email template for customer service responses. */
+export interface SOPTemplate {
+  id: string;
+  category: "Quality Issue" | "Sizing" | "Wrong Item" | "Delivery" | "Trustpilot";
+  name: string;
+  subject: string;
+  body: string;
+  isDefault: boolean;
+}
+
 /** A customer service ticket / case. */
 export interface CustomerCase {
   id: string;
@@ -91,8 +110,7 @@ export interface CustomerCase {
   orderCount: number;
   previousRefunds: string;
   messagePreview: string;
-  fullMessage: string;
-  suggestedResponse: string;
+  messages: CaseMessage[];
   receivedAt: string;
   isRepeatClaimer: boolean;
 }
