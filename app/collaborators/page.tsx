@@ -89,6 +89,8 @@ const PERIOD_FACTOR: Record<TimePeriod, number> = {
   all: 5.5,
 };
 
+const GBP_TO_USD = 1.27;
+
 const OVERLAY_SECTIONS = [
   {
     icon: TrendingUp,
@@ -224,6 +226,12 @@ export default function CollaboratorsPage() {
     }
     return { revenue, adSpend, profit, activeStudents: scaledAccessList.length };
   }, [scaledAccessList]);
+
+  const totalsUsd = useMemo(() => ({
+    revenue: Math.round(totals.revenue * GBP_TO_USD),
+    adSpend: Math.round(totals.adSpend * GBP_TO_USD),
+    profit: Math.round(totals.profit * GBP_TO_USD),
+  }), [totals]);
 
   // ── Derived ──
   const pendingRequests = useMemo(
@@ -627,21 +635,21 @@ export default function CollaboratorsPage() {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                 <MetricCard
                   label="Total Revenue"
-                  value={totals.revenue}
+                  value={totalsUsd.revenue}
                   format="currency"
-                  currency="£"
+                  currency="$"
                 />
                 <MetricCard
                   label="Total Ad Spend"
-                  value={totals.adSpend}
+                  value={totalsUsd.adSpend}
                   format="currency"
-                  currency="£"
+                  currency="$"
                 />
                 <MetricCard
                   label="Total Profit"
-                  value={totals.profit}
+                  value={totalsUsd.profit}
                   format="currency"
-                  currency="£"
+                  currency="$"
                 />
                 <MetricCard
                   label="Active Stores"
@@ -653,16 +661,16 @@ export default function CollaboratorsPage() {
               {/* ── Performance chart ── */}
               <div className="card p-5 mb-6">
                 <h3 className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-4">
-                  Revenue · Ad Spend · Profit by Store
+                  Total Revenue · Ad Spend · Profit (USD)
                 </h3>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart
                     data={[
                       {
                         name: "Totals",
-                        Revenue: totals.revenue,
-                        "Ad Spend": totals.adSpend,
-                        Profit: totals.profit,
+                        Revenue: totalsUsd.revenue,
+                        "Ad Spend": totalsUsd.adSpend,
+                        Profit: totalsUsd.profit,
                       },
                     ]}
                     margin={{ top: 0, right: 0, left: -10, bottom: 0 }}
@@ -685,7 +693,7 @@ export default function CollaboratorsPage() {
                       axisLine={false}
                       tickLine={false}
                       tickFormatter={(v: number) =>
-                        v >= 1000 ? `£${(v / 1000).toFixed(1)}k` : `£${v}`
+                        v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`
                       }
                     />
                     <Tooltip
@@ -700,7 +708,7 @@ export default function CollaboratorsPage() {
                         color: "#F1F1F3",
                       }}
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      formatter={(value: any) => [`£${Number(value).toLocaleString("en-GB")}`]}
+                      formatter={(value: any) => [`$${Number(value).toLocaleString("en-US")}`]}
                     />
                     <Legend
                       iconType="circle"
