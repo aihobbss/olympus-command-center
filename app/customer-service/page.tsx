@@ -21,6 +21,7 @@ import {
   type SOPTemplate,
 } from "@/data/mock";
 import { cn } from "@/lib/utils";
+import { useStoreContext } from "@/lib/store";
 import { MessageThread } from "@/components/modules/MessageThread";
 import { TemplateAssistant } from "@/components/modules/TemplateAssistant";
 import { TemplateManager } from "@/components/modules/TemplateManager";
@@ -97,6 +98,9 @@ function initials(name: string): string {
 // ─── Page ───────────────────────────────────────────────────
 
 export default function CustomerServicePage() {
+  const { selectedStore } = useStoreContext();
+  const currency = selectedStore.currency;
+
   const [activeTab, setActiveTab] = useState<Tab>("inbox");
   const [selectedId, setSelectedId] = useState<string>(customerCases[0].id);
   const [caseStatuses, setCaseStatuses] = useState<
@@ -381,7 +385,7 @@ export default function CustomerServicePage() {
                         <span className="text-text-muted">&middot;</span>
                         <span className="text-text-secondary">
                           <span className="font-semibold text-text-primary font-jetbrains">
-                            &pound;{selectedCase.lifetimeValue}
+                            {currency}{selectedCase.lifetimeValue}
                           </span>{" "}
                           lifetime value
                         </span>
@@ -475,6 +479,7 @@ export default function CustomerServicePage() {
                   templates={templates}
                   value={currentResponse}
                   onChange={handleResponseChange}
+                  storePrefix={selectedStore.market === "AU" ? "VANTAGE" : "OLYMPUS"}
                 />
 
                 {/* ── Action Bar ── */}
@@ -626,13 +631,13 @@ export default function CustomerServicePage() {
         title={refundModal.type === "store-credit" ? "Issue 100% store credit?" : `Issue ${refundModal.type} refund?`}
         description={
           refundModal.type === "store-credit"
-            ? `Issue £${refundModal.amount.toFixed(2)} store credit to ${refundModal.customerName}. This will be added to their account and cannot be undone.`
-            : `Issue £${refundModal.amount.toFixed(2)} refund to ${refundModal.customerName}. This will be processed via Shopify and cannot be undone.`
+            ? `Issue ${currency}${refundModal.amount.toFixed(2)} store credit to ${refundModal.customerName}. This will be added to their account and cannot be undone.`
+            : `Issue ${currency}${refundModal.amount.toFixed(2)} refund to ${refundModal.customerName}. This will be processed via Shopify and cannot be undone.`
         }
         confirmLabel={
           refundModal.type === "store-credit"
-            ? `Credit £${refundModal.amount.toFixed(2)}`
-            : `Refund £${refundModal.amount.toFixed(2)}`
+            ? `Credit ${currency}${refundModal.amount.toFixed(2)}`
+            : `Refund ${currency}${refundModal.amount.toFixed(2)}`
         }
         variant="danger"
       />

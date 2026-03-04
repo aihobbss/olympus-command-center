@@ -16,6 +16,7 @@ import {
   Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useStoreContext } from "@/lib/store";
 import { ActionSlider } from "@/components/ui";
 
 // ─── Types ──────────────────────────────────────────────────
@@ -106,6 +107,9 @@ const GRADIENTS = [
 // ─── Page ───────────────────────────────────────────────────
 
 export default function CreativeGeneratorPage() {
+  const { selectedStore } = useStoreContext();
+  const currency = selectedStore.currency;
+
   // ── Form state ──
   const [selectedProductId, setSelectedProductId] = useState("");
   const [productName, setProductName] = useState("");
@@ -420,11 +424,11 @@ export default function CreativeGeneratorPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] text-text-muted font-medium uppercase tracking-wider mb-2">
-                Sale Price (£)
+                Sale Price ({currency})
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted font-jetbrains">
-                  £
+                  {currency}
                 </span>
                 <input
                   type="number"
@@ -447,11 +451,11 @@ export default function CreativeGeneratorPage() {
             </div>
             <div>
               <label className="block text-[11px] text-text-muted font-medium uppercase tracking-wider mb-2">
-                Original Price (£)
+                Original Price ({currency})
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted font-jetbrains">
-                  £
+                  {currency}
                 </span>
                 <input
                   type="number"

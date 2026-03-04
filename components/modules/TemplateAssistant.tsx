@@ -15,6 +15,7 @@ interface TemplateAssistantProps {
   templates: SOPTemplate[];
   value: string;
   onChange: (text: string) => void;
+  storePrefix?: string;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -27,17 +28,17 @@ function firstName(fullName: string): string {
   return fullName.split(" ")[0];
 }
 
-function generateCode(): string {
+function generateCode(prefix: string): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let code = "";
   for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  return `OLYMPUS-SIZE50-${code}`;
+  return `${prefix}-SIZE50-${code}`;
 }
 
-function processTemplate(body: string, customerName: string): string {
+function processTemplate(body: string, customerName: string, prefix: string): string {
   return body
     .replace(/\[Customer's Name\]/g, firstName(customerName))
-    .replace(/\[CODE\]/g, generateCode());
+    .replace(/\[CODE\]/g, generateCode(prefix));
 }
 
 // ────────────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ export function TemplateAssistant({
   classification,
   customerName,
   templates,
+  storePrefix = "OLYMPUS",
   value,
   onChange,
 }: TemplateAssistantProps) {
@@ -72,7 +74,7 @@ export function TemplateAssistant({
   function handleGenerate() {
     const tpl = templates.find((t) => t.id === activeTemplateId);
     if (!tpl) return;
-    onChange(processTemplate(tpl.body, customerName));
+    onChange(processTemplate(tpl.body, customerName, storePrefix));
   }
 
   const selectClass = cn(

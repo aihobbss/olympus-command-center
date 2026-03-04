@@ -54,7 +54,7 @@ export function MetricCard({
   delta,
   deltaType,
   format = "number",
-  currency = "£",
+  currency = "$",
   subtitle,
   className,
 }: MetricCardProps) {

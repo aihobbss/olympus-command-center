@@ -41,7 +41,7 @@ import {
   type CollabAccess,
   type SentCollabRequest,
 } from "@/data/mock";
-import { useAuthStore, useCoachViewStore } from "@/lib/store";
+import { useAuthStore, useCoachViewStore, useStoreContext } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 // ─── Constants ───────────────────────────────────────────────
@@ -91,7 +91,7 @@ const PERIOD_FACTOR: Record<TimePeriod, number> = {
   all: 5.5,
 };
 
-const GBP_TO_USD = 1.27;
+const CURRENCY_TO_USD: Record<string, number> = { "£": 1.27, "A$": 0.63 };
 
 const OVERLAY_SECTIONS = [
   {
@@ -150,6 +150,7 @@ function initials(name: string): string {
 export default function CollaboratorsPage() {
   const user = useAuthStore((s) => s.user);
   const userId = user?.id ?? "jake";
+  const { selectedStore } = useStoreContext();
 
   // ── Tab state ──
   const [activeTab, setActiveTab] = useState<CollabTab>("manage");
@@ -234,11 +235,16 @@ export default function CollaboratorsPage() {
     return { revenue, adSpend, profit, activeStudents: scaledAccessList.length };
   }, [scaledAccessList]);
 
-  const totalsUsd = useMemo(() => ({
-    revenue: Math.round(totals.revenue * GBP_TO_USD),
-    adSpend: Math.round(totals.adSpend * GBP_TO_USD),
-    profit: Math.round(totals.profit * GBP_TO_USD),
-  }), [totals]);
+  const totalsUsd = useMemo(() => {
+    let revenue = 0, adSpend = 0, profit = 0;
+    for (const s of scaledAccessList) {
+      const rate = CURRENCY_TO_USD[s.currency] ?? 1;
+      revenue += Math.round(s.revenue * rate);
+      adSpend += Math.round(s.adSpend * rate);
+      profit += Math.round(s.profit * rate);
+    }
+    return { revenue, adSpend, profit };
+  }, [scaledAccessList]);
 
   // ── Overlay derivations ──
   const overlayBaseStore = useMemo(
@@ -280,8 +286,8 @@ export default function CollaboratorsPage() {
         storeName: user?.name ? `${user.name}'s Store` : "My Store",
         ownerName: req.requesterName,
         ownerInitials: req.requesterInitials,
-        market: "UK",
-        currency: "£",
+        market: selectedStore.market,
+        currency: selectedStore.currency,
         revenue: 0,
         adSpend: 0,
         profit: 0,
@@ -291,7 +297,7 @@ export default function CollaboratorsPage() {
       };
       setApprovedCollabs((prev) => [...prev, newAccess]);
     },
-    [userId, user?.name]
+    [userId, user?.name, selectedStore.market, selectedStore.currency]
   );
 
   const handleDenyConfirm = useCallback(() => {

@@ -91,7 +91,7 @@ function ChartTooltip({
 
 export default function ProfitChart({
   logs,
-  currency = "£",
+  currency = "$",
   title,
 }: ProfitChartProps) {
   const chartData = useMemo<ChartRow[]>(() => {
