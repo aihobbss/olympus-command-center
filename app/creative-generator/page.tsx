@@ -11,8 +11,12 @@ import {
   Check,
   AlertTriangle,
   Bookmark,
+  SlidersHorizontal,
+  Plus,
+  Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ActionSlider } from "@/components/ui";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -26,6 +30,19 @@ type ProductOption = {
 type CreativeCard = {
   id: string;
   concept: string;
+};
+
+type PromptTemplate = {
+  id: string;
+  label: string;
+  prompt: string;
+};
+
+type ActivePrompt = {
+  templateId: string | null;
+  label: string;
+  prompt: string;
+  count: number;
 };
 
 type LibraryItem = {
@@ -62,14 +79,17 @@ const PRODUCTS: ProductOption[] = [
   },
 ];
 
-const BASE_CONCEPTS = [
-  "Winter — Text",
-  "Winter — No Text",
-  "High-End — No Text",
-  "High-End — Text",
-  "__PRICE__",
-  "Replicate Winner",
-  "Model Wearing It",
+const PROMPT_TEMPLATES: PromptTemplate[] = [
+  { id: "t1", label: "Winter — Text", prompt: "Winter setting with product, text overlay with name and price" },
+  { id: "t2", label: "Winter — No Text", prompt: "Winter setting with product, clean image no text" },
+  { id: "t3", label: "High-End — No Text", prompt: "Luxury studio shot, minimal background, no text" },
+  { id: "t4", label: "High-End — Text", prompt: "Luxury studio shot with elegant text overlay" },
+  { id: "t5", label: "Price Shown", prompt: "Product with sale price and crossed-out original price" },
+  { id: "t6", label: "Replicate Winner", prompt: "Replicate the style of the best-performing ad creative" },
+  { id: "t7", label: "Model Wearing It", prompt: "Model wearing/using the product in lifestyle setting" },
+  { id: "t8", label: "UGC Style", prompt: "User-generated content style, casual phone camera look" },
+  { id: "t9", label: "Before & After", prompt: "Split comparison showing transformation or styling" },
+  { id: "t10", label: "Flat Lay", prompt: "Top-down flat lay arrangement on neutral background" },
 ];
 
 // Gradient pairs for placeholder creative cards
@@ -91,10 +111,15 @@ export default function CreativeGeneratorPage() {
   const [productName, setProductName] = useState("");
   const [salePrice, setSalePrice] = useState<number | "">("");
   const [originalPrice, setOriginalPrice] = useState<number | "">("");
-  const [conceptCount, setConceptCount] = useState(12);
   const [referenceFile, setReferenceFile] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Prompt configuration ──
+  const [activePrompts, setActivePrompts] = useState<ActivePrompt[]>([]);
+  const [promptPanelOpen, setPromptPanelOpen] = useState(false);
+  const [customLabel, setCustomLabel] = useState("");
+  const [customPrompt, setCustomPrompt] = useState("");
 
   // ── Generation state ──
   const [generating, setGenerating] = useState(false);
@@ -120,16 +145,9 @@ export default function CreativeGeneratorPage() {
 
   const safeDiscount = discountWarning ? 46 : discount;
 
-  const priceLabel = useMemo(() => {
-    const sp = typeof salePrice === "number" ? salePrice : 0;
-    const op = typeof originalPrice === "number" ? originalPrice : 0;
-    return `Price Shown (£${sp} / was £${op})`;
-  }, [salePrice, originalPrice]);
-
-  const conceptLabels = useMemo(
-    () =>
-      BASE_CONCEPTS.map((c) => (c === "__PRICE__" ? priceLabel : c)),
-    [priceLabel]
+  const totalCreatives = useMemo(
+    () => activePrompts.reduce((sum, p) => sum + p.count, 0),
+    [activePrompts]
   );
 
   const visibleCards = useMemo(
@@ -145,6 +163,7 @@ export default function CreativeGeneratorPage() {
     salePrice > 0 &&
     typeof originalPrice === "number" &&
     originalPrice > 0 &&
+    activePrompts.length > 0 &&
     !generating;
 
   // ── Handlers ──
@@ -191,24 +210,26 @@ export default function CreativeGeneratorPage() {
     setSelectedIds(new Set());
     setRejectedIds(new Set());
 
-    const total = conceptCount;
     const newCards: CreativeCard[] = [];
+    let idx = 0;
 
-    for (let i = 0; i < total; i++) {
-      const concept = conceptLabels[i % conceptLabels.length];
-      const card: CreativeCard = {
-        id: `cr-${Date.now()}-${i}`,
-        concept,
-      };
-      newCards.push(card);
+    for (const ap of activePrompts) {
+      for (let i = 0; i < ap.count; i++) {
+        const card: CreativeCard = {
+          id: `cr-${Date.now()}-${idx}`,
+          concept: ap.label,
+        };
+        newCards.push(card);
+        idx++;
 
-      // Stagger: reveal one card at a time with 200ms gap
-      await new Promise((r) => setTimeout(r, 200));
-      setCards([...newCards]);
+        // Stagger: reveal one card at a time with 200ms gap
+        await new Promise((r) => setTimeout(r, 200));
+        setCards([...newCards]);
+      }
     }
 
     setGenerating(false);
-  }, [canGenerate, conceptCount, conceptLabels]);
+  }, [canGenerate, activePrompts]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -487,28 +508,36 @@ export default function CreativeGeneratorPage() {
             </div>
           )}
 
-          {/* Concept slider */}
+          {/* Configure prompts button */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-[11px] text-text-muted font-medium uppercase tracking-wider">
-                Creatives
-              </label>
-              <span className="text-sm font-jetbrains text-text-primary tabular-nums">
-                {conceptCount}
-              </span>
-            </div>
-            <input
-              type="range"
-              min={10}
-              max={20}
-              value={conceptCount}
-              onChange={(e) => setConceptCount(Number(e.target.value))}
-              className="w-full accent-accent-amber h-1.5 rounded-full appearance-none bg-white/[0.06] cursor-pointer"
-            />
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-[10px] text-text-muted">10</span>
-              <span className="text-[10px] text-text-muted">20</span>
-            </div>
+            <label className="block text-[11px] text-text-muted font-medium uppercase tracking-wider mb-2">
+              Prompts
+            </label>
+            <button
+              onClick={() => setPromptPanelOpen(true)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-3 rounded-lg border transition-colors duration-150",
+                activePrompts.length > 0
+                  ? "border-accent-amber/30 bg-accent-amber/[0.05] hover:bg-accent-amber/[0.08]"
+                  : "border-subtle bg-white/[0.03] hover:border-[var(--border-hover)]"
+              )}
+            >
+              <SlidersHorizontal size={15} className="text-accent-amber shrink-0" />
+              <div className="flex-1 text-left">
+                {activePrompts.length > 0 ? (
+                  <>
+                    <p className="text-xs font-medium text-text-primary">
+                      {activePrompts.length} prompt{activePrompts.length !== 1 ? "s" : ""} configured
+                    </p>
+                    <p className="text-[10px] text-text-muted font-jetbrains">
+                      {totalCreatives} creative{totalCreatives !== 1 ? "s" : ""} total
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-text-muted">Configure prompts...</p>
+                )}
+              </div>
+            </button>
           </div>
 
           {/* Generate button */}
@@ -709,6 +738,264 @@ export default function CreativeGeneratorPage() {
           )}
         </div>
       </div>
+
+      {/* ─── Configure Prompts Panel ─── */}
+      <ActionSlider
+        open={promptPanelOpen}
+        onClose={() => setPromptPanelOpen(false)}
+        title="Configure Prompts"
+        width="460px"
+      >
+        <div className="space-y-6">
+          {/* Template list */}
+          <div>
+            <h4 className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-3">
+              Templates
+            </h4>
+            <div className="space-y-1.5">
+              {PROMPT_TEMPLATES.map((t) => {
+                const active = activePrompts.find((ap) => ap.templateId === t.id);
+                const isActive = Boolean(active);
+
+                return (
+                  <div
+                    key={t.id}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150",
+                      isActive
+                        ? "bg-accent-amber/[0.06] border border-accent-amber/20"
+                        : "bg-white/[0.02] border border-transparent hover:bg-white/[0.04]"
+                    )}
+                  >
+                    {/* Checkbox */}
+                    <button
+                      onClick={() => {
+                        if (isActive) {
+                          setActivePrompts((prev) =>
+                            prev.filter((ap) => ap.templateId !== t.id)
+                          );
+                        } else {
+                          setActivePrompts((prev) => [
+                            ...prev,
+                            { templateId: t.id, label: t.label, prompt: t.prompt, count: 2 },
+                          ]);
+                        }
+                      }}
+                      className={cn(
+                        "w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors duration-150",
+                        isActive
+                          ? "bg-accent-amber/20 border-accent-amber/50 text-accent-amber"
+                          : "border-subtle text-transparent hover:border-text-muted"
+                      )}
+                    >
+                      <Check size={12} strokeWidth={3} />
+                    </button>
+
+                    {/* Label + prompt preview */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-text-primary truncate">
+                        {t.label}
+                      </p>
+                      <p className="text-[10px] text-text-muted truncate">
+                        {t.prompt}
+                      </p>
+                    </div>
+
+                    {/* Count stepper */}
+                    {isActive && (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() =>
+                            setActivePrompts((prev) =>
+                              prev.map((ap) =>
+                                ap.templateId === t.id
+                                  ? { ...ap, count: Math.max(1, ap.count - 1) }
+                                  : ap
+                              )
+                            )
+                          }
+                          className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-colors"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <span className="text-xs font-jetbrains text-text-primary w-4 text-center tabular-nums">
+                          {active!.count}
+                        </span>
+                        <button
+                          onClick={() =>
+                            setActivePrompts((prev) =>
+                              prev.map((ap) =>
+                                ap.templateId === t.id
+                                  ? { ...ap, count: Math.min(10, ap.count + 1) }
+                                  : ap
+                              )
+                            )
+                          }
+                          className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-colors"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Custom prompts already added */}
+          {activePrompts.filter((ap) => ap.templateId === null).length > 0 && (
+            <div>
+              <h4 className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-3">
+                Custom Prompts
+              </h4>
+              <div className="space-y-1.5">
+                {activePrompts
+                  .filter((ap) => ap.templateId === null)
+                  .map((ap, i) => (
+                    <div
+                      key={`custom-${i}`}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-accent-indigo/[0.06] border border-accent-indigo/20"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-text-primary truncate">
+                          {ap.label}
+                        </p>
+                        <p className="text-[10px] text-text-muted truncate">
+                          {ap.prompt}
+                        </p>
+                      </div>
+
+                      {/* Count stepper */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() =>
+                            setActivePrompts((prev) =>
+                              prev.map((p) =>
+                                p === ap
+                                  ? { ...p, count: Math.max(1, p.count - 1) }
+                                  : p
+                              )
+                            )
+                          }
+                          className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-colors"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <span className="text-xs font-jetbrains text-text-primary w-4 text-center tabular-nums">
+                          {ap.count}
+                        </span>
+                        <button
+                          onClick={() =>
+                            setActivePrompts((prev) =>
+                              prev.map((p) =>
+                                p === ap
+                                  ? { ...p, count: Math.min(10, p.count + 1) }
+                                  : p
+                              )
+                            )
+                          }
+                          className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-colors"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+
+                      {/* Remove */}
+                      <button
+                        onClick={() =>
+                          setActivePrompts((prev) => prev.filter((p) => p !== ap))
+                        }
+                        className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Add custom prompt */}
+          <div>
+            <h4 className="text-[11px] text-text-muted font-medium uppercase tracking-wider mb-3">
+              Add Custom Prompt
+            </h4>
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={customLabel}
+                onChange={(e) => setCustomLabel(e.target.value)}
+                placeholder="Label (e.g. Streetwear Vibe)"
+                className={cn(
+                  "w-full rounded-lg border border-subtle bg-white/[0.04]",
+                  "px-3 py-2 text-xs text-text-primary",
+                  "focus:outline-none focus:ring-1 focus:ring-accent-indigo/50",
+                  "placeholder:text-text-muted"
+                )}
+              />
+              <textarea
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="Prompt description..."
+                rows={2}
+                className={cn(
+                  "w-full rounded-lg border border-subtle bg-white/[0.04]",
+                  "px-3 py-2 text-xs text-text-primary resize-none",
+                  "focus:outline-none focus:ring-1 focus:ring-accent-indigo/50",
+                  "placeholder:text-text-muted"
+                )}
+              />
+              <button
+                onClick={() => {
+                  if (!customLabel.trim()) return;
+                  setActivePrompts((prev) => [
+                    ...prev,
+                    {
+                      templateId: null,
+                      label: customLabel.trim(),
+                      prompt: customPrompt.trim() || customLabel.trim(),
+                      count: 2,
+                    },
+                  ]);
+                  setCustomLabel("");
+                  setCustomPrompt("");
+                }}
+                disabled={!customLabel.trim()}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors duration-150",
+                  customLabel.trim()
+                    ? "bg-accent-indigo/15 text-accent-indigo hover:bg-accent-indigo/25"
+                    : "bg-white/[0.04] text-text-muted cursor-not-allowed"
+                )}
+              >
+                <Plus size={12} />
+                Add Prompt
+              </button>
+            </div>
+          </div>
+
+          {/* Summary + Done */}
+          <div className="border-t border-subtle pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-text-primary">
+                  {activePrompts.length} prompt{activePrompts.length !== 1 ? "s" : ""}
+                </p>
+                <p className="text-[11px] text-text-muted font-jetbrains">
+                  {totalCreatives} creative{totalCreatives !== 1 ? "s" : ""} total
+                </p>
+              </div>
+              <button
+                onClick={() => setPromptPanelOpen(false)}
+                className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent-amber text-black hover:bg-accent-amber/90 transition-colors duration-150"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      </ActionSlider>
 
       {/* ─── Bottom sticky bar ─── */}
       <AnimatePresence>
