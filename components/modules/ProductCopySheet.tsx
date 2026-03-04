@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X } from "lucide-react";
+import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X, Upload, Check } from "lucide-react";
 import { useProductCopyStore } from "@/lib/store";
 import { type ProductCopy } from "@/data/mock";
 import { cn } from "@/lib/utils";
@@ -113,10 +113,14 @@ function CopyStatusCell({
   status,
   onGenerate,
   onChange,
+  pushState,
+  onPush,
 }: {
   status: ProductCopy["status"];
   onGenerate: () => void;
   onChange: (s: ProductCopy["status"]) => void;
+  pushState: "idle" | "pushing" | "pushed";
+  onPush: () => void;
 }) {
   if (!status || status === "Pending") {
     return (
@@ -144,24 +148,50 @@ function CopyStatusCell({
   }
 
   return (
-    <select
-      value={status}
-      onChange={(e) => onChange(e.target.value as ProductCopy["status"])}
-      className={cn(
-        "text-[11px] font-medium px-2 py-1 rounded-lg",
-        "bg-bg-elevated border border-subtle outline-none cursor-pointer",
-        "hover:border-[var(--border-hover)] transition-colors duration-150",
-        "appearance-none bg-[length:12px] bg-[right_6px_center] bg-no-repeat pr-6",
-        statusColors[status] ?? "text-text-primary"
+    <div className="flex items-center gap-2">
+      <select
+        value={status}
+        onChange={(e) => onChange(e.target.value as ProductCopy["status"])}
+        className={cn(
+          "text-[11px] font-medium px-2 py-1 rounded-lg",
+          "bg-bg-elevated border border-subtle outline-none cursor-pointer",
+          "hover:border-[var(--border-hover)] transition-colors duration-150",
+          "appearance-none bg-[length:12px] bg-[right_6px_center] bg-no-repeat pr-6",
+          statusColors[status] ?? "text-text-primary"
+        )}
+        style={{
+          backgroundColor: "#1A1A24",
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+        }}
+      >
+        <option value="Pending">Pending</option>
+        <option value="Completed">Completed</option>
+      </select>
+
+      {pushState === "pushing" ? (
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-violet-400">
+          <Loader2 size={12} className="animate-spin" />
+          Pushing…
+        </span>
+      ) : pushState === "pushed" ? (
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--accent-emerald)]">
+          <Check size={12} />
+          Pushed
+        </span>
+      ) : (
+        <button
+          onClick={onPush}
+          className={cn(
+            "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium",
+            "bg-[var(--accent-emerald)]/15 text-[var(--accent-emerald)]",
+            "hover:bg-[var(--accent-emerald)]/25 transition-colors duration-150"
+          )}
+        >
+          <Upload size={12} />
+          Push to Store
+        </button>
       )}
-      style={{
-        backgroundColor: "#1A1A24",
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-      }}
-    >
-      <option value="Pending">Pending</option>
-      <option value="Completed">Completed</option>
-    </select>
+    </div>
   );
 }
 
@@ -228,6 +258,20 @@ export function ProductCopySheet() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [pushingIds, setPushingIds] = useState<Set<string>>(new Set());
+  const [pushedIds, setPushedIds] = useState<Set<string>>(new Set());
+
+  function pushToStore(id: string) {
+    setPushingIds((prev) => new Set(prev).add(id));
+    setTimeout(() => {
+      setPushingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      setPushedIds((prev) => new Set(prev).add(id));
+    }, 1500);
+  }
 
   const filtered = useMemo(() => {
     let items = copyProducts;
@@ -434,6 +478,14 @@ export function ProductCopySheet() {
                     onChange={(s) =>
                       updateCopyProduct(product.id, { status: s })
                     }
+                    pushState={
+                      pushingIds.has(product.id)
+                        ? "pushing"
+                        : pushedIds.has(product.id)
+                          ? "pushed"
+                          : "idle"
+                    }
+                    onPush={() => pushToStore(product.id)}
                   />
                 </td>
 
