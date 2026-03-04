@@ -9,6 +9,8 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  RotateCcw,
+  CheckCheck,
 } from "lucide-react";
 import { useResearchStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -34,6 +36,20 @@ export default function ImportPage() {
 
   function removeFromQueue(id: string) {
     updateSheetProduct(id, { testingStatus: "" });
+    setCsvGenerated(false);
+  }
+
+  function clearQueueReset() {
+    queuedProducts.forEach((p) =>
+      updateSheetProduct(p.id, { testingStatus: "" })
+    );
+    setCsvGenerated(false);
+  }
+
+  function clearQueueImported() {
+    queuedProducts.forEach((p) =>
+      updateSheetProduct(p.id, { testingStatus: "Imported" })
+    );
     setCsvGenerated(false);
   }
 
@@ -107,20 +123,44 @@ export default function ImportPage() {
               </span>
             )}
 
-            <button
-              onClick={generateCSV}
-              disabled={validProducts.length === 0}
-              className={cn(
-                "ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium",
-                "transition-colors duration-150",
-                validProducts.length > 0
-                  ? "bg-accent-indigo text-white hover:bg-accent-indigo/80"
-                  : "bg-white/[0.04] text-text-muted cursor-not-allowed"
-              )}
-            >
-              <Download size={15} />
-              Generate CSV
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={clearQueueReset}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
+                  "border border-subtle text-text-secondary",
+                  "hover:border-[var(--border-hover)] hover:text-text-primary transition-colors duration-150"
+                )}
+              >
+                <RotateCcw size={13} />
+                Reset All
+              </button>
+              <button
+                onClick={clearQueueImported}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
+                  "bg-[var(--accent-emerald)]/15 text-[var(--accent-emerald)]",
+                  "hover:bg-[var(--accent-emerald)]/25 transition-colors duration-150"
+                )}
+              >
+                <CheckCheck size={13} />
+                Mark All Imported
+              </button>
+              <button
+                onClick={generateCSV}
+                disabled={validProducts.length === 0}
+                className={cn(
+                  "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium",
+                  "transition-colors duration-150",
+                  validProducts.length > 0
+                    ? "bg-accent-indigo text-white hover:bg-accent-indigo/80"
+                    : "bg-white/[0.04] text-text-muted cursor-not-allowed"
+                )}
+              >
+                <Download size={15} />
+                Generate CSV
+              </button>
+            </div>
           </div>
 
           {/* ── Success banner ── */}
