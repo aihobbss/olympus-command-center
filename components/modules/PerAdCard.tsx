@@ -15,6 +15,7 @@ interface PerAdCardProps {
   cog: number;
   onCogChange: (id: string, newCog: number) => void;
   storeCurrency: string;
+  market: string;
   toUsd: (localAmount: number) => number;
   tierIndicator?: "current" | "scaled";
   scaledToBudget?: number;
@@ -52,6 +53,7 @@ export function PerAdCard({
   cog,
   onCogChange,
   storeCurrency,
+  market,
   toUsd,
   tierIndicator,
   scaledToBudget,
@@ -61,6 +63,11 @@ export function PerAdCard({
 
   const { product, revenue, spend, orders, roas, profit, cpc, budget } =
     campaign;
+
+  const profitPercent = revenue > 0 ? (profit / revenue) * 100 : 0;
+  const fees = revenue * 0.05;
+  const minPriceDivisor = market === "UK" ? 1.33 : 0.65;
+  const minPrice = (cog * 2) / minPriceDivisor;
 
   const metrics: {
     label: string;
@@ -93,12 +100,25 @@ export function PerAdCard({
       colorClass: profit < 0 ? "text-accent-red" : profit > 0 ? "text-accent-emerald" : undefined,
     },
     {
+      label: "Profit %",
+      value: `${profitPercent.toFixed(1)}%`,
+      colorClass: profitPercent < 0 ? "text-accent-red" : profitPercent > 0 ? "text-accent-emerald" : undefined,
+    },
+    {
+      label: "Fees",
+      value: formatCurrency(fees, storeCurrency, 2),
+    },
+    {
       label: "CPC",
       value: formatCurrency(cpc, "$", 2),
     },
     {
       label: "Budget",
       value: `${formatCurrency(budget, "$")}/day`,
+    },
+    {
+      label: "Min Price",
+      value: formatCurrency(minPrice, storeCurrency, 2),
     },
   ];
 

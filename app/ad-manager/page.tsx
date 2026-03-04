@@ -7,7 +7,7 @@ import type { TimePeriod } from "@/components/ui";
 import { CampaignCard } from "@/components/modules/CampaignCard";
 import { AdActionPanel } from "@/components/modules/AdActionPanel";
 import { AdCharts } from "@/components/modules/AdCharts";
-import { adCampaigns, type AdCampaign } from "@/data/mock";
+import { getAdCampaigns, type AdCampaign } from "@/data/mock";
 import { useStoreContext } from "@/lib/store";
 
 // ─── Period scaling factors ─────────────────────────────────
@@ -87,10 +87,12 @@ export default function AdManagerPage() {
 
   // ── Scale campaigns by period factor ──
 
+  const storeAdCampaigns = useMemo(() => getAdCampaigns(selectedStore.id), [selectedStore.id]);
+
   const scaledCampaigns = useMemo(() => {
     const factor = PERIOD_FACTOR[period];
 
-    return adCampaigns.map((c, idx) => {
+    return storeAdCampaigns.map((c, idx) => {
       const f = jitter(factor, idx * 17 + 3);
       const spend = Math.round(c.spend * f);
       const revenue = Math.round(c.revenue * f);
@@ -120,7 +122,7 @@ export default function AdManagerPage() {
         recommendation,
       } satisfies AdCampaign;
     });
-  }, [period]);
+  }, [period, storeAdCampaigns]);
 
   // ── Aggregated metrics ──
 

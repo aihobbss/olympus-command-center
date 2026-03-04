@@ -221,19 +221,19 @@ export const initialCopyProducts: ProductCopy[] = [
   {
     id: "pc-001",
     productName: "Aymbr Sweater",
-    productUrl: "https://vantagemelbourne.com/products/aymbr",
-    imageUrl: "http://vantagemelbourne.com/cdn/shop/files/britt_wit_1_1_720x.jpg",
-    shopifyDescription: "Modern Edge Meets Everyday Comfort\n\nElevate your seasonal wardrobe with a statement knit designed to turn heads. The Aymbr Sweater features distinctive openwork detail and a relaxed silhouette that flatters while keeping things effortlessly stylish.\n\n\u2022 Knitted Design: Cozy construction combines warmth with everyday refinement\n\u2022 Openwork Details: Intricate patterns bring depth and modern flair\n\u2022 Relaxed Fit: Slightly oversized shape with dropped shoulders for easy layering\n\u2022 Round Neck: Classic crew neckline complements any outfit\n\nDesigned in Melbourne by Vantage for timeless versatility.",
-    facebookCopy: "Slide Into Textured Sophistication with the Aymbr Sweater\n\nPlayful structure meets confident style in this relaxed must-have. The Aymbr Sweater\u2019s openwork detail and patchwork texture bring effortless elegance to your rotation.\n\nRelaxed. Intricate. Versatile.\n\nhttps://vantagemelbourne.com/products/aymbr\nAymbr Sweater\nFree Shipping in Australia\nShop now",
+    productUrl: "https://olympus-london.myshopify.com/products/aymbr",
+    imageUrl: "http://olympus-london.myshopify.com/cdn/shop/files/britt_wit_1_1_720x.jpg",
+    shopifyDescription: "Modern Edge Meets Everyday Comfort\n\nElevate your seasonal wardrobe with a statement knit designed to turn heads. The Aymbr Sweater features distinctive openwork detail and a relaxed silhouette that flatters while keeping things effortlessly stylish.\n\n\u2022 Knitted Design: Cozy construction combines warmth with everyday refinement\n\u2022 Openwork Details: Intricate patterns bring depth and modern flair\n\u2022 Relaxed Fit: Slightly oversized shape with dropped shoulders for easy layering\n\u2022 Round Neck: Classic crew neckline complements any outfit\n\nDesigned in London by Olympus for timeless versatility.",
+    facebookCopy: "Slide Into Textured Sophistication with the Aymbr Sweater\n\nPlayful structure meets confident style in this relaxed must-have. The Aymbr Sweater\u2019s openwork detail and patchwork texture bring effortless elegance to your rotation.\n\nRelaxed. Intricate. Versatile.\n\nhttps://olympus-london.myshopify.com/products/aymbr\nAymbr Sweater\nFree Shipping in the UK\nShop now",
     status: "Completed",
   },
   {
     id: "pc-002",
     productName: "All-Terrain Canvas Sneaker",
-    productUrl: "https://vantagemelbourne.com/products/all-terrain-canvas-sneaker",
-    imageUrl: "http://vantagemelbourne.com/cdn/shop/files/S6dba56a87e254678.webp",
-    shopifyDescription: "Warm-Weather Function Meets Everyday Utility\n\nCrafted for comfort and ease, the All-Terrain Canvas Sneaker is ready for anything from daily errands to weekend adventures. The breathable upper and flexible sole support natural movement.\n\n\u2022 Low-Top Construction: Relaxed silhouette with casual styling appeal\n\u2022 Lace-Up Front: Metal eyelets provide secure fit and utility edge\n\u2022 Slip-Resistant Tread: Durable outsole provides reliable traction\n\u2022 Textured Details: Visible stitching and panel design add structure\n\nDesigned in Melbourne by Vantage for modern versatility.",
-    facebookCopy: "Slide Into Everyday Motion with the All-Terrain Canvas Sneaker\n\nBuilt to keep pace with your routine, the All-Terrain Canvas Sneaker delivers breathable comfort, structured support, and rugged traction in one easygoing package.\n\nPractical. Breathable. Grounded.\n\nhttps://vantagemelbourne.com/products/all-terrain-canvas-sneaker\nAll-Terrain Canvas Sneaker\nFree Shipping in Australia\nShop now",
+    productUrl: "https://olympus-london.myshopify.com/products/all-terrain-canvas-sneaker",
+    imageUrl: "http://olympus-london.myshopify.com/cdn/shop/files/S6dba56a87e254678.webp",
+    shopifyDescription: "Warm-Weather Function Meets Everyday Utility\n\nCrafted for comfort and ease, the All-Terrain Canvas Sneaker is ready for anything from daily errands to weekend adventures. The breathable upper and flexible sole support natural movement.\n\n\u2022 Low-Top Construction: Relaxed silhouette with casual styling appeal\n\u2022 Lace-Up Front: Metal eyelets provide secure fit and utility edge\n\u2022 Slip-Resistant Tread: Durable outsole provides reliable traction\n\u2022 Textured Details: Visible stitching and panel design add structure\n\nDesigned in London by Olympus for modern versatility.",
+    facebookCopy: "Slide Into Everyday Motion with the All-Terrain Canvas Sneaker\n\nBuilt to keep pace with your routine, the All-Terrain Canvas Sneaker delivers breathable comfort, structured support, and rugged traction in one easygoing package.\n\nPractical. Breathable. Grounded.\n\nhttps://olympus-london.myshopify.com/products/all-terrain-canvas-sneaker\nAll-Terrain Canvas Sneaker\nFree Shipping in the UK\nShop now",
     status: "Completed",
   },
   {
@@ -599,6 +599,94 @@ export const profitLogs: ProfitLog[] = [
   { date: daysAgo(58), revenue: 401, cog: 82, adSpend: 152, transactionFee: 20.05, profit: 146.95, roas: 2.64, profitPercent: 36.6 },
   { date: daysAgo(59), revenue: 136, cog: 30, adSpend: 90, transactionFee: 6.8, profit: 9.2, roas: 1.51, profitPercent: 6.8 },
 ];
+
+// ============================================================
+// 3b. Per-store data helpers
+// ============================================================
+
+// Olympus London is the main store (~£950K all-time revenue).
+// Vantage Melbourne is the student store (smaller numbers).
+// Scale factor: current Vantage total ≈ £20K over 60 days → Olympus target ≈ £950K → ~47x
+
+const OLYMPUS_SCALE = 47;
+
+function scaleProfitLog(log: ProfitLog, scale: number): ProfitLog {
+  const revenue = Math.round(log.revenue * scale);
+  const cog = Math.round(log.cog * scale);
+  const adSpend = Math.round(log.adSpend * scale);
+  const transactionFee = +(log.transactionFee * scale).toFixed(2);
+  const profit = +(revenue - cog - adSpend - transactionFee).toFixed(2);
+  const roas = adSpend > 0 ? +(revenue / adSpend).toFixed(2) : 0;
+  const profitPercent = revenue > 0 ? +((profit / revenue) * 100).toFixed(1) : 0;
+  return { ...log, revenue, cog, adSpend, transactionFee, profit, roas, profitPercent };
+}
+
+const olympusProfitLogs: ProfitLog[] = profitLogs.map((l) => scaleProfitLog(l, OLYMPUS_SCALE));
+
+function scaleAdCampaign(c: AdCampaign, scale: number): AdCampaign {
+  const spend = Math.round(c.spend * scale);
+  const revenue = Math.round(c.revenue * scale);
+  const orders = Math.round(c.orders * scale);
+  const profit = Math.round(c.profit * scale);
+  const roas = spend > 0 ? +(revenue / spend).toFixed(2) : 0;
+  const budget = Math.round(c.budget * scale);
+
+  const budgetHistory = c.budgetHistory?.map((h) => ({
+    ...h,
+    budgetPerDay: Math.round(h.budgetPerDay * scale),
+    spend: Math.round(h.spend * scale),
+    revenue: Math.round(h.revenue * scale),
+    orders: Math.round(h.orders * scale),
+    profit: Math.round(h.profit * scale),
+    roas: h.spend > 0 ? +(h.revenue / h.spend).toFixed(2) : 0,
+  }));
+
+  return {
+    ...c,
+    id: `ol-${c.id.slice(3)}`,
+    spend,
+    revenue,
+    orders,
+    profit,
+    roas,
+    budget,
+    budgetHistory,
+  };
+}
+
+const olympusAdCampaigns: AdCampaign[] = adCampaigns.map((c) => scaleAdCampaign(c, OLYMPUS_SCALE));
+
+// Default COGs per store
+export const OLYMPUS_DEFAULT_COGS: Record<string, number> = {
+  "ol-001": 16.0,
+  "ol-002": 15.0,
+  "ol-003": 20.0,
+  "ol-004": 12.0,
+  "ol-005": 12.0,
+};
+
+export const VANTAGE_DEFAULT_COGS: Record<string, number> = {
+  "ac-001": 16.0,
+  "ac-002": 15.0,
+  "ac-003": 20.0,
+  "ac-004": 12.0,
+  "ac-005": 12.0,
+};
+
+/** Get profit logs for a given store */
+export function getProfitLogs(storeId: string): ProfitLog[] {
+  return storeId === "olympus-london" ? olympusProfitLogs : profitLogs;
+}
+
+/** Get ad campaigns for a given store */
+export function getAdCampaigns(storeId: string): AdCampaign[] {
+  return storeId === "olympus-london" ? olympusAdCampaigns : adCampaigns;
+}
+
+/** Get default COGs for a given store */
+export function getDefaultCogs(storeId: string): Record<string, number> {
+  return storeId === "olympus-london" ? OLYMPUS_DEFAULT_COGS : VANTAGE_DEFAULT_COGS;
+}
 
 // ============================================================
 // 4. Customer Service Cases (5 items)

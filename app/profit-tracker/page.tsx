@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
@@ -15,8 +15,9 @@ import type { TimePeriod } from "@/components/ui";
 import ProfitChart from "@/components/modules/ProfitChart";
 import { PerAdCard } from "@/components/modules/PerAdCard";
 import {
-  profitLogs,
-  adCampaigns,
+  getProfitLogs,
+  getAdCampaigns,
+  getDefaultCogs,
   type AdCampaign,
   type BudgetTierSnapshot,
 } from "@/data/mock";
@@ -33,14 +34,6 @@ const VIEW_OPTIONS: { key: View; label: string }[] = [
   { key: "store-logs", label: "Store Logs" },
   { key: "per-ad", label: "Per-Ad Breakdown" },
 ];
-
-const DEFAULT_COGS: Record<string, number> = {
-  "ac-001": 16.0,
-  "ac-002": 15.0,
-  "ac-003": 20.0,
-  "ac-004": 12.0,
-  "ac-005": 12.0,
-};
 
 const PERIOD_LABEL: Record<TimePeriod, string> = {
   today: "Today",
@@ -85,14 +78,14 @@ type TierGroup = {
 // ─── Page ───────────────────────────────────────────────────
 
 export default function ProfitTrackerPage() {
+  const { selectedStore } = useStoreContext();
+
   const [view, setView] = useState<View>("store-logs");
   const [period, setPeriod] = useState<TimePeriod>("all");
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState(() => new Date());
-  const [cogs, setCogs] = useState<Record<string, number>>(DEFAULT_COGS);
+  const [cogs, setCogs] = useState<Record<string, number>>(() => getDefaultCogs(selectedStore.id));
   const [tableMonth, setTableMonth] = useState<Date>(() => new Date());
-
-  const { selectedStore } = useStoreContext();
   const storeCurrency = selectedStore.currency;
   const ptRate = STORE_TO_USD[selectedStore.market] ?? 1;
   const currencyCode = selectedStore.market === "UK" ? "GBP" : "AUD";
@@ -103,8 +96,16 @@ export default function ProfitTrackerPage() {
 
   // ── Time-filtered logs (feeds metric cards + chart) ──
 
+  // Reset COGs when store changes
+  useEffect(() => {
+    setCogs(getDefaultCogs(selectedStore.id));
+  }, [selectedStore.id]);
+
+  const storeProfitLogs = useMemo(() => getProfitLogs(selectedStore.id), [selectedStore.id]);
+  const storeAdCampaigns = useMemo(() => getAdCampaigns(selectedStore.id), [selectedStore.id]);
+
   const filteredLogs = useMemo(() => {
-    if (period === "all") return profitLogs;
+    if (period === "all") return storeProfitLogs;
     const daysMap: Record<TimePeriod, number> = {
       today: 1,
       "3d": 3,
@@ -116,8 +117,8 @@ export default function ProfitTrackerPage() {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     cutoff.setHours(0, 0, 0, 0);
-    return profitLogs.filter((log) => new Date(log.date) >= cutoff);
-  }, [period]);
+    return storeProfitLogs.filter((log) => new Date(log.date) >= cutoff);
+  }, [period, storeProfitLogs]);
 
   // ── Aggregated totals (from filtered logs) ──
 
@@ -140,11 +141,11 @@ export default function ProfitTrackerPage() {
   const monthLogs = useMemo(() => {
     const year = tableMonth.getFullYear();
     const month = tableMonth.getMonth();
-    return profitLogs.filter((log) => {
+    return storeProfitLogs.filter((log) => {
       const d = new Date(log.date);
       return d.getFullYear() === year && d.getMonth() === month;
     });
-  }, [tableMonth]);
+  }, [tableMonth, storeProfitLogs]);
 
   const monthTotals = useMemo(() => {
     let revenue = 0,
@@ -192,7 +193,7 @@ export default function ProfitTrackerPage() {
   const budgetTierGroups = useMemo((): TierGroup[] => {
     const tierMap = new Map<number, TierEntry[]>();
 
-    for (const campaign of adCampaigns) {
+    for (const campaign of storeAdCampaigns) {
       const history: BudgetTierSnapshot[] = campaign.budgetHistory ?? [
         {
           budgetPerDay: campaign.budget,
@@ -228,7 +229,7 @@ export default function ProfitTrackerPage() {
     return Array.from(tierMap.entries())
       .sort(([a], [b]) => a - b)
       .map(([budgetPerDay, entries]) => ({ budgetPerDay, entries }));
-  }, []);
+  }, [storeAdCampaigns]);
 
   // ── Sync simulation ──
 
@@ -573,6 +574,7 @@ export default function ProfitTrackerPage() {
                       cog={cogs[entry.campaign.id] ?? 0}
                       onCogChange={handleCogChange}
                       storeCurrency={storeCurrency}
+                      market={selectedStore.market}
                       toUsd={convertToUsd}
                       tierIndicator={entry.tierIndicator}
                       scaledToBudget={entry.scaledToBudget}
