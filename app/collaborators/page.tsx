@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
@@ -17,6 +18,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  LogIn,
 } from "lucide-react";
 import {
   BarChart,
@@ -39,7 +41,7 @@ import {
   type CollabAccess,
   type SentCollabRequest,
 } from "@/data/mock";
-import { useAuthStore } from "@/lib/store";
+import { useAuthStore, useCoachViewStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 // ─── Constants ───────────────────────────────────────────────
@@ -180,9 +182,14 @@ export default function CollaboratorsPage() {
     [userId]
   );
   const [period, setPeriod] = useState<TimePeriod>("7d");
-  const [overlayStore, setOverlayStore] = useState<CollabAccess | null>(null);
+  const [overlayStoreId, setOverlayStoreId] = useState<string | null>(null);
+  const [overlayPeriod, setOverlayPeriod] = useState<TimePeriod>("7d");
   const [sortKey, setSortKey] = useState<string>("revenue");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  // ── Coach view ──
+  const enterCoachView = useCoachViewStore((s) => s.enter);
+  const router = useRouter();
 
   const handleSort = useCallback((key: string) => {
     setSortKey((prev) => {
@@ -233,6 +240,22 @@ export default function CollaboratorsPage() {
     profit: Math.round(totals.profit * GBP_TO_USD),
   }), [totals]);
 
+  // ── Overlay derivations ──
+  const overlayBaseStore = useMemo(
+    () => (overlayStoreId ? accessList.find((s) => s.id === overlayStoreId) ?? null : null),
+    [overlayStoreId, accessList]
+  );
+
+  const overlayScaled = useMemo(() => {
+    if (!overlayBaseStore) return null;
+    const f = PERIOD_FACTOR[overlayPeriod];
+    const revenue = Math.round(overlayBaseStore.revenue * f);
+    const adSpend = Math.round(overlayBaseStore.adSpend * f);
+    const profit = Math.round(overlayBaseStore.profit * f);
+    const roas = adSpend > 0 ? parseFloat((revenue / adSpend).toFixed(2)) : 0;
+    return { ...overlayBaseStore, revenue, adSpend, profit, roas };
+  }, [overlayBaseStore, overlayPeriod]);
+
   // ── Derived ──
   const pendingRequests = useMemo(
     () => requests.filter((r) => r.status === "pending"),
@@ -282,6 +305,12 @@ export default function CollaboratorsPage() {
       prev.filter((c) => c.id !== removeModal.collabId)
     );
   }, [removeModal.collabId]);
+
+  const handleEnterStore = useCallback(() => {
+    if (!overlayBaseStore) return;
+    enterCoachView(overlayBaseStore.storeName, overlayBaseStore.ownerName);
+    router.push("/profit-tracker");
+  }, [overlayBaseStore, enterCoachView, router]);
 
   const handleSendRequest = useCallback(() => {
     const storeId = requestInput.trim();
@@ -780,7 +809,10 @@ export default function CollaboratorsPage() {
                     {scaledAccessList.map((store) => (
                       <tr
                         key={store.id}
-                        onClick={() => setOverlayStore(store)}
+                        onClick={() => {
+                          setOverlayStoreId(store.id);
+                          setOverlayPeriod("7d");
+                        }}
                         className="border-b border-subtle last:border-b-0 cursor-pointer hover:bg-white/[0.02] transition-colors duration-100"
                       >
                         <td className="px-4 py-3 text-center">
@@ -847,7 +879,7 @@ export default function CollaboratorsPage() {
 
       {/* ─── Full Store Overlay ─── */}
       <AnimatePresence>
-        {overlayStore && (
+        {overlayScaled && (
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
@@ -865,8 +897,8 @@ export default function CollaboratorsPage() {
                   className="text-accent-amber shrink-0"
                 />
                 <span className="text-[12px] text-accent-amber font-medium">
-                  Viewing {overlayStore.storeName} &middot;{" "}
-                  {overlayStore.ownerName}&apos;s Store &middot; Collaborator
+                  Viewing {overlayScaled.storeName} &middot;{" "}
+                  {overlayScaled.ownerName}&apos;s Store &middot; Collaborator
                   Access
                 </span>
               </div>
@@ -874,7 +906,7 @@ export default function CollaboratorsPage() {
               {/* Nav bar */}
               <div className="flex items-center justify-between px-6 py-3.5">
                 <button
-                  onClick={() => setOverlayStore(null)}
+                  onClick={() => setOverlayStoreId(null)}
                   className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
                 >
                   <ArrowLeft size={16} strokeWidth={2} />
@@ -882,10 +914,10 @@ export default function CollaboratorsPage() {
                 </button>
                 <div className="flex items-center gap-3">
                   <div className="w-7 h-7 rounded-full bg-accent-indigo/10 flex items-center justify-center text-xs font-semibold text-accent-indigo">
-                    {overlayStore.ownerInitials}
+                    {overlayScaled.ownerInitials}
                   </div>
                   <span className="text-sm font-syne font-semibold text-text-primary">
-                    {overlayStore.storeName}
+                    {overlayScaled.storeName}
                   </span>
                 </div>
               </div>
@@ -904,43 +936,55 @@ export default function CollaboratorsPage() {
                 </div>
                 <div>
                   <h2 className="text-xl font-syne font-bold tracking-tight text-text-primary">
-                    {overlayStore.storeName}
+                    {overlayScaled.storeName}
                   </h2>
                   <p className="text-sm text-text-secondary">
-                    Owned by {overlayStore.ownerName} &middot;{" "}
-                    {overlayStore.market} &middot; {overlayStore.currency}
+                    Owned by {overlayScaled.ownerName} &middot;{" "}
+                    {overlayScaled.market} &middot; {overlayScaled.currency}
                   </p>
                 </div>
               </div>
 
-              {/* Metrics */}
+              {/* Period selector */}
+              <div className="flex items-center justify-between mb-5">
+                <p className="text-[11px] text-text-muted uppercase tracking-wider font-semibold">
+                  Performance
+                </p>
+                <TimePeriodSelector
+                  value={overlayPeriod}
+                  onChange={setOverlayPeriod}
+                  layoutId="period-pill-overlay"
+                />
+              </div>
+
+              {/* Metrics — scale with overlayPeriod */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
                 <MetricCard
                   label="Revenue"
-                  value={overlayStore.revenue}
+                  value={overlayScaled.revenue}
                   format="currency"
-                  currency={overlayStore.currency}
+                  currency={overlayScaled.currency}
                 />
                 <MetricCard
                   label="Ad Spend"
-                  value={overlayStore.adSpend}
+                  value={overlayScaled.adSpend}
                   format="currency"
-                  currency={overlayStore.currency}
+                  currency={overlayScaled.currency}
                 />
                 <MetricCard
                   label="Profit"
-                  value={overlayStore.profit}
+                  value={overlayScaled.profit}
                   format="currency"
-                  currency={overlayStore.currency}
+                  currency={overlayScaled.currency}
                 />
                 <MetricCard
                   label="ROAS"
-                  value={overlayStore.roas}
+                  value={overlayScaled.roas}
                   format="number"
                 />
               </div>
 
-              {/* Module sections */}
+              {/* Module sections — "View Details" removed */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 {OVERLAY_SECTIONS.map((section) => (
                   <div key={section.label} className="card p-5">
@@ -954,42 +998,37 @@ export default function CollaboratorsPage() {
                         {section.label}
                       </h4>
                     </div>
-                    <p className="text-[12px] text-text-secondary mb-4">
-                      {section.getStatus(overlayStore)}
+                    <p className="text-[12px] text-text-secondary">
+                      {section.getStatus(overlayScaled)}
                     </p>
-                    <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-medium bg-accent-indigo/10 text-accent-indigo hover:bg-accent-indigo/20 transition-colors">
-                      <Eye size={12} />
-                      View Details
-                    </button>
                   </div>
                 ))}
               </div>
 
-              {/* Status + actions strip */}
+              {/* Status + actions strip — Scale/Kill replaced with Enter This Store */}
               <div className="card p-5">
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <div className="flex items-center gap-3">
                     <StatusBadge
-                      status={overlayStore.status}
-                      variant={STATUS_VARIANT[overlayStore.status]}
+                      status={overlayScaled.status}
+                      variant={STATUS_VARIANT[overlayScaled.status]}
                       size="md"
                     />
                     <span className="text-sm text-text-secondary">
-                      {overlayStore.status === "Active"
+                      {overlayScaled.status === "Active"
                         ? "Store is performing well"
-                        : overlayStore.status === "Struggling"
+                        : overlayScaled.status === "Struggling"
                           ? "Store needs attention — low margins"
                           : "Store at risk — negative profit"}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-accent-indigo/10 text-accent-indigo hover:bg-accent-indigo/20 transition-colors">
-                      Scale Campaigns
-                    </button>
-                    <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium bg-accent-red/10 text-accent-red hover:bg-accent-red/20 transition-colors">
-                      Kill Campaigns
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleEnterStore}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent-emerald hover:bg-accent-emerald/85 text-white shadow-lg shadow-accent-emerald/20 transition-all duration-200"
+                  >
+                    <LogIn size={15} strokeWidth={2} />
+                    Enter This Store
+                  </button>
                 </div>
               </div>
             </div>

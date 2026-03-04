@@ -9,6 +9,7 @@ export interface TimePeriodSelectorProps {
   value: TimePeriod;
   onChange: (period: TimePeriod) => void;
   className?: string;
+  layoutId?: string;
 }
 
 const periods: { key: TimePeriod; label: string }[] = [
@@ -23,6 +24,7 @@ export function TimePeriodSelector({
   value,
   onChange,
   className,
+  layoutId = "period-pill",
 }: TimePeriodSelectorProps) {
   return (
     <div
@@ -47,7 +49,7 @@ export function TimePeriodSelector({
           >
             {isActive && (
               <motion.div
-                layoutId="period-pill"
+                layoutId={layoutId}
                 className="absolute inset-0 rounded-md bg-accent-indigo/15 ring-1 ring-accent-indigo/25"
                 transition={{
                   type: "spring",

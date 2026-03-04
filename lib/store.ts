@@ -204,3 +204,24 @@ export const useDemoStore = create<DemoStore>((set) => ({
     set((state) => ({ tourStep: Math.max(state.tourStep - 1, 0) })),
   endTour: () => set({ tourActive: false, tourStep: 0 }),
 }));
+
+// ─── Coach View ──────────────────────────────────────────
+// Set when a coach clicks "Enter This Store" from the
+// Collaborators overlay. Persists globally so AppShell can
+// render the mint green banner across all module pages.
+
+interface CoachViewState {
+  active: boolean;
+  storeName: string;
+  ownerName: string;
+  enter: (storeName: string, ownerName: string) => void;
+  exit: () => void;
+}
+
+export const useCoachViewStore = create<CoachViewState>((set) => ({
+  active: false,
+  storeName: "",
+  ownerName: "",
+  enter: (storeName, ownerName) => set({ active: true, storeName, ownerName }),
+  exit: () => set({ active: false, storeName: "", ownerName: "" }),
+}));
