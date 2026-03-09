@@ -8,6 +8,7 @@ import {
   SlidersHorizontal,
   ExternalLink,
   PackageCheck,
+  Plus,
 } from "lucide-react";
 import { useResearchStore, useStoreContext } from "@/lib/store";
 import {
@@ -360,7 +361,7 @@ type TestingStatusFilter =
 // ── Main sheet component ───────────────────────────────────
 
 export function ResearchSheet() {
-  const { sheetProducts, updateSheetProduct, importAllUnimported } =
+  const { sheetProducts, updateSheetProduct, importAllUnimported, addSheetProduct } =
     useResearchStore();
   const { selectedStore } = useStoreContext();
   const [search, setSearch] = useState("");
@@ -482,7 +483,7 @@ export function ResearchSheet() {
 
       {/* ── Table ── */}
     <div className="overflow-x-auto scrollbar-hide -mx-1">
-      <table className="w-full min-w-[1060px] text-left">
+      <table className="w-full min-w-[1200px] text-left">
         <thead>
           <tr className="border-b border-subtle">
             {[
@@ -494,6 +495,8 @@ export function ResearchSheet() {
               "COG",
               "Type",
               "Price",
+              "Discount %",
+              "Compare At",
               "Notes",
             ].map((h) => (
               <th
@@ -618,6 +621,43 @@ export function ResearchSheet() {
                 </span>
               </td>
 
+              {/* Discount % — editable */}
+              <td className="px-3 py-2.5 w-20">
+                <EditableCell
+                  value={product.discountPercent}
+                  type="number"
+                  placeholder="42"
+                  prefix=""
+                  onSave={(v) => {
+                    const pct = v ? Math.min(99, Math.max(0, parseFloat(v))) : 42;
+                    updateSheetProduct(product.id, { discountPercent: pct });
+                  }}
+                />
+              </td>
+
+              {/* Compare At — auto-calculated from price & discount */}
+              <td className="px-3 py-2.5 w-24">
+                <span
+                  className={cn(
+                    "text-xs font-mono-metric px-2 py-1",
+                    product.pricing != null
+                      ? "text-text-secondary line-through"
+                      : "text-text-muted"
+                  )}
+                >
+                  {product.pricing != null ? (
+                    <>
+                      <span className="text-text-muted">
+                        {selectedStore.currency}
+                      </span>
+                      {Math.ceil(product.pricing / (1 - product.discountPercent / 100))}
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+              </td>
+
               {/* Notes — editable */}
               <td className="px-3 py-2.5 min-w-[160px]">
                 <EditableCell
@@ -633,6 +673,20 @@ export function ResearchSheet() {
         </tbody>
       </table>
     </div>
+
+      {/* Add Row */}
+      <button
+        onClick={addSheetProduct}
+        className={cn(
+          "mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
+          "text-text-muted hover:text-text-secondary",
+          "border border-dashed border-subtle hover:border-text-muted",
+          "transition-all duration-150"
+        )}
+      >
+        <Plus size={14} />
+        Add Product
+      </button>
 
       {/* No results */}
       {filtered.length === 0 && (

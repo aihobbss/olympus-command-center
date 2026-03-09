@@ -117,6 +117,7 @@ export type SheetProduct = {
   cog: number | null;
   productType: ProductType;
   pricing: number | null;
+  discountPercent: number;
   notes: string;
 };
 
@@ -131,6 +132,7 @@ export const initialSheetProducts: SheetProduct[] = [
     cog: 18,
     productType: "Regular Jacket",
     pricing: 35,
+    discountPercent: 42,
     notes: "GOOD",
   },
   {
@@ -143,6 +145,7 @@ export const initialSheetProducts: SheetProduct[] = [
     cog: 12,
     productType: "Heavy Top",
     pricing: 31,
+    discountPercent: 42,
     notes: "good",
   },
   {
@@ -155,6 +158,7 @@ export const initialSheetProducts: SheetProduct[] = [
     cog: 22,
     productType: "All Accessories",
     pricing: 26,
+    discountPercent: 42,
     notes: "GOOD",
   },
   {
@@ -167,6 +171,7 @@ export const initialSheetProducts: SheetProduct[] = [
     cog: null,
     productType: "Luxury Jacket",
     pricing: 48,
+    discountPercent: 42,
     notes: "Not DS",
   },
   {
@@ -179,6 +184,7 @@ export const initialSheetProducts: SheetProduct[] = [
     cog: 24,
     productType: "Light Jacket",
     pricing: 32,
+    discountPercent: 42,
     notes: "Creative is branded",
   },
   {
@@ -191,6 +197,7 @@ export const initialSheetProducts: SheetProduct[] = [
     cog: 16,
     productType: "Luxury Jacket",
     pricing: 48,
+    discountPercent: 42,
     notes: "avoid",
   },
   {
@@ -203,6 +210,7 @@ export const initialSheetProducts: SheetProduct[] = [
     cog: 19,
     productType: "All Accessories",
     pricing: 26,
+    discountPercent: 42,
     notes: "",
   },
   {
@@ -215,6 +223,7 @@ export const initialSheetProducts: SheetProduct[] = [
     cog: 11,
     productType: "Light Pants",
     pricing: 28,
+    discountPercent: 42,
     notes: "Good margins",
   },
   {
@@ -227,6 +236,7 @@ export const initialSheetProducts: SheetProduct[] = [
     cog: 14,
     productType: "Light Jacket",
     pricing: 32,
+    discountPercent: 42,
     notes: "",
   },
 ];

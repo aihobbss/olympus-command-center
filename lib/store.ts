@@ -68,6 +68,7 @@ interface ResearchStore {
   sheetProducts: SheetProduct[];
   updateSheetProduct: (id: string, updates: Partial<SheetProduct>) => void;
   importAllUnimported: () => void;
+  addSheetProduct: () => void;
 }
 
 export const useResearchStore = create<ResearchStore>((set, get) => ({
@@ -98,6 +99,7 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
       cog: null,
       productType: "",
       pricing: null,
+      discountPercent: 42,
       notes: "",
     };
     set((s) => ({
@@ -120,6 +122,26 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
       sheetProducts: s.sheetProducts.map((p) =>
         !p.testingStatus ? { ...p, testingStatus: "Queued" as const } : p
       ),
+    })),
+
+  addSheetProduct: () =>
+    set((s) => ({
+      sheetProducts: [
+        ...s.sheetProducts,
+        {
+          id: `sp-${Date.now()}`,
+          productName: "",
+          adLink: "",
+          storeLink: "",
+          testingStatus: "" as const,
+          creativeSaved: false,
+          cog: null,
+          productType: "" as const,
+          pricing: null,
+          discountPercent: 42,
+          notes: "",
+        },
+      ],
     })),
 }));
 
