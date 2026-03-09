@@ -109,11 +109,14 @@ function ExpandedAdCards({
   onUpdate: (updates: Partial<AdCreatorCampaign>) => void;
   onRemove: () => void;
 }) {
-  // Get ALL creatives for this product from the global pool
-  const allProductCreatives = useCreativeGeneratorStore(
-    (s) => s.productCreatives.filter((c) => c.productName === campaign.productName && c.status === "completed")
+  // Read raw array from store, then filter in useMemo to avoid new-reference re-render loops
+  const allCreatives = useCreativeGeneratorStore((s) => s.productCreatives);
+  const removeCreative = useCreativeGeneratorStore((s) => s.removeCreative);
+
+  const allProductCreatives = useMemo(
+    () => allCreatives.filter((c) => c.productName === campaign.productName && c.status === "completed"),
+    [allCreatives, campaign.productName]
   );
-  const removeCreativeGlobally = useCreativeGeneratorStore((s) => s.removeCreative);
 
   // IDs of creatives currently selected for this campaign
   const selectedCreativeIds = new Set(campaign.creatives.map((c) => c.id));
@@ -148,7 +151,7 @@ function ExpandedAdCards({
       creatives: campaign.creatives.filter((c) => c.id !== creativeId),
     });
     // Remove from global pool
-    removeCreativeGlobally(creativeId);
+    removeCreative(creativeId);
   };
 
   const hasAnyCreatives = allProductCreatives.length > 0;
