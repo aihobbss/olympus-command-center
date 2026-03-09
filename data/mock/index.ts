@@ -354,6 +354,8 @@ export type AdCreative = {
   placeholderGradient: string;
 };
 
+export type AdGender = "Male" | "Female" | "All" | "";
+
 export type AdCreatorCampaign = {
   id: string;
   productName: string;
@@ -364,6 +366,7 @@ export type AdCreatorCampaign = {
   cta: string;
   country: string;
   budget: number;
+  gender: AdGender;
   creatives: AdCreative[];
   status: AdCreatorStatus;
 };
@@ -388,6 +391,7 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
     cta: "Shop Now",
     country: "UK",
     budget: 30,
+    gender: "Male",
     creatives: [
       { id: "cr-001-a", concept: "Winter \u2014 Text", placeholderGradient: creativeGradients[0] },
       { id: "cr-001-b", concept: "High-End \u2014 No Text", placeholderGradient: creativeGradients[1] },
@@ -405,6 +409,7 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
     cta: "Shop Now",
     country: "UK",
     budget: 30,
+    gender: "All",
     creatives: [
       { id: "cr-002-a", concept: "UGC Style", placeholderGradient: creativeGradients[3] },
       { id: "cr-002-b", concept: "Flat Lay", placeholderGradient: creativeGradients[4] },
@@ -421,6 +426,7 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
     cta: "Shop Now",
     country: "UK",
     budget: 30,
+    gender: "Male",
     creatives: [],
     status: "Queued",
   },
@@ -434,6 +440,7 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
     cta: "Shop Now",
     country: "UK",
     budget: 30,
+    gender: "Male",
     creatives: [
       { id: "cr-004-a", concept: "Price Shown", placeholderGradient: creativeGradients[5] },
     ],

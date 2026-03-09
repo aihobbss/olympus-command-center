@@ -243,6 +243,7 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
           cta: "Shop Now",
           country: "",
           budget: 30,
+          gender: "" as const,
           creatives: [],
           status: "Queued" as const,
         },

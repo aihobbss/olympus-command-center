@@ -17,7 +17,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useAdCreatorStore, useStoreContext } from "@/lib/store";
-import { type AdCreatorCampaign, type AdCreatorStatus } from "@/data/mock";
+import { type AdCreatorCampaign, type AdCreatorStatus, type AdGender } from "@/data/mock";
 import { cn } from "@/lib/utils";
 
 // ── Status badge ────────────────────────────────────────────
@@ -384,6 +384,7 @@ export function AdCreatorSheet() {
                 "Creatives",
                 "Budget",
                 "Country",
+                "Gender",
                 "",
               ].map((h, i) => (
                 <th
@@ -495,6 +496,27 @@ export function AdCreatorSheet() {
                       <CountryCell market={selectedStore.market} />
                     </td>
 
+                    {/* Gender */}
+                    <td className="px-3 py-2.5">
+                      <select
+                        value={campaign.gender}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          updateCampaign(campaign.id, { gender: e.target.value as AdGender });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs px-2 py-1 rounded-md bg-bg-elevated border border-subtle outline-none text-text-primary cursor-pointer appearance-none pr-5 bg-[length:10px] bg-[right_4px_center] bg-no-repeat"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                        }}
+                      >
+                        <option value="">—</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="All">All</option>
+                      </select>
+                    </td>
+
                     {/* Action */}
                     <td className="px-3 py-2.5">
                       {campaign.status === "Pushing" ? (
@@ -532,7 +554,7 @@ export function AdCreatorSheet() {
                   {/* Expanded detail row */}
                   {expanded && (
                     <tr>
-                      <td colSpan={9}>
+                      <td colSpan={10}>
                         <ExpandedAdCards
                           campaign={campaign}
                           onUpdate={(updates) => updateCampaign(campaign.id, updates)}
