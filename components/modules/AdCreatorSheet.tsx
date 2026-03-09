@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import {
   Search,
   SlidersHorizontal,
@@ -499,7 +499,7 @@ export function AdCreatorSheet() {
               const canPush = campaign.status === "Ready";
 
               return (
-                <tr key={campaign.id} className="contents">
+                <Fragment key={campaign.id}>
                   {/* Main row */}
                   <tr
                     className={cn(
@@ -655,7 +655,7 @@ export function AdCreatorSheet() {
                       </td>
                     </tr>
                   )}
-                </tr>
+                </Fragment>
               );
             })}
           </tbody>
