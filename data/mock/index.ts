@@ -343,6 +343,105 @@ export const initialCopyProducts: ProductCopy[] = [
 ];
 
 // ============================================================
+// 1d. Ad Creator Campaigns (test campaigns for Meta)
+// ============================================================
+
+export type AdCreatorStatus = "Queued" | "Ready" | "Pushing" | "Live";
+
+export type AdCreative = {
+  id: string;
+  concept: string;
+  placeholderGradient: string;
+};
+
+export type AdCreatorCampaign = {
+  id: string;
+  productName: string;
+  productUrl: string;
+  primaryText: string;
+  headline: string;
+  description: string;
+  cta: string;
+  country: string;
+  budget: number;
+  creatives: AdCreative[];
+  status: AdCreatorStatus;
+};
+
+const creativeGradients = [
+  "from-indigo-600 to-purple-500",
+  "from-emerald-600 to-teal-500",
+  "from-amber-500 to-orange-500",
+  "from-rose-600 to-pink-500",
+  "from-cyan-500 to-blue-500",
+  "from-violet-600 to-fuchsia-500",
+];
+
+export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
+  {
+    id: "adc-001",
+    productName: "Aymbr Sweater",
+    productUrl: "https://olympus-london.myshopify.com/products/aymbr",
+    primaryText: "Slide Into Textured Sophistication with the Aymbr Sweater\n\nPlayful structure meets confident style in this relaxed must-have. The Aymbr Sweater\u2019s openwork detail and patchwork texture bring effortless elegance to your rotation.\n\nRelaxed. Intricate. Versatile.",
+    headline: "Aymbr Sweater",
+    description: "Free Shipping in the UK",
+    cta: "Shop Now",
+    country: "UK",
+    budget: 30,
+    creatives: [
+      { id: "cr-001-a", concept: "Winter \u2014 Text", placeholderGradient: creativeGradients[0] },
+      { id: "cr-001-b", concept: "High-End \u2014 No Text", placeholderGradient: creativeGradients[1] },
+      { id: "cr-001-c", concept: "Model Wearing It", placeholderGradient: creativeGradients[2] },
+    ],
+    status: "Ready",
+  },
+  {
+    id: "adc-002",
+    productName: "All-Terrain Canvas Sneaker",
+    productUrl: "https://olympus-london.myshopify.com/products/all-terrain-canvas-sneaker",
+    primaryText: "Slide Into Everyday Motion with the All-Terrain Canvas Sneaker\n\nBuilt to keep pace with your routine, the All-Terrain Canvas Sneaker delivers breathable comfort, structured support, and rugged traction in one easygoing package.\n\nPractical. Breathable. Grounded.",
+    headline: "All-Terrain Canvas Sneaker",
+    description: "Free Shipping in the UK",
+    cta: "Shop Now",
+    country: "UK",
+    budget: 30,
+    creatives: [
+      { id: "cr-002-a", concept: "UGC Style", placeholderGradient: creativeGradients[3] },
+      { id: "cr-002-b", concept: "Flat Lay", placeholderGradient: creativeGradients[4] },
+    ],
+    status: "Ready",
+  },
+  {
+    id: "adc-003",
+    productName: "Maven Bomber Jacket",
+    productUrl: "https://olympus-london.myshopify.com/products/maven-bomber-jacket",
+    primaryText: "",
+    headline: "Maven Bomber Jacket",
+    description: "Free Shipping in the UK",
+    cta: "Shop Now",
+    country: "UK",
+    budget: 30,
+    creatives: [],
+    status: "Queued",
+  },
+  {
+    id: "adc-004",
+    productName: "Harrington Trainers",
+    productUrl: "https://olympus-london.myshopify.com/products/harrington-trainers",
+    primaryText: "",
+    headline: "Harrington Trainers",
+    description: "Free Shipping in the UK",
+    cta: "Shop Now",
+    country: "UK",
+    budget: 30,
+    creatives: [
+      { id: "cr-004-a", concept: "Price Shown", placeholderGradient: creativeGradients[5] },
+    ],
+    status: "Queued",
+  },
+];
+
+// ============================================================
 // 2. Ad Campaigns (4 items)
 // ============================================================
 

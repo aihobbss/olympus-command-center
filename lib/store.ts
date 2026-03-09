@@ -3,9 +3,11 @@ import {
   discoveryPool,
   initialSheetProducts,
   initialCopyProducts,
+  initialAdCreatorCampaigns,
   type DiscoveryProduct,
   type SheetProduct,
   type ProductCopy,
+  type AdCreatorCampaign,
 } from "@/data/mock";
 import { mockStores, type MockStore } from "@/lib/navigation";
 
@@ -201,6 +203,54 @@ export const useProductCopyStore = create<ProductCopyStore>((set) => ({
     pending.forEach((p, i) => {
       // Stagger by 400ms each to simulate sequential generation
       setTimeout(() => generateCopy(p.id), i * 400);
+    });
+  },
+}));
+
+// ─── Ad Creator Store ────────────────────────────────────
+// Manages test campaign creation for Meta Ads.
+
+interface AdCreatorStore {
+  campaigns: AdCreatorCampaign[];
+  updateCampaign: (id: string, updates: Partial<AdCreatorCampaign>) => void;
+  pushCampaign: (id: string) => void;
+  pushAll: () => void;
+}
+
+export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
+  campaigns: initialAdCreatorCampaigns.map((c) => ({ ...c })),
+
+  updateCampaign: (id, updates) =>
+    set((s) => ({
+      campaigns: s.campaigns.map((c) =>
+        c.id === id ? { ...c, ...updates } : c
+      ),
+    })),
+
+  pushCampaign: (id) => {
+    const campaign = get().campaigns.find((c) => c.id === id);
+    if (!campaign || campaign.status !== "Ready") return;
+
+    set((s) => ({
+      campaigns: s.campaigns.map((c) =>
+        c.id === id ? { ...c, status: "Pushing" as const } : c
+      ),
+    }));
+
+    setTimeout(() => {
+      set((s) => ({
+        campaigns: s.campaigns.map((c) =>
+          c.id === id ? { ...c, status: "Live" as const } : c
+        ),
+      }));
+    }, 2000);
+  },
+
+  pushAll: () => {
+    const { campaigns, pushCampaign } = get();
+    const ready = campaigns.filter((c) => c.status === "Ready");
+    ready.forEach((c, i) => {
+      setTimeout(() => pushCampaign(c.id), i * 500);
     });
   },
 }));

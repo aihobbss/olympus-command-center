@@ -7,8 +7,11 @@ import type { TimePeriod } from "@/components/ui";
 import { CampaignCard } from "@/components/modules/CampaignCard";
 import { AdActionPanel } from "@/components/modules/AdActionPanel";
 import { AdCharts } from "@/components/modules/AdCharts";
+import { AdCreatorSheet } from "@/components/modules/AdCreatorSheet";
 import { getAdCampaigns, type AdCampaign } from "@/data/mock";
 import { useStoreContext } from "@/lib/store";
+
+type AdTab = "live" | "creator";
 
 // ─── Period scaling factors ─────────────────────────────────
 // Multipliers that simulate how aggregated numbers change
@@ -72,6 +75,7 @@ function computeRecommendation(c: {
 // ─── Page ───────────────────────────────────────────────────
 
 export default function AdManagerPage() {
+  const [activeTab, setActiveTab] = useState<AdTab>("live");
   const [period, setPeriod] = useState<TimePeriod>("7d");
   const [selectedCampaign, setSelectedCampaign] =
     useState<AdCampaign | null>(null);
@@ -169,6 +173,11 @@ export default function AdManagerPage() {
     setPanelOpen(false);
   }, []);
 
+  const tabs: { key: AdTab; label: string }[] = [
+    { key: "live", label: "Live Campaigns" },
+    { key: "creator", label: "Ad Creator" },
+  ];
+
   return (
     <div>
       {/* ─── Header ─── */}
@@ -186,72 +195,101 @@ export default function AdManagerPage() {
               Ad Manager
             </h1>
             <p className="text-sm text-text-secondary">
-              Live Meta campaigns with kill/scale recommendations
+              {activeTab === "live"
+                ? "Live Meta campaigns with kill/scale recommendations"
+                : "Build & push test campaigns in bulk"}
             </p>
           </div>
         </div>
 
-        <TimePeriodSelector value={period} onChange={setPeriod} />
+        {activeTab === "live" && (
+          <TimePeriodSelector value={period} onChange={setPeriod} />
+        )}
       </div>
 
-      {/* ─── Metric Cards ─── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
-        <MetricCard
-          label="Total Spend"
-          value={totals.spend}
-          format="currency"
-          currency="$"
-        />
-        <MetricCard
-          label="Revenue"
-          value={totals.revenue}
-          format="currency"
-          currency={storeCurrency}
-          subtitle={`$${toUsd(totals.revenue).toLocaleString("en-GB")} USD`}
-        />
-        <MetricCard
-          label="Profit"
-          value={totals.profit}
-          format="currency"
-          currency={storeCurrency}
-          subtitle={`$${toUsd(totals.profit).toLocaleString("en-GB")} USD`}
-        />
-        <MetricCard label="Orders" value={totals.orders} format="number" />
-        <MetricCard
-          label="Avg ROAS"
-          value={totals.roas}
-          format="number"
-          className="col-span-2 lg:col-span-1"
-        />
-      </div>
-
-      {/* ─── Campaign Grid ─── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-        {scaledCampaigns.map((campaign) => (
-          <CampaignCard
-            key={campaign.id}
-            campaign={campaign}
-            onClick={handleCardClick}
-            storeCurrency={storeCurrency}
-            toUsd={toUsd}
-          />
+      {/* ─── Tab Switcher ─── */}
+      <div className="flex gap-1 p-1 rounded-xl bg-bg-elevated/60 w-fit mb-6">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === tab.key
+                ? "bg-accent-indigo text-white shadow-lg shadow-accent-indigo/20"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            {tab.label}
+          </button>
         ))}
       </div>
 
-      {/* ─── ROAS Trend Chart ─── */}
-      <AdCharts campaigns={scaledCampaigns} />
+      {/* ─── Live Campaigns Tab ─── */}
+      {activeTab === "live" && (
+        <>
+          {/* ─── Metric Cards ─── */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+            <MetricCard
+              label="Total Spend"
+              value={totals.spend}
+              format="currency"
+              currency="$"
+            />
+            <MetricCard
+              label="Revenue"
+              value={totals.revenue}
+              format="currency"
+              currency={storeCurrency}
+              subtitle={`$${toUsd(totals.revenue).toLocaleString("en-GB")} USD`}
+            />
+            <MetricCard
+              label="Profit"
+              value={totals.profit}
+              format="currency"
+              currency={storeCurrency}
+              subtitle={`$${toUsd(totals.profit).toLocaleString("en-GB")} USD`}
+            />
+            <MetricCard label="Orders" value={totals.orders} format="number" />
+            <MetricCard
+              label="Avg ROAS"
+              value={totals.roas}
+              format="number"
+              className="col-span-2 lg:col-span-1"
+            />
+          </div>
 
-      {/* ─── Action Panel (slides in from right) ─── */}
-      <AdActionPanel
-        campaign={selectedCampaign}
-        open={panelOpen}
-        onClose={handleClosePanel}
-        onScale={handleScale}
-        onKill={handleKill}
-        onPass={handlePass}
-        storeCurrency={storeCurrency}
-        toUsd={toUsd}
-      />
+          {/* ─── Campaign Grid ─── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+            {scaledCampaigns.map((campaign) => (
+              <CampaignCard
+                key={campaign.id}
+                campaign={campaign}
+                onClick={handleCardClick}
+                storeCurrency={storeCurrency}
+                toUsd={toUsd}
+              />
+            ))}
+          </div>
+
+          {/* ─── ROAS Trend Chart ─── */}
+          <AdCharts campaigns={scaledCampaigns} />
+
+          {/* ─── Action Panel (slides in from right) ─── */}
+          <AdActionPanel
+            campaign={selectedCampaign}
+            open={panelOpen}
+            onClose={handleClosePanel}
+            onScale={handleScale}
+            onKill={handleKill}
+            onPass={handlePass}
+            storeCurrency={storeCurrency}
+            toUsd={toUsd}
+          />
+        </>
+      )}
+
+      {/* ─── Ad Creator Tab ─── */}
+      {activeTab === "creator" && <AdCreatorSheet />}
     </div>
   );
 }
