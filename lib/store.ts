@@ -55,26 +55,25 @@ export const useAuthStore = create<AuthStore>((set) => ({
 }));
 
 // ─── Research Store ──────────────────────────────────────
-// Manages both the Discovery tab (run research, review cards)
-// and the Research Sheet tab (imported products tracking).
+// Manages the Research Sheet (product research tracking).
 
 interface ResearchStore {
-  // Discovery tab
+  // Discovery (kept for potential future use)
   discoveryResults: DiscoveryProduct[];
   runResearch: (count: number) => void;
   removeDiscovery: (id: string) => void;
   importToSheet: (id: string) => void;
 
-  // Research Sheet tab
+  // Research Sheet
   sheetProducts: SheetProduct[];
   updateSheetProduct: (id: string, updates: Partial<SheetProduct>) => void;
+  importAllUnimported: () => void;
 }
 
 export const useResearchStore = create<ResearchStore>((set, get) => ({
   discoveryResults: [],
 
   runResearch: (count) => {
-    // Shuffle the pool and pick `count` items, excluding any already on the sheet
     const sheetNames = new Set(get().sheetProducts.map((p) => p.productName));
     const available = discoveryPool.filter((p) => !sheetNames.has(p.productName));
     const shuffled = [...available].sort(() => Math.random() - 0.5);
@@ -97,6 +96,7 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
       testingStatus: "",
       creativeSaved: false,
       cog: null,
+      productType: "",
       pricing: null,
       notes: "",
     };
@@ -112,6 +112,13 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
     set((s) => ({
       sheetProducts: s.sheetProducts.map((p) =>
         p.id === id ? { ...p, ...updates } : p
+      ),
+    })),
+
+  importAllUnimported: () =>
+    set((s) => ({
+      sheetProducts: s.sheetProducts.map((p) =>
+        !p.testingStatus ? { ...p, testingStatus: "Queued" as const } : p
       ),
     })),
 }));

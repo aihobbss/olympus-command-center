@@ -1,9 +1,20 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Upload, Check, Search, SlidersHorizontal } from "lucide-react";
+import {
+  Upload,
+  Check,
+  Search,
+  SlidersHorizontal,
+  ExternalLink,
+  PackageCheck,
+} from "lucide-react";
 import { useResearchStore, useStoreContext } from "@/lib/store";
-import { type SheetProduct } from "@/data/mock";
+import {
+  type SheetProduct,
+  type ProductType,
+  pricingTable,
+} from "@/data/mock";
 import { cn } from "@/lib/utils";
 
 // ── Inline editable text/number cell ───────────────────────
@@ -89,6 +100,159 @@ function EditableCell({
   );
 }
 
+// ── Link cell — clickable hyperlink + editable ──────────────
+
+function LinkCell({
+  value,
+  placeholder,
+  onSave,
+}: {
+  value: string;
+  placeholder: string;
+  onSave: (v: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  function commit() {
+    setEditing(false);
+    onSave(draft);
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") setEditing(false);
+        }}
+        className={cn(
+          "w-full text-xs py-1 px-2 rounded",
+          "bg-bg-elevated border border-accent-indigo/40 outline-none",
+          "text-text-primary placeholder:text-text-muted"
+        )}
+        placeholder={placeholder}
+      />
+    );
+  }
+
+  if (!value) {
+    return (
+      <button
+        onClick={() => {
+          setDraft("");
+          setEditing(true);
+        }}
+        className="w-full text-left text-xs px-2 py-1 rounded text-text-muted hover:bg-white/[0.04] transition-colors duration-100 cursor-text"
+      >
+        {placeholder}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 group">
+      <a
+        href={value}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs text-accent-indigo hover:text-accent-indigo/80 truncate max-w-[140px] transition-colors duration-100"
+        title={value}
+      >
+        {(() => {
+          try {
+            const url = new URL(value);
+            return url.hostname.replace("www.", "");
+          } catch {
+            return value.slice(0, 24);
+          }
+        })()}
+      </a>
+      <ExternalLink
+        size={11}
+        className="text-text-muted opacity-0 group-hover:opacity-100 shrink-0 transition-opacity duration-100"
+      />
+      <button
+        onClick={() => {
+          setDraft(value);
+          setEditing(true);
+        }}
+        className="text-text-muted opacity-0 group-hover:opacity-100 text-[10px] hover:text-text-secondary shrink-0 transition-opacity duration-100"
+        title="Edit"
+      >
+        edit
+      </button>
+    </div>
+  );
+}
+
+// ── Product type selector (drives pricing) ──────────────────
+
+const PRODUCT_TYPES: ProductType[] = [
+  "",
+  "Regular Jacket",
+  "Light Jacket",
+  "Luxury Jacket",
+  "Light Sweater",
+  "Heavy Sweater",
+  "Light Top",
+  "Heavy Top",
+  "All Accessories",
+  "Sandals",
+  "Dress",
+  "Set",
+  "Light Pants",
+  "Heavy Pants",
+];
+
+function ProductTypeCell({
+  productType,
+  onChange,
+}: {
+  productType: ProductType;
+  onChange: (pt: ProductType, price: number | null) => void;
+}) {
+  return (
+    <select
+      value={productType}
+      onChange={(e) => {
+        const pt = e.target.value as ProductType;
+        const price = pt ? pricingTable[pt] ?? null : null;
+        onChange(pt, price);
+      }}
+      className={cn(
+        "text-[11px] font-medium px-2 py-1 rounded-lg",
+        "bg-bg-elevated border border-subtle outline-none cursor-pointer",
+        "hover:border-[var(--border-hover)] transition-colors duration-150",
+        "appearance-none bg-[length:12px] bg-[right_6px_center] bg-no-repeat",
+        "pr-6",
+        productType ? "text-text-primary" : "text-text-muted"
+      )}
+      style={{
+        backgroundColor: "#1A1A24",
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+      }}
+    >
+      <option value="">Select type</option>
+      {PRODUCT_TYPES.filter((t) => t !== "").map((t) => (
+        <option key={t} value={t}>
+          {t}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 // ── Status dropdown / Import button ────────────────────────
 
 const STATUS_OPTIONS: { value: SheetProduct["testingStatus"]; label: string }[] = [
@@ -114,7 +278,6 @@ function StatusCell({
   status: SheetProduct["testingStatus"];
   onChange: (s: SheetProduct["testingStatus"]) => void;
 }) {
-  // Blank status → show Import button
   if (!status) {
     return (
       <button
@@ -197,7 +360,8 @@ type TestingStatusFilter =
 // ── Main sheet component ───────────────────────────────────
 
 export function ResearchSheet() {
-  const { sheetProducts, updateSheetProduct } = useResearchStore();
+  const { sheetProducts, updateSheetProduct, importAllUnimported } =
+    useResearchStore();
   const { selectedStore } = useStoreContext();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TestingStatusFilter>("All");
@@ -223,6 +387,11 @@ export function ResearchSheet() {
     return items;
   }, [sheetProducts, search, statusFilter]);
 
+  const unimportedCount = useMemo(
+    () => sheetProducts.filter((p) => !p.testingStatus).length,
+    [sheetProducts]
+  );
+
   if (sheetProducts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -231,7 +400,7 @@ export function ResearchSheet() {
         </div>
         <p className="text-sm text-text-secondary mb-1">No products on the sheet yet</p>
         <p className="text-xs text-text-muted">
-          Import products from the Discover tab to get started
+          Add products from your research to get started
         </p>
       </div>
     );
@@ -290,6 +459,22 @@ export function ResearchSheet() {
           </select>
         </div>
 
+        {/* Import All button */}
+        {unimportedCount > 0 && (
+          <button
+            onClick={importAllUnimported}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
+              "bg-accent-indigo hover:bg-accent-indigo-hover text-white",
+              "shadow-lg shadow-accent-indigo/20 hover:shadow-accent-indigo/30",
+              "transition-all duration-200"
+            )}
+          >
+            <PackageCheck size={14} />
+            Import All ({unimportedCount})
+          </button>
+        )}
+
         <span className="text-[11px] text-text-muted font-jetbrains ml-auto">
           {filtered.length} of {sheetProducts.length}
         </span>
@@ -297,7 +482,7 @@ export function ResearchSheet() {
 
       {/* ── Table ── */}
     <div className="overflow-x-auto scrollbar-hide -mx-1">
-      <table className="w-full min-w-[960px] text-left">
+      <table className="w-full min-w-[1060px] text-left">
         <thead>
           <tr className="border-b border-subtle">
             {[
@@ -307,6 +492,7 @@ export function ResearchSheet() {
               "Status",
               "Creative",
               "COG",
+              "Type",
               "Price",
               "Notes",
             ].map((h) => (
@@ -339,9 +525,9 @@ export function ResearchSheet() {
                 />
               </td>
 
-              {/* Ad link — editable */}
-              <td className="px-3 py-2.5 min-w-[100px]">
-                <EditableCell
+              {/* Ad link — clickable hyperlink */}
+              <td className="px-3 py-2.5 min-w-[120px]">
+                <LinkCell
                   value={product.adLink}
                   placeholder="Ad link"
                   onSave={(v) =>
@@ -350,9 +536,9 @@ export function ResearchSheet() {
                 />
               </td>
 
-              {/* Store link — editable */}
-              <td className="px-3 py-2.5 min-w-[100px]">
-                <EditableCell
+              {/* Store link — clickable hyperlink */}
+              <td className="px-3 py-2.5 min-w-[120px]">
+                <LinkCell
                   value={product.storeLink}
                   placeholder="Not imported"
                   onSave={(v) =>
@@ -396,19 +582,40 @@ export function ResearchSheet() {
                 />
               </td>
 
-              {/* Pricing — editable, store currency */}
-              <td className="px-3 py-2.5 w-20">
-                <EditableCell
-                  value={product.pricing}
-                  type="number"
-                  placeholder="—"
-                  prefix={selectedStore.currency}
-                  onSave={(v) =>
+              {/* Product Type — dropdown, drives pricing */}
+              <td className="px-3 py-2.5">
+                <ProductTypeCell
+                  productType={product.productType}
+                  onChange={(pt, price) =>
                     updateSheetProduct(product.id, {
-                      pricing: v ? parseFloat(v) : null,
+                      productType: pt,
+                      pricing: price,
                     })
                   }
                 />
+              </td>
+
+              {/* Pricing — auto-generated from product type, read-only display */}
+              <td className="px-3 py-2.5 w-20">
+                <span
+                  className={cn(
+                    "text-xs font-mono-metric px-2 py-1",
+                    product.pricing != null
+                      ? "text-text-primary"
+                      : "text-text-muted"
+                  )}
+                >
+                  {product.pricing != null ? (
+                    <>
+                      <span className="text-text-muted">
+                        {selectedStore.currency}
+                      </span>
+                      {product.pricing}
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </span>
               </td>
 
               {/* Notes — editable */}

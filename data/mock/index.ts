@@ -74,6 +74,39 @@ export const discoveryPool: DiscoveryProduct[] = [
 // 1b. Research Sheet Products (products that passed discovery)
 // ============================================================
 
+export type ProductType =
+  | ""
+  | "Regular Jacket"
+  | "Light Jacket"
+  | "Luxury Jacket"
+  | "Light Sweater"
+  | "Heavy Sweater"
+  | "Light Top"
+  | "Heavy Top"
+  | "All Accessories"
+  | "Sandals"
+  | "Dress"
+  | "Set"
+  | "Light Pants"
+  | "Heavy Pants";
+
+// Simo's pricing table (GBP base prices)
+export const pricingTable: Record<string, number> = {
+  "Regular Jacket": 35,
+  "Light Jacket": 32,
+  "Luxury Jacket": 48,
+  "Light Sweater": 28,
+  "Heavy Sweater": 32,
+  "Light Top": 25,
+  "Heavy Top": 31,
+  "All Accessories": 26,
+  "Sandals": 26,
+  "Dress": 36,
+  "Set": 38,
+  "Light Pants": 28,
+  "Heavy Pants": 32,
+};
+
 export type SheetProduct = {
   id: string;
   productName: string;
@@ -82,6 +115,7 @@ export type SheetProduct = {
   testingStatus: "" | "Queued" | "Imported" | "Scheduled" | "Live" | "Killed";
   creativeSaved: boolean;
   cog: number | null;
+  productType: ProductType;
   pricing: number | null;
   notes: string;
 };
@@ -95,7 +129,8 @@ export const initialSheetProducts: SheetProduct[] = [
     testingStatus: "Live",
     creativeSaved: true,
     cog: 18,
-    pricing: 59.99,
+    productType: "Regular Jacket",
+    pricing: 35,
     notes: "GOOD",
   },
   {
@@ -106,7 +141,8 @@ export const initialSheetProducts: SheetProduct[] = [
     testingStatus: "Scheduled",
     creativeSaved: true,
     cog: 12,
-    pricing: 44.99,
+    productType: "Heavy Top",
+    pricing: 31,
     notes: "good",
   },
   {
@@ -117,7 +153,8 @@ export const initialSheetProducts: SheetProduct[] = [
     testingStatus: "Imported",
     creativeSaved: false,
     cog: 22,
-    pricing: 74.99,
+    productType: "All Accessories",
+    pricing: 26,
     notes: "GOOD",
   },
   {
@@ -128,7 +165,8 @@ export const initialSheetProducts: SheetProduct[] = [
     testingStatus: "",
     creativeSaved: false,
     cog: null,
-    pricing: null,
+    productType: "Luxury Jacket",
+    pricing: 48,
     notes: "Not DS",
   },
   {
@@ -139,7 +177,8 @@ export const initialSheetProducts: SheetProduct[] = [
     testingStatus: "Killed",
     creativeSaved: true,
     cog: 24,
-    pricing: 69.99,
+    productType: "Light Jacket",
+    pricing: 32,
     notes: "Creative is branded",
   },
   {
@@ -150,7 +189,8 @@ export const initialSheetProducts: SheetProduct[] = [
     testingStatus: "Queued",
     creativeSaved: false,
     cog: 16,
-    pricing: null,
+    productType: "Luxury Jacket",
+    pricing: 48,
     notes: "avoid",
   },
   {
@@ -161,7 +201,8 @@ export const initialSheetProducts: SheetProduct[] = [
     testingStatus: "Queued",
     creativeSaved: false,
     cog: 19,
-    pricing: 64.99,
+    productType: "All Accessories",
+    pricing: 26,
     notes: "",
   },
   {
@@ -172,7 +213,8 @@ export const initialSheetProducts: SheetProduct[] = [
     testingStatus: "Queued",
     creativeSaved: true,
     cog: 11,
-    pricing: 42.99,
+    productType: "Light Pants",
+    pricing: 28,
     notes: "Good margins",
   },
   {
@@ -183,7 +225,8 @@ export const initialSheetProducts: SheetProduct[] = [
     testingStatus: "Queued",
     creativeSaved: false,
     cog: 14,
-    pricing: 54.99,
+    productType: "Light Jacket",
+    pricing: 32,
     notes: "",
   },
 ];

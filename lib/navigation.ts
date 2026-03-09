@@ -61,6 +61,10 @@ export const navItems: NavItem[] = [
     icon: Sparkles,
     group: "main",
   },
+];
+
+// Phase 2/3 modules — kept for later implementation
+export const deferredNavItems: NavItem[] = [
   {
     id: "customer-service",
     label: "Customer Service",
