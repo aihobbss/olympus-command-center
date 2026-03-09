@@ -276,8 +276,11 @@ export const researchProducts: ResearchProduct[] = [];
 // 1c. Product Copy Creation
 // ============================================================
 
+export type AdStatus = "red" | "yellow" | "green";
+
 export type ProductCopy = {
   id: string;
+  adStatus: AdStatus;
   productUrl: string;
   productName: string;
   imageUrl: string;
@@ -289,6 +292,7 @@ export type ProductCopy = {
 export const initialCopyProducts: ProductCopy[] = [
   {
     id: "pc-001",
+    adStatus: "green",
     productName: "Aymbr Sweater",
     productUrl: "https://olympus-london.myshopify.com/products/aymbr",
     imageUrl: "http://olympus-london.myshopify.com/cdn/shop/files/britt_wit_1_1_720x.jpg",
@@ -298,6 +302,7 @@ export const initialCopyProducts: ProductCopy[] = [
   },
   {
     id: "pc-002",
+    adStatus: "green",
     productName: "All-Terrain Canvas Sneaker",
     productUrl: "https://olympus-london.myshopify.com/products/all-terrain-canvas-sneaker",
     imageUrl: "http://olympus-london.myshopify.com/cdn/shop/files/S6dba56a87e254678.webp",
@@ -307,6 +312,7 @@ export const initialCopyProducts: ProductCopy[] = [
   },
   {
     id: "pc-003",
+    adStatus: "yellow",
     productName: "Maven Bomber Jacket",
     productUrl: "https://olympus-london.myshopify.com/products/maven-bomber-jacket",
     imageUrl: "",
@@ -316,6 +322,7 @@ export const initialCopyProducts: ProductCopy[] = [
   },
   {
     id: "pc-004",
+    adStatus: "red",
     productName: "Harrington Trainers",
     productUrl: "https://olympus-london.myshopify.com/products/harrington-trainers",
     imageUrl: "",
@@ -325,6 +332,7 @@ export const initialCopyProducts: ProductCopy[] = [
   },
   {
     id: "pc-005",
+    adStatus: "yellow",
     productName: "Haldrin Layered Shirt",
     productUrl: "https://olympus-london.myshopify.com/products/haldrin-layered-shirt",
     imageUrl: "",

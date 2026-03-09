@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X, Upload, Check } from "lucide-react";
 import { useProductCopyStore } from "@/lib/store";
-import { type ProductCopy } from "@/data/mock";
+import { type ProductCopy, type AdStatus } from "@/data/mock";
 import { cn } from "@/lib/utils";
 
 // ── Inline editable text cell ───────────────────────────────
@@ -98,6 +98,55 @@ function EditableCell({
       )}
       placeholder={placeholder}
     />
+  );
+}
+
+// ── Ad status dot ──────────────────────────────────────────────
+
+const adStatusConfig: Record<AdStatus, { color: string; glow: string; label: string }> = {
+  red: {
+    color: "bg-red-500",
+    glow: "shadow-[0_0_8px_2px_rgba(239,68,68,0.5)]",
+    label: "Off",
+  },
+  yellow: {
+    color: "bg-amber-400",
+    glow: "shadow-[0_0_8px_2px_rgba(245,158,11,0.5)]",
+    label: "Paused",
+  },
+  green: {
+    color: "bg-emerald-400",
+    glow: "shadow-[0_0_8px_2px_rgba(16,185,129,0.5)]",
+    label: "Live",
+  },
+};
+
+function AdStatusDot({
+  status,
+  onChange,
+}: {
+  status: AdStatus;
+  onChange: (s: AdStatus) => void;
+}) {
+  const cfg = adStatusConfig[status];
+  const cycle: AdStatus[] = ["red", "yellow", "green"];
+  const next = cycle[(cycle.indexOf(status) + 1) % cycle.length];
+
+  return (
+    <button
+      onClick={() => onChange(next)}
+      className="flex items-center justify-center w-full"
+      title={cfg.label}
+    >
+      <div
+        className={cn(
+          "w-3 h-3 rounded-full",
+          cfg.color,
+          cfg.glow,
+          "transition-all duration-200"
+        )}
+      />
+    </button>
   );
 }
 
@@ -253,7 +302,7 @@ type StatusFilter = "All" | "Pending" | "Generating" | "Completed" | "Blank";
 // ── Main sheet component ───────────────────────────────────
 
 export function ProductCopySheet() {
-  const { copyProducts, updateCopyProduct, generateCopy } =
+  const { copyProducts, updateCopyProduct, generateCopy, generateAll } =
     useProductCopyStore();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
@@ -367,6 +416,47 @@ export function ProductCopySheet() {
           </select>
         </div>
 
+        {/* Generate All button */}
+        {copyProducts.some((p) => p.status === "" || p.status === "Pending") && (
+          <button
+            onClick={generateAll}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
+              "bg-accent-indigo hover:bg-accent-indigo-hover text-white",
+              "shadow-lg shadow-accent-indigo/20 hover:shadow-accent-indigo/30",
+              "transition-all duration-200"
+            )}
+          >
+            <Sparkles size={14} />
+            Generate All
+          </button>
+        )}
+
+        {/* Push All to Store button */}
+        {copyProducts.some(
+          (p) => p.status === "Completed" && !pushedIds.has(p.id) && !pushingIds.has(p.id)
+        ) && (
+          <button
+            onClick={() => {
+              const completedUnpushed = copyProducts.filter(
+                (p) => p.status === "Completed" && !pushedIds.has(p.id) && !pushingIds.has(p.id)
+              );
+              completedUnpushed.forEach((p, i) => {
+                setTimeout(() => pushToStore(p.id), i * 300);
+              });
+            }}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
+              "bg-[var(--accent-emerald)] hover:bg-[var(--accent-emerald)]/80 text-white",
+              "shadow-lg shadow-[var(--accent-emerald)]/20",
+              "transition-all duration-200"
+            )}
+          >
+            <Upload size={14} />
+            Push All to Store
+          </button>
+        )}
+
         {/* Count */}
         <span className="text-[11px] text-text-muted font-jetbrains ml-auto">
           {filtered.length} of {copyProducts.length}
@@ -377,17 +467,19 @@ export function ProductCopySheet() {
       <div className="overflow-x-auto scrollbar-hide -mx-1">
         <table className="w-full min-w-[1100px] text-left table-fixed">
           <colgroup>
-            <col className="w-[14%]" />
-            <col className="w-[18%]" />
-            <col className="w-[18%]" />
+            <col className="w-[3%]" />
+            <col className="w-[13%]" />
             <col className="w-[17%]" />
             <col className="w-[17%]" />
+            <col className="w-[16%]" />
+            <col className="w-[16%]" />
             <col className="w-[12%]" />
             <col className="w-[4%]" />
           </colgroup>
           <thead>
             <tr className="border-b border-subtle">
               {[
+                "Ad",
                 "Product Name",
                 "Product URL",
                 "Image URL",
@@ -411,6 +503,16 @@ export function ProductCopySheet() {
                 key={product.id}
                 className="border-b border-subtle/50 hover:bg-white/[0.02] transition-colors duration-100"
               >
+                {/* Ad status dot */}
+                <td className="px-3 py-2.5">
+                  <AdStatusDot
+                    status={product.adStatus}
+                    onChange={(s) =>
+                      updateCopyProduct(product.id, { adStatus: s })
+                    }
+                  />
+                </td>
+
                 {/* Product Name */}
                 <td className="px-3 py-2.5 overflow-hidden">
                   <EditableCell

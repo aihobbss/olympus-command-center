@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Upload,
-  Check,
   Search,
   SlidersHorizontal,
   ExternalLink,
@@ -328,30 +327,6 @@ function StatusCell({
   );
 }
 
-// ── Creative saved toggle ──────────────────────────────────
-
-function CreativeToggle({
-  saved,
-  onChange,
-}: {
-  saved: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      onClick={() => onChange(!saved)}
-      className={cn(
-        "w-5 h-5 rounded border flex items-center justify-center transition-colors duration-150",
-        saved
-          ? "bg-accent-indigo/20 border-accent-indigo/50 text-accent-indigo"
-          : "border-subtle text-transparent hover:border-text-muted"
-      )}
-    >
-      <Check size={12} strokeWidth={3} />
-    </button>
-  );
-}
-
 // ── Filter types ──────────────────────────────────────────────
 
 type TestingStatusFilter =
@@ -496,7 +471,6 @@ export function ResearchSheet() {
               "Ad Link",
               "Store Link",
               "Status",
-              "Creative",
               "COG",
               "Type",
               "Price",
@@ -561,16 +535,6 @@ export function ResearchSheet() {
                   status={product.testingStatus}
                   onChange={(s) =>
                     updateSheetProduct(product.id, { testingStatus: s })
-                  }
-                />
-              </td>
-
-              {/* Creative saved — toggle */}
-              <td className="px-3 py-2.5">
-                <CreativeToggle
-                  saved={product.creativeSaved}
-                  onChange={(v) =>
-                    updateSheetProduct(product.id, { creativeSaved: v })
                   }
                 />
               </td>

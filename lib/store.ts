@@ -152,6 +152,7 @@ interface ProductCopyStore {
   copyProducts: ProductCopy[];
   updateCopyProduct: (id: string, updates: Partial<ProductCopy>) => void;
   generateCopy: (id: string) => void;
+  generateAll: () => void;
 }
 
 const MOCK_SHOPIFY = "Timeless Style Meets Modern Craft\n\nElevate your wardrobe with a versatile piece designed for everyday confidence. Premium materials and refined details make this a go-to for any occasion.\n\n\u2022 Quality Construction: Built to last with premium stitching\n\u2022 Modern Fit: Tailored silhouette flatters every frame\n\u2022 Versatile Design: Pairs effortlessly with any outfit\n\nDesigned for those who value style and substance.";
@@ -190,6 +191,17 @@ export const useProductCopyStore = create<ProductCopyStore>((set) => ({
         ),
       }));
     }, 2000);
+  },
+
+  generateAll: () => {
+    const { copyProducts, generateCopy } = useProductCopyStore.getState();
+    const pending = copyProducts.filter(
+      (p) => p.status === "" || p.status === "Pending"
+    );
+    pending.forEach((p, i) => {
+      // Stagger by 400ms each to simulate sequential generation
+      setTimeout(() => generateCopy(p.id), i * 400);
+    });
   },
 }));
 
