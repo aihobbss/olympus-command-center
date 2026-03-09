@@ -605,65 +605,63 @@ export function ResearchSheet() {
                 />
               </td>
 
-              {/* Pricing — auto-generated from product type, read-only display */}
-              <td className="px-3 py-2.5 w-20">
-                <span
-                  className={cn(
-                    "text-xs font-mono-metric px-2 py-1",
-                    product.pricing != null
-                      ? "text-text-primary"
-                      : "text-text-muted"
-                  )}
-                >
-                  {product.pricing != null ? (
-                    <>
-                      <span className="text-text-muted">
-                        {selectedStore.currency}
+              {/* Pricing — derived from product type + current store market */}
+              {(() => {
+                const marketPrice = getPriceForType(product.productType, selectedStore.market);
+                const discount = marketPrice != null
+                  ? getDiscountForPrice(marketPrice, selectedStore.market)
+                  : product.discountPercent;
+                const compareAt = marketPrice != null
+                  ? Math.ceil(marketPrice / (1 - discount / 100))
+                  : null;
+                return (
+                  <>
+                    <td className="px-3 py-2.5 w-20">
+                      <span
+                        className={cn(
+                          "text-xs font-mono-metric px-2 py-1",
+                          marketPrice != null ? "text-text-primary" : "text-text-muted"
+                        )}
+                      >
+                        {marketPrice != null ? (
+                          <>
+                            <span className="text-text-muted">{selectedStore.currency}</span>
+                            {marketPrice}
+                          </>
+                        ) : (
+                          "—"
+                        )}
                       </span>
-                      {product.pricing}
-                    </>
-                  ) : (
-                    "—"
-                  )}
-                </span>
-              </td>
+                    </td>
 
-              {/* Discount % — editable */}
-              <td className="px-3 py-2.5 w-20">
-                <EditableCell
-                  value={product.discountPercent}
-                  type="number"
-                  placeholder="42"
-                  prefix=""
-                  onSave={(v) => {
-                    const pct = v ? Math.min(99, Math.max(0, parseFloat(v))) : 42;
-                    updateSheetProduct(product.id, { discountPercent: pct });
-                  }}
-                />
-              </td>
-
-              {/* Compare At — auto-calculated from price & discount */}
-              <td className="px-3 py-2.5 w-24">
-                <span
-                  className={cn(
-                    "text-xs font-mono-metric px-2 py-1",
-                    product.pricing != null
-                      ? "text-text-secondary line-through"
-                      : "text-text-muted"
-                  )}
-                >
-                  {product.pricing != null ? (
-                    <>
-                      <span className="text-text-muted">
-                        {selectedStore.currency}
+                    {/* Discount % — editable override */}
+                    <td className="px-3 py-2.5 w-20">
+                      <span className="text-xs font-mono-metric px-2 py-1 text-text-primary">
+                        {discount}%
                       </span>
-                      {Math.ceil(product.pricing / (1 - product.discountPercent / 100))}
-                    </>
-                  ) : (
-                    "—"
-                  )}
-                </span>
-              </td>
+                    </td>
+
+                    {/* Compare At — auto-calculated from market price & discount */}
+                    <td className="px-3 py-2.5 w-24">
+                      <span
+                        className={cn(
+                          "text-xs font-mono-metric px-2 py-1",
+                          compareAt != null ? "text-text-secondary line-through" : "text-text-muted"
+                        )}
+                      >
+                        {compareAt != null ? (
+                          <>
+                            <span className="text-text-muted">{selectedStore.currency}</span>
+                            {compareAt}
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </span>
+                    </td>
+                  </>
+                );
+              })()}
 
               {/* Notes — editable */}
               <td className="px-3 py-2.5 min-w-[160px]">
