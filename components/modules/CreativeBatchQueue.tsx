@@ -81,21 +81,23 @@ export function CreativeBatchQueue() {
         (a) => a.templateId === templateId
       );
       if (existing) {
+        // Remove this prompt and redistribute its count to remaining
         const remaining = promptAllocations.filter(
           (a) => a.templateId !== templateId
         );
-        // Redistribute removed count to first remaining prompt
         if (remaining.length > 0) {
+          // Give freed count to first remaining prompt (capped at imagesPerProduct)
+          const freedCount = existing.count;
           remaining[0] = {
             ...remaining[0],
-            count: remaining[0].count + existing.count,
+            count: remaining[0].count + freedCount,
           };
         }
         setPromptAllocations(remaining);
       } else {
-        // Auto-distribute: take 1 from the prompt with most, give to new
-        const updated = [...promptAllocations];
-        if (updated.length > 0) {
+        // Add new prompt — take 1 from the prompt with most allocation
+        if (promptAllocations.length > 0) {
+          const updated = [...promptAllocations];
           const maxIdx = updated.reduce(
             (mi, a, i) => (a.count > updated[mi].count ? i : mi),
             0
@@ -109,35 +111,36 @@ export function CreativeBatchQueue() {
               ...updated,
               { templateId, label, count: 1 },
             ]);
-          } else {
-            setPromptAllocations([
-              ...updated,
-              { templateId, label, count: 1 },
-            ]);
-            // Total will exceed — adjust images per product
-            setImagesPerProduct(imagesPerProduct + 1);
           }
+          // If all existing prompts are at 1, can't add without exceeding budget — do nothing
         } else {
+          // No prompts yet — give all images to new prompt
           setPromptAllocations([
             { templateId, label, count: imagesPerProduct },
           ]);
         }
       }
     },
-    [promptAllocations, setPromptAllocations, imagesPerProduct, setImagesPerProduct]
+    [promptAllocations, setPromptAllocations, imagesPerProduct]
   );
 
   const adjustPromptCount = useCallback(
     (templateId: string, delta: number) => {
+      // Block increment if total already equals imagesPerProduct
+      if (delta > 0 && totalAllocated >= imagesPerProduct) return;
+      // Block decrement below 1
+      const current = promptAllocations.find((a) => a.templateId === templateId);
+      if (current && delta < 0 && current.count <= 1) return;
+
       setPromptAllocations(
         promptAllocations.map((a) =>
           a.templateId === templateId
-            ? { ...a, count: Math.max(1, Math.min(10, a.count + delta)) }
+            ? { ...a, count: Math.max(1, Math.min(imagesPerProduct, a.count + delta)) }
             : a
         )
       );
     },
-    [promptAllocations, setPromptAllocations]
+    [promptAllocations, setPromptAllocations, totalAllocated, imagesPerProduct]
   );
 
   const handleGenerate = useCallback(() => {
@@ -251,9 +254,21 @@ export function CreativeBatchQueue() {
             </label>
             <div className="flex items-center gap-3">
               <button
-                onClick={() =>
-                  setImagesPerProduct(Math.max(1, imagesPerProduct - 1))
-                }
+                onClick={() => {
+                  const newTotal = Math.max(1, imagesPerProduct - 1);
+                  // Can't go below number of active prompts (each needs at least 1)
+                  if (newTotal < promptAllocations.length) return;
+                  setImagesPerProduct(newTotal);
+                  // Redistribute: shrink the largest allocation by 1
+                  if (promptAllocations.length > 0 && totalAllocated > newTotal) {
+                    const updated = [...promptAllocations];
+                    const maxIdx = updated.reduce(
+                      (mi, a, i) => (a.count > updated[mi].count ? i : mi), 0
+                    );
+                    updated[maxIdx] = { ...updated[maxIdx], count: updated[maxIdx].count - 1 };
+                    setPromptAllocations(updated);
+                  }
+                }}
                 className="w-8 h-8 rounded-lg border border-subtle flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-colors"
               >
                 <Minus size={14} />
@@ -262,9 +277,16 @@ export function CreativeBatchQueue() {
                 {imagesPerProduct}
               </span>
               <button
-                onClick={() =>
-                  setImagesPerProduct(Math.min(10, imagesPerProduct + 1))
-                }
+                onClick={() => {
+                  const newTotal = Math.min(10, imagesPerProduct + 1);
+                  setImagesPerProduct(newTotal);
+                  // Give the extra image to the first allocation
+                  if (promptAllocations.length > 0) {
+                    const updated = [...promptAllocations];
+                    updated[0] = { ...updated[0], count: updated[0].count + 1 };
+                    setPromptAllocations(updated);
+                  }
+                }}
                 className="w-8 h-8 rounded-lg border border-subtle flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-colors"
               >
                 <Plus size={14} />
@@ -345,11 +367,11 @@ export function CreativeBatchQueue() {
                   </span>{" "}
                   product{selectedCount !== 1 ? "s" : ""} ×{" "}
                   <span className="text-text-primary font-medium">
-                    {totalAllocated}
+                    {imagesPerProduct}
                   </span>{" "}
                   ={" "}
                   <span className="text-accent-amber font-semibold font-jetbrains">
-                    {selectedCount * totalAllocated}
+                    {selectedCount * imagesPerProduct}
                   </span>{" "}
                   creatives
                 </>
