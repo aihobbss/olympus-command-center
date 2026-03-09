@@ -76,6 +76,7 @@ export const discoveryPool: DiscoveryProduct[] = [
 
 export type ProductType =
   | ""
+  | "Shoes"
   | "Regular Jacket"
   | "Light Jacket"
   | "Luxury Jacket"
@@ -90,22 +91,37 @@ export type ProductType =
   | "Light Pants"
   | "Heavy Pants";
 
-// Simo's pricing table (GBP base prices)
-export const pricingTable: Record<string, number> = {
-  "Regular Jacket": 35,
-  "Light Jacket": 32,
-  "Luxury Jacket": 48,
-  "Light Sweater": 28,
-  "Heavy Sweater": 32,
-  "Light Top": 25,
-  "Heavy Top": 31,
-  "All Accessories": 26,
-  "Sandals": 26,
-  "Dress": 36,
-  "Set": 38,
-  "Light Pants": 28,
-  "Heavy Pants": 32,
+// Simo's pricing table — GBP and AUD prices per product type
+export const pricingTable: Record<string, { gbp: number; aud: number }> = {
+  "Shoes":            { gbp: 38, aud: 78 },
+  "Regular Jacket":   { gbp: 38, aud: 78 },
+  "Light Jacket":     { gbp: 32, aud: 68 },
+  "Luxury Jacket":    { gbp: 48, aud: 92 },
+  "Light Sweater":    { gbp: 28, aud: 62 },
+  "Heavy Sweater":    { gbp: 32, aud: 68 },
+  "Light Top":        { gbp: 26, aud: 48 },
+  "Heavy Top":        { gbp: 28, aud: 62 },
+  "All Accessories":  { gbp: 26, aud: 48 },
+  "Sandals":          { gbp: 28, aud: 62 },
+  "Dress":            { gbp: 28, aud: 62 },
+  "Set":              { gbp: 38, aud: 78 },
+  "Light Pants":      { gbp: 28, aud: 62 },
+  "Heavy Pants":      { gbp: 32, aud: 68 },
 };
+
+// Discount rules: 53% for low-ticket (£26/A$48 and below), 42% otherwise
+export function getDiscountForPrice(price: number, market: "UK" | "AU" | "USA"): number {
+  const lowTicketThreshold = market === "AU" ? 48 : 26;
+  return price <= lowTicketThreshold ? 53 : 42;
+}
+
+// Helper to get the price for a product type in the right currency
+export function getPriceForType(productType: ProductType, market: "UK" | "AU" | "USA"): number | null {
+  if (!productType) return null;
+  const entry = pricingTable[productType];
+  if (!entry) return null;
+  return market === "AU" ? entry.aud : entry.gbp;
+}
 
 export type SheetProduct = {
   id: string;
@@ -131,7 +147,7 @@ export const initialSheetProducts: SheetProduct[] = [
     creativeSaved: true,
     cog: 18,
     productType: "Regular Jacket",
-    pricing: 35,
+    pricing: 38,
     discountPercent: 42,
     notes: "GOOD",
   },
@@ -144,7 +160,7 @@ export const initialSheetProducts: SheetProduct[] = [
     creativeSaved: true,
     cog: 12,
     productType: "Heavy Top",
-    pricing: 31,
+    pricing: 28,
     discountPercent: 42,
     notes: "good",
   },
@@ -156,8 +172,8 @@ export const initialSheetProducts: SheetProduct[] = [
     testingStatus: "Imported",
     creativeSaved: false,
     cog: 22,
-    productType: "All Accessories",
-    pricing: 26,
+    productType: "Shoes",
+    pricing: 38,
     discountPercent: 42,
     notes: "GOOD",
   },
@@ -169,8 +185,8 @@ export const initialSheetProducts: SheetProduct[] = [
     testingStatus: "",
     creativeSaved: false,
     cog: null,
-    productType: "Luxury Jacket",
-    pricing: 48,
+    productType: "Shoes",
+    pricing: 38,
     discountPercent: 42,
     notes: "Not DS",
   },
@@ -208,8 +224,8 @@ export const initialSheetProducts: SheetProduct[] = [
     testingStatus: "Queued",
     creativeSaved: false,
     cog: 19,
-    productType: "All Accessories",
-    pricing: 26,
+    productType: "Shoes",
+    pricing: 38,
     discountPercent: 42,
     notes: "",
   },

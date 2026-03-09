@@ -14,7 +14,8 @@ import { useResearchStore, useStoreContext } from "@/lib/store";
 import {
   type SheetProduct,
   type ProductType,
-  pricingTable,
+  getPriceForType,
+  getDiscountForPrice,
 } from "@/data/mock";
 import { cn } from "@/lib/utils";
 
@@ -201,6 +202,7 @@ function LinkCell({
 
 const PRODUCT_TYPES: ProductType[] = [
   "",
+  "Shoes",
   "Regular Jacket",
   "Light Jacket",
   "Luxury Jacket",
@@ -218,18 +220,21 @@ const PRODUCT_TYPES: ProductType[] = [
 
 function ProductTypeCell({
   productType,
+  market,
   onChange,
 }: {
   productType: ProductType;
-  onChange: (pt: ProductType, price: number | null) => void;
+  market: "UK" | "AU" | "USA";
+  onChange: (pt: ProductType, price: number | null, discount: number) => void;
 }) {
   return (
     <select
       value={productType}
       onChange={(e) => {
         const pt = e.target.value as ProductType;
-        const price = pt ? pricingTable[pt] ?? null : null;
-        onChange(pt, price);
+        const price = getPriceForType(pt, market);
+        const discount = price != null ? getDiscountForPrice(price, market) : 42;
+        onChange(pt, price, discount);
       }}
       className={cn(
         "text-[11px] font-medium px-2 py-1 rounded-lg",
@@ -589,10 +594,12 @@ export function ResearchSheet() {
               <td className="px-3 py-2.5">
                 <ProductTypeCell
                   productType={product.productType}
-                  onChange={(pt, price) =>
+                  market={selectedStore.market}
+                  onChange={(pt, price, discount) =>
                     updateSheetProduct(product.id, {
                       productType: pt,
                       pricing: price,
+                      discountPercent: discount,
                     })
                   }
                 />
