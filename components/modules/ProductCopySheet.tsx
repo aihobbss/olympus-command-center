@@ -106,17 +106,17 @@ function EditableCell({
 const adStatusConfig: Record<AdStatus, { color: string; glow: string; label: string }> = {
   red: {
     color: "bg-red-500",
-    glow: "shadow-[0_0_8px_2px_rgba(239,68,68,0.5)]",
+    glow: "shadow-[0_0_6px_1px_rgba(239,68,68,0.45)]",
     label: "Off",
   },
   yellow: {
     color: "bg-amber-400",
-    glow: "shadow-[0_0_8px_2px_rgba(245,158,11,0.5)]",
+    glow: "shadow-[0_0_6px_1px_rgba(245,158,11,0.45)]",
     label: "Paused",
   },
   green: {
     color: "bg-emerald-400",
-    glow: "shadow-[0_0_8px_2px_rgba(16,185,129,0.5)]",
+    glow: "shadow-[0_0_6px_1px_rgba(16,185,129,0.45)]",
     label: "Live",
   },
 };
@@ -140,7 +140,7 @@ function AdStatusDot({
     >
       <div
         className={cn(
-          "w-3 h-3 rounded-full",
+          "w-2 h-2 rounded-full",
           cfg.color,
           cfg.glow,
           "transition-all duration-200"
