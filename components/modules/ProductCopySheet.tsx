@@ -302,25 +302,11 @@ type StatusFilter = "All" | "Pending" | "Generating" | "Completed" | "Blank";
 // ── Main sheet component ───────────────────────────────────
 
 export function ProductCopySheet() {
-  const { copyProducts, updateCopyProduct, generateCopy, generateAll } =
+  const { copyProducts, updateCopyProduct, generateCopy, generateAll, pushToStore, pushAllToStore } =
     useProductCopyStore();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [previewId, setPreviewId] = useState<string | null>(null);
-  const [pushingIds, setPushingIds] = useState<Set<string>>(new Set());
-  const [pushedIds, setPushedIds] = useState<Set<string>>(new Set());
-
-  function pushToStore(id: string) {
-    setPushingIds((prev) => new Set(prev).add(id));
-    setTimeout(() => {
-      setPushingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-      setPushedIds((prev) => new Set(prev).add(id));
-    }, 1500);
-  }
 
   const filtered = useMemo(() => {
     let items = copyProducts;
@@ -434,17 +420,10 @@ export function ProductCopySheet() {
 
         {/* Push All to Store button */}
         {copyProducts.some(
-          (p) => p.status === "Completed" && !pushedIds.has(p.id) && !pushingIds.has(p.id)
+          (p) => p.status === "Completed" && p.pushStatus === ""
         ) && (
           <button
-            onClick={() => {
-              const completedUnpushed = copyProducts.filter(
-                (p) => p.status === "Completed" && !pushedIds.has(p.id) && !pushingIds.has(p.id)
-              );
-              completedUnpushed.forEach((p, i) => {
-                setTimeout(() => pushToStore(p.id), i * 300);
-              });
-            }}
+            onClick={pushAllToStore}
             className={cn(
               "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
               "bg-[var(--accent-emerald)] hover:bg-[var(--accent-emerald)]/80 text-white",
@@ -581,9 +560,9 @@ export function ProductCopySheet() {
                       updateCopyProduct(product.id, { status: s })
                     }
                     pushState={
-                      pushingIds.has(product.id)
+                      product.pushStatus === "pushing"
                         ? "pushing"
-                        : pushedIds.has(product.id)
+                        : product.pushStatus === "pushed"
                           ? "pushed"
                           : "idle"
                     }

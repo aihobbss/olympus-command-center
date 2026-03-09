@@ -15,8 +15,9 @@ import {
   Globe,
   Trash2,
   Plus,
+  X,
 } from "lucide-react";
-import { useAdCreatorStore, useStoreContext } from "@/lib/store";
+import { useAdCreatorStore, useCreativeGeneratorStore, useStoreContext } from "@/lib/store";
 import { type AdCreatorCampaign, type AdCreatorStatus, type AdGender } from "@/data/mock";
 import { cn } from "@/lib/utils";
 
@@ -108,7 +109,49 @@ function ExpandedAdCards({
   onUpdate: (updates: Partial<AdCreatorCampaign>) => void;
   onRemove: () => void;
 }) {
-  const hasCreatives = campaign.creatives.length > 0;
+  // Get ALL creatives for this product from the global pool
+  const allProductCreatives = useCreativeGeneratorStore(
+    (s) => s.productCreatives.filter((c) => c.productName === campaign.productName && c.status === "completed")
+  );
+  const removeCreativeGlobally = useCreativeGeneratorStore((s) => s.removeCreative);
+
+  // IDs of creatives currently selected for this campaign
+  const selectedCreativeIds = new Set(campaign.creatives.map((c) => c.id));
+
+  const toggleCreativeSelection = (creativeId: string) => {
+    if (selectedCreativeIds.has(creativeId)) {
+      // Deselect — remove from campaign creatives
+      onUpdate({
+        creatives: campaign.creatives.filter((c) => c.id !== creativeId),
+      });
+    } else {
+      // Select — add to campaign creatives
+      const creative = allProductCreatives.find((c) => c.id === creativeId);
+      if (creative) {
+        onUpdate({
+          creatives: [
+            ...campaign.creatives,
+            {
+              id: creative.id,
+              concept: creative.concept,
+              placeholderGradient: creative.placeholderGradient,
+            },
+          ],
+        });
+      }
+    }
+  };
+
+  const deleteCreativeGlobally = (creativeId: string) => {
+    // Remove from campaign
+    onUpdate({
+      creatives: campaign.creatives.filter((c) => c.id !== creativeId),
+    });
+    // Remove from global pool
+    removeCreativeGlobally(creativeId);
+  };
+
+  const hasAnyCreatives = allProductCreatives.length > 0;
 
   return (
     <div className="px-6 py-4 bg-white/[0.01] border-t border-subtle/30">
@@ -202,33 +245,82 @@ function ExpandedAdCards({
         </div>
       </div>
 
-      {/* Creative cards grid */}
-      {hasCreatives ? (
+      {/* Creative cards grid — shows ALL product creatives with select/deselect */}
+      {hasAnyCreatives ? (
         <div>
           <div className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-2">
-            Creatives ({campaign.creatives.length})
+            Product Creatives ({allProductCreatives.length})
+            {campaign.creatives.length > 0 && (
+              <span className="text-accent-indigo ml-2">
+                {campaign.creatives.length} selected as ads
+              </span>
+            )}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {campaign.creatives.map((creative) => (
-              <div
-                key={creative.id}
-                className="rounded-lg overflow-hidden border border-subtle"
-              >
+            {allProductCreatives.map((creative) => {
+              const isSelected = selectedCreativeIds.has(creative.id);
+              return (
                 <div
+                  key={creative.id}
                   className={cn(
-                    "aspect-square bg-gradient-to-br flex items-center justify-center",
-                    creative.placeholderGradient
+                    "group relative rounded-lg overflow-hidden border transition-all duration-200",
+                    isSelected
+                      ? "border-accent-indigo ring-1 ring-accent-indigo/30"
+                      : "border-subtle hover:border-[var(--border-hover)]"
                   )}
                 >
-                  <ImageIcon size={20} className="text-white/40" />
+                  <div
+                    className={cn(
+                      "aspect-square bg-gradient-to-br flex items-center justify-center cursor-pointer",
+                      creative.placeholderGradient
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCreativeSelection(creative.id);
+                    }}
+                  >
+                    <span className="text-[10px] font-syne font-semibold text-white/60 text-center leading-snug px-2">
+                      {creative.concept}
+                    </span>
+                  </div>
+                  <div className="px-2 py-1.5 bg-bg-card flex items-center justify-between">
+                    <span className="text-[10px] text-text-secondary truncate">
+                      {creative.concept}
+                    </span>
+                    {isSelected && (
+                      <Check size={10} className="text-accent-indigo shrink-0" />
+                    )}
+                  </div>
+
+                  {/* Select/deselect checkbox overlay */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCreativeSelection(creative.id);
+                    }}
+                    className={cn(
+                      "absolute top-1.5 left-1.5 w-5 h-5 rounded border flex items-center justify-center transition-all duration-150",
+                      isSelected
+                        ? "bg-accent-indigo border-accent-indigo text-white"
+                        : "bg-black/40 border-white/30 text-transparent group-hover:text-white/50"
+                    )}
+                  >
+                    <Check size={10} strokeWidth={3} />
+                  </button>
+
+                  {/* Delete button (global removal) */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteCreativeGlobally(creative.id);
+                    }}
+                    className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-white/50 hover:text-white hover:bg-accent-red/80 opacity-0 group-hover:opacity-100 transition-all duration-150"
+                  >
+                    <X size={10} strokeWidth={2.5} />
+                  </button>
                 </div>
-                <div className="px-2 py-1.5 bg-bg-card">
-                  <span className="text-[10px] text-text-secondary truncate block">
-                    {creative.concept}
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : (
@@ -511,8 +603,8 @@ export function AdCreatorSheet() {
                         }}
                       >
                         <option value="">—</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
+                        <option value="Male">Men</option>
+                        <option value="Female">Women</option>
                         <option value="All">All</option>
                       </select>
                     </td>

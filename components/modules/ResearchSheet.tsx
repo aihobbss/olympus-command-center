@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
   Upload,
   Search,
@@ -8,6 +8,7 @@ import {
   ExternalLink,
   PackageCheck,
   Plus,
+  Loader2,
 } from "lucide-react";
 import { useResearchStore, useStoreContext } from "@/lib/store";
 import {
@@ -346,6 +347,58 @@ export function ResearchSheet() {
   const { selectedStore } = useStoreContext();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TestingStatusFilter>("All");
+  const [scrapingIds, setScrapingIds] = useState<Set<string>>(new Set());
+
+  // Auto-fill product data when an afterlib/winninghunter link is pasted
+  const handleAdLinkSave = useCallback(
+    async (productId: string, link: string) => {
+      // Always save the link itself
+      updateSheetProduct(productId, { adLink: link });
+
+      // Only attempt scrape for recognized URLs
+      if (
+        !link ||
+        (!link.includes("afterlib.com") && !link.includes("winninghunter.com"))
+      ) {
+        return;
+      }
+
+      setScrapingIds((prev) => new Set(prev).add(productId));
+
+      try {
+        const res = await fetch(
+          `/api/scrape-ad?url=${encodeURIComponent(link)}`
+        );
+        if (!res.ok) throw new Error("Scrape failed");
+        const data = await res.json();
+
+        // Only auto-fill empty fields — never overwrite existing data
+        const product = sheetProducts.find((p) => p.id === productId);
+        if (!product) return;
+
+        const updates: Partial<typeof product> = {};
+        if (!product.productName && data.productName)
+          updates.productName = data.productName;
+        if (!product.storeLink && data.storeLink)
+          updates.storeLink = data.storeLink;
+        if (!product.notes && data.adCopy)
+          updates.notes = data.adCopy.slice(0, 200);
+
+        if (Object.keys(updates).length > 0) {
+          updateSheetProduct(productId, updates);
+        }
+      } catch {
+        // Silently skip — user can fill manually
+      } finally {
+        setScrapingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+      }
+    },
+    [sheetProducts, updateSheetProduct]
+  );
 
   const filtered = useMemo(() => {
     let items = sheetProducts;
@@ -507,15 +560,20 @@ export function ResearchSheet() {
                 />
               </td>
 
-              {/* Ad link — clickable hyperlink */}
+              {/* Ad link — clickable hyperlink + auto-fill */}
               <td className="px-3 py-2.5 min-w-[120px]">
+                {scrapingIds.has(product.id) ? (
+                  <span className="inline-flex items-center gap-1.5 text-[11px] text-violet-400">
+                    <Loader2 size={12} className="animate-spin" />
+                    Fetching…
+                  </span>
+                ) : (
                 <LinkCell
                   value={product.adLink}
                   placeholder="Ad link"
-                  onSave={(v) =>
-                    updateSheetProduct(product.id, { adLink: v })
-                  }
+                  onSave={(v) => handleAdLinkSave(product.id, v)}
                 />
+                )}
               </td>
 
               {/* Store link — clickable hyperlink */}

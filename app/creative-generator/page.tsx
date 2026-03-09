@@ -16,8 +16,10 @@ import {
   Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStoreContext } from "@/lib/store";
+import { useStoreContext, useCreativeGeneratorStore } from "@/lib/store";
 import { ActionSlider } from "@/components/ui";
+import { PROMPT_TEMPLATES as SHARED_PROMPT_TEMPLATES } from "@/data/mock";
+import { CreativeBatchQueue } from "@/components/modules/CreativeBatchQueue";
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -31,12 +33,6 @@ type ProductOption = {
 type CreativeCard = {
   id: string;
   concept: string;
-};
-
-type PromptTemplate = {
-  id: string;
-  label: string;
-  prompt: string;
 };
 
 type ActivePrompt = {
@@ -80,18 +76,7 @@ const PRODUCTS: ProductOption[] = [
   },
 ];
 
-const PROMPT_TEMPLATES: PromptTemplate[] = [
-  { id: "t1", label: "Winter — Text", prompt: "Winter setting with product, text overlay with name and price" },
-  { id: "t2", label: "Winter — No Text", prompt: "Winter setting with product, clean image no text" },
-  { id: "t3", label: "High-End — No Text", prompt: "Luxury studio shot, minimal background, no text" },
-  { id: "t4", label: "High-End — Text", prompt: "Luxury studio shot with elegant text overlay" },
-  { id: "t5", label: "Price Shown", prompt: "Product with sale price and crossed-out original price" },
-  { id: "t6", label: "Replicate Winner", prompt: "Replicate the style of the best-performing ad creative" },
-  { id: "t7", label: "Model Wearing It", prompt: "Model wearing/using the product in lifestyle setting" },
-  { id: "t8", label: "UGC Style", prompt: "User-generated content style, casual phone camera look" },
-  { id: "t9", label: "Before & After", prompt: "Split comparison showing transformation or styling" },
-  { id: "t10", label: "Flat Lay", prompt: "Top-down flat lay arrangement on neutral background" },
-];
+const PROMPT_TEMPLATES = SHARED_PROMPT_TEMPLATES;
 
 // Gradient pairs for placeholder creative cards
 const GRADIENTS = [
@@ -106,9 +91,13 @@ const GRADIENTS = [
 
 // ─── Page ───────────────────────────────────────────────────
 
+type CreativeTab = "single" | "batch";
+
 export default function CreativeGeneratorPage() {
   const { selectedStore } = useStoreContext();
   const currency = selectedStore.currency;
+  const [activeTab, setActiveTab] = useState<CreativeTab>("single");
+  const batchQueueCount = useCreativeGeneratorStore((s) => s.batchQueue.length);
 
   // ── Form state ──
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -292,11 +281,49 @@ export default function CreativeGeneratorPage() {
             Creative Generator
           </h1>
           <p className="text-sm text-text-secondary">
-            AI-powered ad creatives via Higgsfield
+            {activeTab === "single"
+              ? "AI-powered ad creatives via Higgsfield"
+              : "Bulk generate creatives for pushed products"}
           </p>
         </div>
       </div>
 
+      {/* ─── Tab Switcher ─── */}
+      <div className="flex gap-1 p-1 rounded-xl bg-bg-elevated/60 w-fit mb-6">
+        <button
+          onClick={() => setActiveTab("single")}
+          className={cn(
+            "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+            activeTab === "single"
+              ? "bg-accent-amber text-black shadow-lg shadow-accent-amber/20"
+              : "text-text-secondary hover:text-text-primary"
+          )}
+        >
+          Single Product
+        </button>
+        <button
+          onClick={() => setActiveTab("batch")}
+          className={cn(
+            "relative px-4 py-2 rounded-lg text-sm font-medium transition-all",
+            activeTab === "batch"
+              ? "bg-accent-amber text-black shadow-lg shadow-accent-amber/20"
+              : "text-text-secondary hover:text-text-primary"
+          )}
+        >
+          Batch Queue
+          {batchQueueCount > 0 && activeTab !== "batch" && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent-indigo text-white text-[9px] font-bold flex items-center justify-center">
+              {batchQueueCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ─── Batch Queue Tab ─── */}
+      {activeTab === "batch" && <CreativeBatchQueue />}
+
+      {/* ─── Single Product Tab ─── */}
+      {activeTab === "single" && (<>
       {/* ─── Two-panel layout ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start">
         {/* ━━━━ LEFT — Form Panel ━━━━ */}
@@ -742,6 +769,8 @@ export default function CreativeGeneratorPage() {
           )}
         </div>
       </div>
+
+      </>)}
 
       {/* ─── Configure Prompts Panel ─── */}
       <ActionSlider

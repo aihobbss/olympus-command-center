@@ -278,6 +278,8 @@ export const researchProducts: ResearchProduct[] = [];
 
 export type AdStatus = "red" | "yellow" | "green";
 
+export type PushStatus = "" | "pushing" | "pushed";
+
 export type ProductCopy = {
   id: string;
   adStatus: AdStatus;
@@ -287,6 +289,7 @@ export type ProductCopy = {
   shopifyDescription: string;
   facebookCopy: string;
   status: "" | "Pending" | "Generating" | "Completed";
+  pushStatus: PushStatus;
 };
 
 export const initialCopyProducts: ProductCopy[] = [
@@ -299,6 +302,7 @@ export const initialCopyProducts: ProductCopy[] = [
     shopifyDescription: "Modern Edge Meets Everyday Comfort\n\nElevate your seasonal wardrobe with a statement knit designed to turn heads. The Aymbr Sweater features distinctive openwork detail and a relaxed silhouette that flatters while keeping things effortlessly stylish.\n\n\u2022 Knitted Design: Cozy construction combines warmth with everyday refinement\n\u2022 Openwork Details: Intricate patterns bring depth and modern flair\n\u2022 Relaxed Fit: Slightly oversized shape with dropped shoulders for easy layering\n\u2022 Round Neck: Classic crew neckline complements any outfit\n\nDesigned in London by Olympus for timeless versatility.",
     facebookCopy: "Slide Into Textured Sophistication with the Aymbr Sweater\n\nPlayful structure meets confident style in this relaxed must-have. The Aymbr Sweater\u2019s openwork detail and patchwork texture bring effortless elegance to your rotation.\n\nRelaxed. Intricate. Versatile.\n\nhttps://olympus-london.myshopify.com/products/aymbr\nAymbr Sweater\nFree Shipping in the UK\nShop now",
     status: "Completed",
+    pushStatus: "",
   },
   {
     id: "pc-002",
@@ -309,6 +313,7 @@ export const initialCopyProducts: ProductCopy[] = [
     shopifyDescription: "Warm-Weather Function Meets Everyday Utility\n\nCrafted for comfort and ease, the All-Terrain Canvas Sneaker is ready for anything from daily errands to weekend adventures. The breathable upper and flexible sole support natural movement.\n\n\u2022 Low-Top Construction: Relaxed silhouette with casual styling appeal\n\u2022 Lace-Up Front: Metal eyelets provide secure fit and utility edge\n\u2022 Slip-Resistant Tread: Durable outsole provides reliable traction\n\u2022 Textured Details: Visible stitching and panel design add structure\n\nDesigned in London by Olympus for modern versatility.",
     facebookCopy: "Slide Into Everyday Motion with the All-Terrain Canvas Sneaker\n\nBuilt to keep pace with your routine, the All-Terrain Canvas Sneaker delivers breathable comfort, structured support, and rugged traction in one easygoing package.\n\nPractical. Breathable. Grounded.\n\nhttps://olympus-london.myshopify.com/products/all-terrain-canvas-sneaker\nAll-Terrain Canvas Sneaker\nFree Shipping in the UK\nShop now",
     status: "Completed",
+    pushStatus: "",
   },
   {
     id: "pc-003",
@@ -319,6 +324,7 @@ export const initialCopyProducts: ProductCopy[] = [
     shopifyDescription: "",
     facebookCopy: "",
     status: "Pending",
+    pushStatus: "",
   },
   {
     id: "pc-004",
@@ -329,6 +335,7 @@ export const initialCopyProducts: ProductCopy[] = [
     shopifyDescription: "",
     facebookCopy: "",
     status: "Pending",
+    pushStatus: "",
   },
   {
     id: "pc-005",
@@ -339,6 +346,7 @@ export const initialCopyProducts: ProductCopy[] = [
     shopifyDescription: "",
     facebookCopy: "",
     status: "",
+    pushStatus: "",
   },
 ];
 
@@ -447,6 +455,58 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
     status: "Queued",
   },
 ];
+
+// ============================================================
+// 1e. Shared Prompt Templates (used by Creative Generator)
+// ============================================================
+
+export type PromptTemplate = {
+  id: string;
+  label: string;
+  prompt: string;
+};
+
+export const PROMPT_TEMPLATES: PromptTemplate[] = [
+  { id: "t1", label: "Winter — Text", prompt: "Winter setting with product, text overlay with name and price" },
+  { id: "t2", label: "Winter — No Text", prompt: "Winter setting with product, clean image no text" },
+  { id: "t3", label: "High-End — No Text", prompt: "Luxury studio shot, minimal background, no text" },
+  { id: "t4", label: "High-End — Text", prompt: "Luxury studio shot with elegant text overlay" },
+  { id: "t5", label: "Price Shown", prompt: "Product with sale price and crossed-out original price" },
+  { id: "t6", label: "Replicate Winner", prompt: "Replicate the style of the best-performing ad creative" },
+  { id: "t7", label: "Model Wearing It", prompt: "Model wearing/using the product in lifestyle setting" },
+  { id: "t8", label: "UGC Style", prompt: "User-generated content style, casual phone camera look" },
+  { id: "t9", label: "Before & After", prompt: "Split comparison showing transformation or styling" },
+  { id: "t10", label: "Flat Lay", prompt: "Top-down flat lay arrangement on neutral background" },
+  { id: "t11", label: "Standard Test", prompt: "Clean product shot on white background, standard e-commerce format" },
+];
+
+// ============================================================
+// 1f. Creative Generator Batch Queue Types
+// ============================================================
+
+export type BatchQueueProduct = {
+  id: string;
+  productCopyId: string;
+  productName: string;
+  productUrl: string;
+  imageUrl: string;
+  status: "queued" | "generating" | "completed";
+};
+
+export type ProductCreative = {
+  id: string;
+  productName: string;
+  productCopyId: string;
+  concept: string;
+  placeholderGradient: string;
+  status: "pending" | "generating" | "completed";
+};
+
+export type PromptAllocation = {
+  templateId: string;
+  label: string;
+  count: number;
+};
 
 // ============================================================
 // 2. Ad Campaigns (4 items)

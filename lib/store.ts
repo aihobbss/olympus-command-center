@@ -4,10 +4,14 @@ import {
   initialSheetProducts,
   initialCopyProducts,
   initialAdCreatorCampaigns,
+  PROMPT_TEMPLATES,
   type DiscoveryProduct,
   type SheetProduct,
   type ProductCopy,
   type AdCreatorCampaign,
+  type BatchQueueProduct,
+  type ProductCreative,
+  type PromptAllocation,
 } from "@/data/mock";
 import { mockStores, type MockStore } from "@/lib/navigation";
 
@@ -155,6 +159,8 @@ interface ProductCopyStore {
   updateCopyProduct: (id: string, updates: Partial<ProductCopy>) => void;
   generateCopy: (id: string) => void;
   generateAll: () => void;
+  pushToStore: (id: string) => void;
+  pushAllToStore: () => void;
 }
 
 const MOCK_SHOPIFY = "Timeless Style Meets Modern Craft\n\nElevate your wardrobe with a versatile piece designed for everyday confidence. Premium materials and refined details make this a go-to for any occasion.\n\n\u2022 Quality Construction: Built to last with premium stitching\n\u2022 Modern Fit: Tailored silhouette flatters every frame\n\u2022 Versatile Design: Pairs effortlessly with any outfit\n\nDesigned for those who value style and substance.";
@@ -201,8 +207,32 @@ export const useProductCopyStore = create<ProductCopyStore>((set) => ({
       (p) => p.status === "" || p.status === "Pending"
     );
     pending.forEach((p, i) => {
-      // Stagger by 400ms each to simulate sequential generation
       setTimeout(() => generateCopy(p.id), i * 400);
+    });
+  },
+
+  pushToStore: (id) => {
+    set((s) => ({
+      copyProducts: s.copyProducts.map((p) =>
+        p.id === id ? { ...p, pushStatus: "pushing" as const } : p
+      ),
+    }));
+    setTimeout(() => {
+      set((s) => ({
+        copyProducts: s.copyProducts.map((p) =>
+          p.id === id ? { ...p, pushStatus: "pushed" as const } : p
+        ),
+      }));
+    }, 1500);
+  },
+
+  pushAllToStore: () => {
+    const { copyProducts, pushToStore } = useProductCopyStore.getState();
+    const ready = copyProducts.filter(
+      (p) => p.status === "Completed" && p.pushStatus === ""
+    );
+    ready.forEach((p, i) => {
+      setTimeout(() => pushToStore(p.id), i * 300);
     });
   },
 }));
@@ -282,6 +312,155 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
     });
   },
 }));
+
+// ─── Creative Generator Store ────────────────────────────
+// Manages batch queue and global product creatives pool.
+
+const creativeGradients = [
+  "from-indigo-600 to-purple-500",
+  "from-emerald-600 to-teal-500",
+  "from-amber-500 to-orange-500",
+  "from-rose-600 to-pink-500",
+  "from-cyan-500 to-blue-500",
+  "from-violet-600 to-fuchsia-500",
+];
+
+interface CreativeGeneratorStore {
+  batchQueue: BatchQueueProduct[];
+  productCreatives: ProductCreative[];
+  imagesPerProduct: number;
+  promptAllocations: PromptAllocation[];
+
+  setImagesPerProduct: (n: number) => void;
+  setPromptAllocations: (allocs: PromptAllocation[]) => void;
+  generateBatch: (productIds: string[]) => void;
+  removeCreative: (creativeId: string) => void;
+}
+
+export const useCreativeGeneratorStore = create<CreativeGeneratorStore>(
+  (set, get) => ({
+    batchQueue: [],
+    productCreatives: [],
+    imagesPerProduct: 3,
+    promptAllocations: [
+      { templateId: PROMPT_TEMPLATES[10].id, label: PROMPT_TEMPLATES[10].label, count: 2 },
+      { templateId: PROMPT_TEMPLATES[2].id, label: PROMPT_TEMPLATES[2].label, count: 1 },
+    ],
+
+    setImagesPerProduct: (n) => set({ imagesPerProduct: n }),
+    setPromptAllocations: (allocs) => set({ promptAllocations: allocs }),
+
+    generateBatch: (productIds) => {
+      const { batchQueue, promptAllocations } = get();
+      const products = batchQueue.filter((p) => productIds.includes(p.id));
+      const newCreatives: ProductCreative[] = [];
+      let idx = 0;
+
+      for (const product of products) {
+        for (const alloc of promptAllocations) {
+          for (let i = 0; i < alloc.count; i++) {
+            newCreatives.push({
+              id: `pcr-${Date.now()}-${idx}`,
+              productName: product.productName,
+              productCopyId: product.productCopyId,
+              concept: alloc.label,
+              placeholderGradient: creativeGradients[idx % creativeGradients.length],
+              status: "pending",
+            });
+            idx++;
+          }
+        }
+      }
+
+      // Set all selected products to generating
+      set((s) => ({
+        batchQueue: s.batchQueue.map((p) =>
+          productIds.includes(p.id) ? { ...p, status: "generating" as const } : p
+        ),
+        productCreatives: [...s.productCreatives, ...newCreatives],
+      }));
+
+      // Stagger-reveal creatives
+      newCreatives.forEach((c, i) => {
+        setTimeout(() => {
+          set((s) => ({
+            productCreatives: s.productCreatives.map((pc) =>
+              pc.id === c.id ? { ...pc, status: "completed" as const } : pc
+            ),
+          }));
+        }, (i + 1) * 200);
+      });
+
+      // Mark products completed after all creatives done
+      const totalTime = (newCreatives.length + 1) * 200;
+      setTimeout(() => {
+        set((s) => ({
+          batchQueue: s.batchQueue.map((p) =>
+            productIds.includes(p.id) ? { ...p, status: "completed" as const } : p
+          ),
+        }));
+      }, totalTime);
+    },
+
+    removeCreative: (creativeId) =>
+      set((s) => ({
+        productCreatives: s.productCreatives.filter((c) => c.id !== creativeId),
+      })),
+  })
+);
+
+// ─── Cross-store subscription: ProductCopy → Creative Generator batch queue ──
+useProductCopyStore.subscribe((state) => {
+  const pushed = state.copyProducts.filter((p) => p.pushStatus === "pushed");
+  const currentQueue = useCreativeGeneratorStore.getState().batchQueue;
+  const existingIds = new Set(currentQueue.map((q) => q.productCopyId));
+  const newProducts = pushed.filter((p) => !existingIds.has(p.id));
+
+  if (newProducts.length > 0) {
+    useCreativeGeneratorStore.setState((s) => ({
+      batchQueue: [
+        ...s.batchQueue,
+        ...newProducts.map((p) => ({
+          id: `bq-${Date.now()}-${p.id}`,
+          productCopyId: p.id,
+          productName: p.productName,
+          productUrl: p.productUrl,
+          imageUrl: p.imageUrl,
+          status: "queued" as const,
+        })),
+      ],
+    }));
+  }
+});
+
+// ─── Cross-store subscription: Creatives → Ad Creator auto-attach ──
+useCreativeGeneratorStore.subscribe((state) => {
+  const completed = state.productCreatives.filter((c) => c.status === "completed");
+  if (completed.length === 0) return;
+
+  const adStore = useAdCreatorStore.getState();
+
+  for (const creative of completed) {
+    const campaign = adStore.campaigns.find(
+      (c) => c.productName === creative.productName
+    );
+    if (!campaign) continue;
+
+    const alreadyAttached = campaign.creatives.some((c) => c.id === creative.id);
+    if (alreadyAttached) continue;
+
+    adStore.updateCampaign(campaign.id, {
+      creatives: [
+        ...campaign.creatives,
+        {
+          id: creative.id,
+          concept: creative.concept,
+          placeholderGradient: creative.placeholderGradient,
+        },
+      ],
+    });
+  }
+});
 
 // ─── Store Context ──────────────────────────────────────
 // Global store selector state so that the chosen store
