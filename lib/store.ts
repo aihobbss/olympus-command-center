@@ -213,6 +213,8 @@ export const useProductCopyStore = create<ProductCopyStore>((set) => ({
 interface AdCreatorStore {
   campaigns: AdCreatorCampaign[];
   updateCampaign: (id: string, updates: Partial<AdCreatorCampaign>) => void;
+  addCampaign: () => void;
+  removeCampaign: (id: string) => void;
   pushCampaign: (id: string) => void;
   pushAll: () => void;
 }
@@ -225,6 +227,31 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
       campaigns: s.campaigns.map((c) =>
         c.id === id ? { ...c, ...updates } : c
       ),
+    })),
+
+  addCampaign: () =>
+    set((s) => ({
+      campaigns: [
+        ...s.campaigns,
+        {
+          id: `ac-${Date.now()}`,
+          productName: "",
+          productUrl: "",
+          primaryText: "",
+          headline: "",
+          description: "",
+          cta: "Shop Now",
+          country: "",
+          budget: 30,
+          creatives: [],
+          status: "Queued" as const,
+        },
+      ],
+    })),
+
+  removeCampaign: (id) =>
+    set((s) => ({
+      campaigns: s.campaigns.filter((c) => c.id !== id),
     })),
 
   pushCampaign: (id) => {

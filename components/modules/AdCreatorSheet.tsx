@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   Check,
   Globe,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import { useAdCreatorStore, useStoreContext } from "@/lib/store";
 import { type AdCreatorCampaign, type AdCreatorStatus } from "@/data/mock";
@@ -90,51 +92,113 @@ function CountryCell({ market }: { market: string }) {
 
 // ── Expanded row: individual ad cards ───────────────────────
 
-function ExpandedAdCards({ campaign }: { campaign: AdCreatorCampaign }) {
-  const hasCopy = campaign.primaryText.trim() !== "";
+const editableInputCn = cn(
+  "w-full px-3 py-2 rounded-lg text-xs",
+  "bg-bg-elevated border border-subtle outline-none",
+  "text-text-primary placeholder:text-text-muted",
+  "focus:border-accent-indigo/40 transition-colors duration-150"
+);
+
+function ExpandedAdCards({
+  campaign,
+  onUpdate,
+  onRemove,
+}: {
+  campaign: AdCreatorCampaign;
+  onUpdate: (updates: Partial<AdCreatorCampaign>) => void;
+  onRemove: () => void;
+}) {
   const hasCreatives = campaign.creatives.length > 0;
 
   return (
     <div className="px-6 py-4 bg-white/[0.01] border-t border-subtle/30">
       {/* Campaign structure summary */}
-      <div className="flex items-center gap-2 mb-4 text-[11px] text-text-muted font-jetbrains">
-        <span className="text-text-secondary font-medium">1 Campaign</span>
-        <span>&rarr;</span>
-        <span className="text-text-secondary font-medium">1 Ad Set</span>
-        <span>&rarr;</span>
-        <span className="text-text-secondary font-medium">
-          {campaign.creatives.length} Ad{campaign.creatives.length !== 1 ? "s" : ""}
-        </span>
-        <span className="ml-2 text-text-muted">
-          &middot; ${campaign.budget}/day &middot; {campaign.country}
-        </span>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2 text-[11px] text-text-muted font-jetbrains">
+          <span className="text-text-secondary font-medium">1 Campaign</span>
+          <span>&rarr;</span>
+          <span className="text-text-secondary font-medium">1 Ad Set</span>
+          <span>&rarr;</span>
+          <span className="text-text-secondary font-medium">
+            {campaign.creatives.length} Ad{campaign.creatives.length !== 1 ? "s" : ""}
+          </span>
+          <span className="ml-2 text-text-muted">
+            &middot; ${campaign.budget}/day &middot; {campaign.country}
+          </span>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-accent-red/70 hover:text-accent-red hover:bg-accent-red/10 transition-colors duration-150"
+        >
+          <Trash2 size={12} />
+          Delete
+        </button>
       </div>
 
-      {/* Copy preview */}
+      {/* Editable fields */}
       <div className="grid grid-cols-3 gap-4 mb-4">
         <div>
           <div className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1">
             Primary Text
           </div>
-          <div className="text-xs text-text-secondary whitespace-pre-wrap line-clamp-4 bg-bg-elevated rounded-lg p-3">
-            {hasCopy ? campaign.primaryText : "—"}
-          </div>
+          <textarea
+            value={campaign.primaryText}
+            onChange={(e) => onUpdate({ primaryText: e.target.value })}
+            onClick={(e) => e.stopPropagation()}
+            rows={4}
+            placeholder="Enter primary text..."
+            className={cn(editableInputCn, "resize-none")}
+          />
         </div>
         <div>
           <div className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1">
             Headline
           </div>
-          <div className="text-xs text-text-primary font-medium bg-bg-elevated rounded-lg p-3">
-            {campaign.headline || "—"}
+          <input
+            type="text"
+            value={campaign.headline}
+            onChange={(e) => onUpdate({ headline: e.target.value })}
+            onClick={(e) => e.stopPropagation()}
+            placeholder="Enter headline..."
+            className={editableInputCn}
+          />
+          <div className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1 mt-3">
+            Description
           </div>
+          <input
+            type="text"
+            value={campaign.description}
+            onChange={(e) => onUpdate({ description: e.target.value })}
+            onClick={(e) => e.stopPropagation()}
+            placeholder="Enter description..."
+            className={editableInputCn}
+          />
         </div>
         <div>
           <div className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1">
-            Description
+            Store Link
           </div>
-          <div className="text-xs text-text-secondary bg-bg-elevated rounded-lg p-3">
-            {campaign.description} &middot; CTA: {campaign.cta}
+          <input
+            type="text"
+            value={campaign.productUrl}
+            onChange={(e) => onUpdate({ productUrl: e.target.value })}
+            onClick={(e) => e.stopPropagation()}
+            placeholder="https://..."
+            className={editableInputCn}
+          />
+          <div className="text-[10px] font-medium text-text-muted uppercase tracking-wider mb-1 mt-3">
+            Budget ($/day)
           </div>
+          <input
+            type="number"
+            value={campaign.budget}
+            onChange={(e) => onUpdate({ budget: Number(e.target.value) || 0 })}
+            onClick={(e) => e.stopPropagation()}
+            className={cn(editableInputCn, "font-mono-metric")}
+          />
         </div>
       </div>
 
@@ -184,7 +248,7 @@ type StatusFilter = "All" | "Queued" | "Ready" | "Live";
 // ── Main component ──────────────────────────────────────────
 
 export function AdCreatorSheet() {
-  const { campaigns, pushCampaign, pushAll } = useAdCreatorStore();
+  const { campaigns, pushCampaign, pushAll, updateCampaign, addCampaign, removeCampaign } = useAdCreatorStore();
   const { selectedStore } = useStoreContext();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
@@ -469,7 +533,11 @@ export function AdCreatorSheet() {
                   {expanded && (
                     <tr>
                       <td colSpan={9}>
-                        <ExpandedAdCards campaign={campaign} />
+                        <ExpandedAdCards
+                          campaign={campaign}
+                          onUpdate={(updates) => updateCampaign(campaign.id, updates)}
+                          onRemove={() => removeCampaign(campaign.id)}
+                        />
                       </td>
                     </tr>
                   )}
@@ -479,6 +547,15 @@ export function AdCreatorSheet() {
           </tbody>
         </table>
       </div>
+
+      {/* Add row */}
+      <button
+        onClick={addCampaign}
+        className="flex items-center gap-1.5 mt-3 px-3 py-2 text-xs text-text-muted hover:text-text-secondary transition-colors duration-150"
+      >
+        <Plus size={14} />
+        Add campaign
+      </button>
 
       {/* No results */}
       {filtered.length === 0 && (
