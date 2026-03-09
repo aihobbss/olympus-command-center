@@ -126,11 +126,28 @@ export function CreativeBatchQueue() {
 
   const adjustPromptCount = useCallback(
     (templateId: string, delta: number) => {
-      // Block increment if total already equals imagesPerProduct
-      if (delta > 0 && totalAllocated >= imagesPerProduct) return;
-      // Block decrement below 1
       const current = promptAllocations.find((a) => a.templateId === templateId);
-      if (current && delta < 0 && current.count <= 1) return;
+      if (!current) return;
+
+      if (delta < 0 && current.count <= 1) return;
+
+      if (delta > 0 && totalAllocated >= imagesPerProduct) {
+        // At cap — steal 1 from the largest OTHER prompt
+        const others = promptAllocations.filter((a) => a.templateId !== templateId);
+        const donor = others.reduce(
+          (best, a) => (a.count > best.count ? a : best),
+          others[0]
+        );
+        if (!donor || donor.count <= 1) return; // no one to steal from
+        setPromptAllocations(
+          promptAllocations.map((a) => {
+            if (a.templateId === templateId) return { ...a, count: a.count + 1 };
+            if (a.templateId === donor.templateId) return { ...a, count: a.count - 1 };
+            return a;
+          })
+        );
+        return;
+      }
 
       setPromptAllocations(
         promptAllocations.map((a) =>
@@ -256,18 +273,34 @@ export function CreativeBatchQueue() {
               <button
                 onClick={() => {
                   const newTotal = Math.max(1, imagesPerProduct - 1);
-                  // Can't go below number of active prompts (each needs at least 1)
-                  if (newTotal < promptAllocations.length) return;
                   setImagesPerProduct(newTotal);
-                  // Redistribute: shrink the largest allocation by 1
-                  if (promptAllocations.length > 0 && totalAllocated > newTotal) {
-                    const updated = [...promptAllocations];
+
+                  if (promptAllocations.length === 0) return;
+
+                  // If more prompts than new total, drop the smallest ones until we fit
+                  const updated = [...promptAllocations];
+                  while (updated.length > newTotal) {
+                    // Remove the prompt with the smallest count
+                    const minIdx = updated.reduce(
+                      (mi, a, i) => (a.count < updated[mi].count ? i : mi), 0
+                    );
+                    const removed = updated.splice(minIdx, 1)[0];
+                    // Give its count to the first remaining
+                    if (updated.length > 0) {
+                      updated[0] = { ...updated[0], count: updated[0].count + removed.count };
+                    }
+                  }
+
+                  // Shrink the largest allocation by 1 to match newTotal
+                  const currentTotal = updated.reduce((s, a) => s + a.count, 0);
+                  if (currentTotal > newTotal) {
                     const maxIdx = updated.reduce(
                       (mi, a, i) => (a.count > updated[mi].count ? i : mi), 0
                     );
                     updated[maxIdx] = { ...updated[maxIdx], count: updated[maxIdx].count - 1 };
-                    setPromptAllocations(updated);
                   }
+
+                  setPromptAllocations(updated);
                 }}
                 className="w-8 h-8 rounded-lg border border-subtle flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-colors"
               >
