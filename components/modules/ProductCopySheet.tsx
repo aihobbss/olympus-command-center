@@ -428,7 +428,7 @@ function SizeChartPanel({
             </button>
           </div>
         ) : (
-          <label
+          <div
             onDragOver={(e) => {
               e.preventDefault();
               setDragOver(true);
@@ -436,7 +436,7 @@ function SizeChartPanel({
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             className={cn(
-              "w-[280px] h-[140px] rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer",
+              "relative w-[280px] h-[140px] rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer",
               "transition-colors duration-150",
               dragOver
                 ? "border-accent-indigo/60 bg-accent-indigo/5"
@@ -450,14 +450,14 @@ function SizeChartPanel({
             <input
               type="file"
               accept="image/*"
-              className="sr-only"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) handleFile(file);
                 e.target.value = "";
               }}
             />
-          </label>
+          </div>
         )}
       </div>
 
