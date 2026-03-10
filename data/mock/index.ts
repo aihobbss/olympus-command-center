@@ -886,38 +886,107 @@ function scaleProfitLog(log: ProfitLog, scale: number): ProfitLog {
 
 const olympusProfitLogs: ProfitLog[] = profitLogs.map((l) => scaleProfitLog(l, OLYMPUS_SCALE));
 
-function scaleAdCampaign(c: AdCampaign, scale: number): AdCampaign {
-  const spend = Math.round(c.spend * scale);
-  const revenue = Math.round(c.revenue * scale);
-  const orders = Math.round(c.orders * scale);
-  const profit = Math.round(c.profit * scale);
-  const roas = spend > 0 ? +(revenue / spend).toFixed(2) : 0;
-  const budget = Math.round(c.budget * scale);
-
-  const budgetHistory = c.budgetHistory?.map((h) => ({
-    ...h,
-    budgetPerDay: Math.round(h.budgetPerDay * scale),
-    spend: Math.round(h.spend * scale),
-    revenue: Math.round(h.revenue * scale),
-    orders: Math.round(h.orders * scale),
-    profit: Math.round(h.profit * scale),
-    roas: h.spend > 0 ? +(h.revenue / h.spend).toFixed(2) : 0,
-  }));
-
-  return {
-    ...c,
-    id: `ol-${c.id.slice(3)}`,
-    spend,
-    revenue,
-    orders,
-    profit,
-    roas,
-    budget,
-    budgetHistory,
-  };
-}
-
-const olympusAdCampaigns: AdCampaign[] = adCampaigns.map((c) => scaleAdCampaign(c, OLYMPUS_SCALE));
+// Olympus London ad campaigns — hand-crafted with realistic $30→$60→$120→$240→$480 budget tiers
+const olympusAdCampaigns: AdCampaign[] = [
+  {
+    id: "ol-001",
+    campaignName: "Harrington Trainers",
+    product: "Harrington Trainers",
+    spend: 218,
+    budget: 240,
+    cpc: 0.58,
+    atc: 38,
+    roas: 3.12,
+    revenue: 680,
+    orders: 19,
+    profit: 274,
+    status: "Scaling",
+    recommendation: "ROAS above 3.0 across all tiers — SOP: Scale to $480/day",
+    budgetHistory: [
+      { budgetPerDay: 30, status: "historical", spend: 145, revenue: 412, orders: 11, profit: 142, roas: 2.84, cpc: 0.68, atc: 12 },
+      { budgetPerDay: 60, status: "historical", spend: 287, revenue: 836, orders: 23, profit: 298, roas: 2.91, cpc: 0.62, atc: 22 },
+      { budgetPerDay: 120, status: "historical", spend: 564, revenue: 1740, orders: 48, profit: 634, roas: 3.09, cpc: 0.59, atc: 41 },
+      { budgetPerDay: 240, status: "current", spend: 218, revenue: 680, orders: 19, profit: 274, roas: 3.12, cpc: 0.58, atc: 38 },
+    ],
+  },
+  {
+    id: "ol-002",
+    campaignName: "Durango Road Sneakers",
+    product: "Durango Road Sneakers",
+    spend: 34,
+    budget: 30,
+    cpc: 1.12,
+    atc: 2,
+    roas: 0.91,
+    revenue: 31,
+    orders: 1,
+    profit: -18,
+    status: "Kill",
+    recommendation: "$34 spent, CPC > $1, only 2 ATC — SOP: Kill",
+    budgetHistory: [
+      { budgetPerDay: 30, status: "current", spend: 34, revenue: 31, orders: 1, profit: -18, roas: 0.91, cpc: 1.12, atc: 2 },
+    ],
+  },
+  {
+    id: "ol-003",
+    campaignName: "Maven Bomber Jacket",
+    product: "Maven Bomber Jacket",
+    spend: 58,
+    budget: 60,
+    cpc: 0.82,
+    atc: 11,
+    roas: 2.14,
+    revenue: 124,
+    orders: 3,
+    profit: 22,
+    status: "Watch",
+    recommendation: "ROAS just above 2.0 at $60 — SOP: Watch before scaling",
+    budgetHistory: [
+      { budgetPerDay: 30, status: "historical", spend: 142, revenue: 348, orders: 9, profit: 98, roas: 2.45, cpc: 0.78, atc: 14 },
+      { budgetPerDay: 60, status: "current", spend: 58, revenue: 124, orders: 3, profit: 22, roas: 2.14, cpc: 0.82, atc: 11 },
+    ],
+  },
+  {
+    id: "ol-004",
+    campaignName: "Matteo Cotton Pants",
+    product: "Matteo Cotton Pants",
+    spend: 22,
+    budget: 30,
+    cpc: 1.34,
+    atc: 0,
+    roas: 0,
+    revenue: 0,
+    orders: 0,
+    profit: -22,
+    status: "Kill",
+    recommendation: "$22 spent, CPC > $1, 0 ATC — SOP: Kill",
+    budgetHistory: [
+      { budgetPerDay: 30, status: "current", spend: 22, revenue: 0, orders: 0, profit: -22, roas: 0, cpc: 1.34, atc: 0 },
+    ],
+  },
+  {
+    id: "ol-005",
+    campaignName: "Haldrin Layered Shirt",
+    product: "Haldrin Layered Shirt",
+    spend: 436,
+    budget: 480,
+    cpc: 0.52,
+    atc: 56,
+    roas: 3.41,
+    revenue: 1487,
+    orders: 42,
+    profit: 612,
+    status: "Scaling",
+    recommendation: "Top performer — ROAS above 3.0 at $480/day, monitor for fatigue",
+    budgetHistory: [
+      { budgetPerDay: 30, status: "historical", spend: 138, revenue: 396, orders: 11, profit: 138, roas: 2.87, cpc: 0.71, atc: 10 },
+      { budgetPerDay: 60, status: "historical", spend: 284, revenue: 852, orders: 24, profit: 312, roas: 3.0, cpc: 0.64, atc: 20 },
+      { budgetPerDay: 120, status: "historical", spend: 556, revenue: 1784, orders: 50, profit: 672, roas: 3.21, cpc: 0.58, atc: 38 },
+      { budgetPerDay: 240, status: "historical", spend: 1124, revenue: 3708, orders: 104, profit: 1402, roas: 3.3, cpc: 0.55, atc: 74 },
+      { budgetPerDay: 480, status: "current", spend: 436, revenue: 1487, orders: 42, profit: 612, roas: 3.41, cpc: 0.52, atc: 56 },
+    ],
+  },
+];
 
 // Default COGs per store
 export const OLYMPUS_DEFAULT_COGS: Record<string, number> = {
