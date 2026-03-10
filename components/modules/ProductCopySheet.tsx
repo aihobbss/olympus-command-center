@@ -364,10 +364,15 @@ function SizeChartPanel({
 
   const handleFile = useCallback(
     (file: File) => {
-      if (!file.type.startsWith("image/")) return;
-      const url = URL.createObjectURL(file);
-      setLocalPreview(url);
-      onImageChange(url);
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        if (dataUrl) {
+          setLocalPreview(dataUrl);
+          onImageChange(dataUrl);
+        }
+      };
+      reader.readAsDataURL(file);
     },
     [onImageChange]
   );
