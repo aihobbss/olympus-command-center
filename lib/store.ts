@@ -18,7 +18,7 @@ import { mockStores, type MockStore } from "@/lib/navigation";
 // ─── Auth Store ──────────────────────────────────────────
 // Mock user profiles for the demo login screen.
 
-export type UserRole = "owner" | "coach";
+export type UserRole = "owner";
 
 export type MockUser = {
   id: string;
@@ -34,17 +34,9 @@ export const mockUsers: MockUser[] = [
     id: "simo",
     name: "Simo",
     initials: "S",
-    role: "coach",
+    role: "owner",
     storeIds: ["olympus-london", "vantage-melbourne"],
     avatarGradient: "from-accent-indigo to-accent-indigo/40",
-  },
-  {
-    id: "jake",
-    name: "Jake",
-    initials: "J",
-    role: "owner",
-    storeIds: ["vantage-melbourne"],
-    avatarGradient: "from-accent-emerald to-accent-emerald/40",
   },
 ];
 

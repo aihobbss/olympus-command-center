@@ -209,7 +209,7 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
           <div className={cn(
             "w-8 h-8 rounded-full bg-gradient-to-br flex items-center justify-center ring-2",
             user?.avatarGradient,
-            user?.role === "coach" ? "ring-accent-indigo/20" : "ring-accent-emerald/20"
+            "ring-accent-indigo/20"
           )}>
             <span className="text-white text-xs font-bold">{user?.initials}</span>
           </div>

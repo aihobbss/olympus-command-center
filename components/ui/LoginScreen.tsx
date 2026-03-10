@@ -1,124 +1,45 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Store, GraduationCap, ArrowRight } from "lucide-react";
-import { mockUsers, useAuthStore, useStoreContext, type MockUser } from "@/lib/store";
+import { Eye, EyeOff, LogIn } from "lucide-react";
+import { mockUsers, useAuthStore, useStoreContext } from "@/lib/store";
 import { mockStores } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
-const roleConfig = {
-  owner: {
-    icon: Store,
-    subtitle: "Store Owner",
-    description: "Manage your store, track profits, and run ads",
-    accentClass: "accent-emerald",
-  },
-  coach: {
-    icon: GraduationCap,
-    subtitle: "Coach",
-    description: "Oversee student stores and manage your own",
-    accentClass: "accent-indigo",
-  },
-};
-
-function UserCard({ user, index }: { user: MockUser; index: number }) {
+export function LoginScreen() {
   const login = useAuthStore((s) => s.login);
   const setSelectedStore = useStoreContext((s) => s.setSelectedStore);
-  const config = roleConfig[user.role];
-  const Icon = config.icon;
-  const storeCount = user.storeIds.length;
 
-  function handleLogin() {
-    // Set the user's first store as the selected store
-    const firstStore = mockStores.find((s) => s.id === user.storeIds[0]);
-    if (firstStore) setSelectedStore(firstStore);
-    login(user);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+
+    // Demo validation — accepts "simo" / "olympus" (case-insensitive)
+    const user = mockUsers.find(
+      (u) => u.name.toLowerCase() === username.trim().toLowerCase()
+    );
+
+    if (!user || password !== "olympus") {
+      setError("Invalid username or password");
+      return;
+    }
+
+    setLoading(true);
+    // Brief delay for feel
+    setTimeout(() => {
+      const firstStore = mockStores.find((s) => s.id === user.storeIds[0]);
+      if (firstStore) setSelectedStore(firstStore);
+      login(user);
+    }, 400);
   }
 
-  return (
-    <motion.button
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.3 + index * 0.15 }}
-      onClick={handleLogin}
-      className={cn(
-        "group relative w-full max-w-[340px] rounded-2xl p-6",
-        "bg-bg-card border border-subtle",
-        "hover:border-[var(--border-hover)] hover:bg-bg-elevated",
-        "transition-all duration-300 text-left cursor-pointer",
-        "focus:outline-none focus:ring-2 focus:ring-accent-indigo/40"
-      )}
-    >
-      {/* Glow on hover */}
-      <div
-        className={cn(
-          "absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none",
-          user.role === "coach"
-            ? "shadow-[0_0_40px_-10px_var(--accent-indigo)]"
-            : "shadow-[0_0_40px_-10px_var(--accent-emerald)]"
-        )}
-      />
-
-      {/* Avatar + info */}
-      <div className="flex items-center gap-4 mb-4">
-        <div
-          className={cn(
-            "w-14 h-14 rounded-full bg-gradient-to-br flex items-center justify-center ring-2 shrink-0",
-            user.avatarGradient,
-            user.role === "coach" ? "ring-accent-indigo/30" : "ring-accent-emerald/30"
-          )}
-        >
-          <span className="text-white text-lg font-bold">{user.initials}</span>
-        </div>
-        <div>
-          <h3 className="text-lg font-syne font-bold text-text-primary">
-            {user.name}
-          </h3>
-          <div
-            className={cn(
-              "inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full mt-0.5",
-              user.role === "coach"
-                ? "bg-accent-indigo/15 text-accent-indigo"
-                : "bg-accent-emerald/15 text-accent-emerald"
-            )}
-          >
-            <Icon size={12} />
-            {config.subtitle}
-          </div>
-        </div>
-      </div>
-
-      {/* Description */}
-      <p className="text-sm text-text-secondary mb-4">{config.description}</p>
-
-      {/* Store count */}
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-text-muted">
-          <span className="font-mono-metric font-jetbrains text-text-secondary">
-            {storeCount}
-          </span>{" "}
-          {storeCount === 1 ? "store" : "stores"}
-        </div>
-        <div
-          className={cn(
-            "flex items-center gap-1 text-xs font-medium transition-colors duration-200",
-            user.role === "coach"
-              ? "text-accent-indigo/60 group-hover:text-accent-indigo"
-              : "text-accent-emerald/60 group-hover:text-accent-emerald"
-          )}
-        >
-          Enter
-          <ArrowRight
-            size={14}
-            className="transition-transform duration-200 group-hover:translate-x-0.5"
-          />
-        </div>
-      </div>
-    </motion.button>
-  );
-}
-
-export function LoginScreen() {
   return (
     <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center px-6">
       {/* Background subtle gradient */}
@@ -140,25 +61,117 @@ export function LoginScreen() {
           OLYMPUS
         </h1>
         <p className="text-sm text-text-secondary">
-          Select your profile to continue
+          Sign in to your command center
         </p>
       </motion.div>
 
-      {/* User cards */}
-      <div className="flex flex-col sm:flex-row items-center gap-5 relative z-10">
-        {mockUsers.map((user, i) => (
-          <UserCard key={user.id} user={user} index={i} />
-        ))}
-      </div>
+      {/* Login form */}
+      <motion.form
+        onSubmit={handleSubmit}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="relative z-10 w-full max-w-[380px] rounded-2xl p-8 bg-bg-card border border-subtle"
+      >
+        {/* Username */}
+        <div className="mb-5">
+          <label
+            htmlFor="username"
+            className="block text-xs font-medium text-text-secondary mb-2 uppercase tracking-wider"
+          >
+            Username
+          </label>
+          <input
+            id="username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter username"
+            autoComplete="username"
+            className={cn(
+              "w-full px-4 py-3 rounded-xl text-sm text-text-primary placeholder:text-text-muted",
+              "bg-bg-primary border border-subtle",
+              "focus:outline-none focus:ring-2 focus:ring-accent-indigo/40 focus:border-accent-indigo/40",
+              "transition-all duration-200"
+            )}
+          />
+        </div>
 
-      {/* Footer */}
+        {/* Password */}
+        <div className="mb-6">
+          <label
+            htmlFor="password"
+            className="block text-xs font-medium text-text-secondary mb-2 uppercase tracking-wider"
+          >
+            Password
+          </label>
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+              autoComplete="current-password"
+              className={cn(
+                "w-full px-4 py-3 pr-11 rounded-xl text-sm text-text-primary placeholder:text-text-muted",
+                "bg-bg-primary border border-subtle",
+                "focus:outline-none focus:ring-2 focus:ring-accent-indigo/40 focus:border-accent-indigo/40",
+                "transition-all duration-200"
+              )}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition-colors"
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Error message */}
+        {error && (
+          <motion.p
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-xs text-accent-red mb-4"
+          >
+            {error}
+          </motion.p>
+        )}
+
+        {/* Submit button */}
+        <button
+          type="submit"
+          disabled={loading || !username || !password}
+          className={cn(
+            "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium",
+            "bg-accent-indigo text-white",
+            "hover:bg-accent-indigo/90 transition-all duration-200",
+            "disabled:opacity-40 disabled:cursor-not-allowed",
+            "focus:outline-none focus:ring-2 focus:ring-accent-indigo/40"
+          )}
+        >
+          {loading ? (
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <>
+              <LogIn size={16} />
+              Sign In
+            </>
+          )}
+        </button>
+      </motion.form>
+
+      {/* Hint */}
       <motion.p
-        className="mt-12 text-[11px] text-text-muted relative z-10"
+        className="mt-6 text-[11px] text-text-muted relative z-10"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.8 }}
+        transition={{ delay: 0.6 }}
       >
-        Demo Mode &middot; No real authentication
+        Demo: username <span className="text-text-secondary font-medium">simo</span> &middot; password <span className="text-text-secondary font-medium">olympus</span>
       </motion.p>
     </div>
   );

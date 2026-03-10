@@ -3,16 +3,14 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { navItems } from "@/lib/navigation";
-import { useAuthStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 export function MobileNav() {
   const pathname = usePathname();
-  const user = useAuthStore((s) => s.user);
 
-  // Filter out admin-only nav items for non-coach users
+  // Filter out admin-only nav items
   const visibleNavItems = navItems.filter(
-    (item) => item.group !== "admin" || user?.role === "coach"
+    (item) => item.group !== "admin"
   );
 
   return (
