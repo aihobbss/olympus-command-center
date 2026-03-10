@@ -11,8 +11,8 @@ export function LoginScreen() {
   const login = useAuthStore((s) => s.login);
   const setSelectedStore = useStoreContext((s) => s.setSelectedStore);
 
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("simo");
+  const [password, setPassword] = useState("olympus");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
