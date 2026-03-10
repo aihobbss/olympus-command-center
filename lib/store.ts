@@ -161,11 +161,27 @@ interface ProductCopyStore {
   generateAll: () => void;
   pushToStore: (id: string) => void;
   pushAllToStore: () => void;
+  generateSizeChart: (id: string) => void;
 }
 
 const MOCK_SHOPIFY = "Timeless Style Meets Modern Craft\n\nElevate your wardrobe with a versatile piece designed for everyday confidence. Premium materials and refined details make this a go-to for any occasion.\n\n\u2022 Quality Construction: Built to last with premium stitching\n\u2022 Modern Fit: Tailored silhouette flatters every frame\n\u2022 Versatile Design: Pairs effortlessly with any outfit\n\nDesigned for those who value style and substance.";
 
 const MOCK_FACEBOOK = "Step Into Effortless Style\n\nPremium quality meets everyday wearability. This versatile piece was designed to elevate your look without trying too hard.\n\nClean. Confident. Versatile.\n\nFree Shipping\nShop now";
+
+const MOCK_SIZE_CHART = `<table style="border-collapse:collapse;width:100%;text-align:center;font-size:14px">
+<thead><tr style="background:#f3f4f6">
+<th style="border:1px solid #e5e7eb;padding:8px 12px">Size</th>
+<th style="border:1px solid #e5e7eb;padding:8px 12px">Chest (cm)</th>
+<th style="border:1px solid #e5e7eb;padding:8px 12px">Length (cm)</th>
+<th style="border:1px solid #e5e7eb;padding:8px 12px">Shoulder (cm)</th>
+<th style="border:1px solid #e5e7eb;padding:8px 12px">Sleeve (cm)</th>
+</tr></thead>
+<tbody>
+<tr><td style="border:1px solid #e5e7eb;padding:8px 12px">S</td><td style="border:1px solid #e5e7eb;padding:8px 12px">96</td><td style="border:1px solid #e5e7eb;padding:8px 12px">68</td><td style="border:1px solid #e5e7eb;padding:8px 12px">44</td><td style="border:1px solid #e5e7eb;padding:8px 12px">60</td></tr>
+<tr><td style="border:1px solid #e5e7eb;padding:8px 12px">M</td><td style="border:1px solid #e5e7eb;padding:8px 12px">102</td><td style="border:1px solid #e5e7eb;padding:8px 12px">70</td><td style="border:1px solid #e5e7eb;padding:8px 12px">46</td><td style="border:1px solid #e5e7eb;padding:8px 12px">62</td></tr>
+<tr><td style="border:1px solid #e5e7eb;padding:8px 12px">L</td><td style="border:1px solid #e5e7eb;padding:8px 12px">108</td><td style="border:1px solid #e5e7eb;padding:8px 12px">72</td><td style="border:1px solid #e5e7eb;padding:8px 12px">48</td><td style="border:1px solid #e5e7eb;padding:8px 12px">64</td></tr>
+<tr><td style="border:1px solid #e5e7eb;padding:8px 12px">XL</td><td style="border:1px solid #e5e7eb;padding:8px 12px">114</td><td style="border:1px solid #e5e7eb;padding:8px 12px">74</td><td style="border:1px solid #e5e7eb;padding:8px 12px">50</td><td style="border:1px solid #e5e7eb;padding:8px 12px">66</td></tr>
+</tbody></table>`;
 
 export const useProductCopyStore = create<ProductCopyStore>((set) => ({
   copyProducts: initialCopyProducts.map((p) => ({ ...p })),
@@ -234,6 +250,23 @@ export const useProductCopyStore = create<ProductCopyStore>((set) => ({
     ready.forEach((p, i) => {
       setTimeout(() => pushToStore(p.id), i * 300);
     });
+  },
+
+  generateSizeChart: (id) => {
+    set((s) => ({
+      copyProducts: s.copyProducts.map((p) =>
+        p.id === id ? { ...p, sizeChartStatus: "generating" as const } : p
+      ),
+    }));
+    setTimeout(() => {
+      set((s) => ({
+        copyProducts: s.copyProducts.map((p) =>
+          p.id === id
+            ? { ...p, sizeChartStatus: "done" as const, sizeChartTable: MOCK_SIZE_CHART }
+            : p
+        ),
+      }));
+    }, 2500);
   },
 }));
 

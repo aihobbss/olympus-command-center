@@ -280,6 +280,8 @@ export type AdStatus = "red" | "yellow" | "green";
 
 export type PushStatus = "" | "pushing" | "pushed";
 
+export type SizeChartStatus = "" | "generating" | "done";
+
 export type ProductCopy = {
   id: string;
   adStatus: AdStatus;
@@ -290,6 +292,9 @@ export type ProductCopy = {
   facebookCopy: string;
   status: "" | "Pending" | "Generating" | "Completed";
   pushStatus: PushStatus;
+  sizeChartImage: string;
+  sizeChartTable: string;
+  sizeChartStatus: SizeChartStatus;
 };
 
 export const initialCopyProducts: ProductCopy[] = [
@@ -303,6 +308,9 @@ export const initialCopyProducts: ProductCopy[] = [
     facebookCopy: "Slide Into Textured Sophistication with the Aymbr Sweater\n\nPlayful structure meets confident style in this relaxed must-have. The Aymbr Sweater\u2019s openwork detail and patchwork texture bring effortless elegance to your rotation.\n\nRelaxed. Intricate. Versatile.\n\nhttps://olympus-london.myshopify.com/products/aymbr\nAymbr Sweater\nFree Shipping in the UK\nShop now",
     status: "Completed",
     pushStatus: "",
+    sizeChartImage: "",
+    sizeChartTable: "",
+    sizeChartStatus: "",
   },
   {
     id: "pc-002",
@@ -314,6 +322,9 @@ export const initialCopyProducts: ProductCopy[] = [
     facebookCopy: "Slide Into Everyday Motion with the All-Terrain Canvas Sneaker\n\nBuilt to keep pace with your routine, the All-Terrain Canvas Sneaker delivers breathable comfort, structured support, and rugged traction in one easygoing package.\n\nPractical. Breathable. Grounded.\n\nhttps://olympus-london.myshopify.com/products/all-terrain-canvas-sneaker\nAll-Terrain Canvas Sneaker\nFree Shipping in the UK\nShop now",
     status: "Completed",
     pushStatus: "",
+    sizeChartImage: "",
+    sizeChartTable: "",
+    sizeChartStatus: "",
   },
   {
     id: "pc-003",
@@ -325,6 +336,9 @@ export const initialCopyProducts: ProductCopy[] = [
     facebookCopy: "",
     status: "Pending",
     pushStatus: "",
+    sizeChartImage: "",
+    sizeChartTable: "",
+    sizeChartStatus: "",
   },
   {
     id: "pc-004",
@@ -336,6 +350,9 @@ export const initialCopyProducts: ProductCopy[] = [
     facebookCopy: "",
     status: "Pending",
     pushStatus: "",
+    sizeChartImage: "",
+    sizeChartTable: "",
+    sizeChartStatus: "",
   },
   {
     id: "pc-005",
@@ -347,6 +364,9 @@ export const initialCopyProducts: ProductCopy[] = [
     facebookCopy: "",
     status: "",
     pushStatus: "",
+    sizeChartImage: "",
+    sizeChartTable: "",
+    sizeChartStatus: "",
   },
 ];
 

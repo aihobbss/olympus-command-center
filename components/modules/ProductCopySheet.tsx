@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
-import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X, Upload, Check } from "lucide-react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X, Upload, Check, ChevronRight, ImageIcon, Table2 } from "lucide-react";
 import { useProductCopyStore } from "@/lib/store";
 import { type ProductCopy, type AdStatus } from "@/data/mock";
 import { cn } from "@/lib/utils";
@@ -295,6 +295,170 @@ function CopyPreviewModal({
   );
 }
 
+// ── Size chart panel (shown in expanded row) ─────────────────
+
+function SizeChartPanel({
+  product,
+  onImageChange,
+  onGenerate,
+}: {
+  product: ProductCopy;
+  onImageChange: (url: string) => void;
+  onGenerate: () => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
+
+  const handleFile = useCallback(
+    (file: File) => {
+      if (!file.type.startsWith("image/")) return;
+      const url = URL.createObjectURL(file);
+      setLocalPreview(url);
+      onImageChange(url);
+    },
+    [onImageChange]
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    },
+    [handleFile]
+  );
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const items = e.clipboardData.items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith("image/")) {
+          const file = items[i].getAsFile();
+          if (file) handleFile(file);
+          break;
+        }
+      }
+    },
+    [handleFile]
+  );
+
+  const preview = localPreview || product.sizeChartImage;
+
+  return (
+    <div className="flex gap-6 items-start" onPaste={handlePaste}>
+      {/* Upload area */}
+      <div className="flex-shrink-0">
+        <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-2">
+          Size Chart Image
+        </p>
+        {preview ? (
+          <div className="relative group">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={preview}
+              alt="Size chart"
+              className="rounded-lg border border-subtle max-w-[280px] max-h-[200px] object-contain bg-bg-elevated"
+            />
+            <button
+              onClick={() => {
+                setLocalPreview(null);
+                onImageChange("");
+              }}
+              className={cn(
+                "absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center",
+                "bg-bg-card border border-subtle text-text-muted hover:text-text-primary",
+                "opacity-0 group-hover:opacity-100 transition-opacity"
+              )}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            className={cn(
+              "w-[280px] h-[140px] rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2",
+              "transition-colors duration-150",
+              dragOver
+                ? "border-accent-indigo/60 bg-accent-indigo/5"
+                : "border-subtle hover:border-text-muted/30 bg-bg-elevated/50"
+            )}
+          >
+            <ImageIcon size={20} className="text-text-muted" />
+            <span className="text-[11px] text-text-muted">
+              Drop screenshot, paste, or click to upload
+            </span>
+          </button>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFile(file);
+          }}
+        />
+      </div>
+
+      {/* Generate button + status */}
+      <div className="flex flex-col gap-3 pt-6">
+        {product.sizeChartStatus === "generating" ? (
+          <span className="inline-flex items-center gap-2 text-xs font-medium text-violet-400">
+            <Loader2 size={14} className="animate-spin" />
+            Converting to table…
+          </span>
+        ) : product.sizeChartStatus === "done" ? (
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--accent-emerald)]">
+              <Check size={14} />
+              Size chart ready
+            </span>
+            {preview && (
+              <button
+                onClick={onGenerate}
+                className={cn(
+                  "text-[11px] text-text-muted hover:text-text-primary underline underline-offset-2",
+                  "transition-colors duration-150"
+                )}
+              >
+                Regenerate
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={onGenerate}
+            disabled={!preview}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
+              "transition-colors duration-150",
+              preview
+                ? "bg-accent-indigo/15 text-accent-indigo hover:bg-accent-indigo/25"
+                : "bg-white/[0.03] text-text-muted cursor-not-allowed"
+            )}
+          >
+            <Table2 size={14} />
+            Generate Table
+          </button>
+        )}
+        <p className="text-[10px] text-text-muted max-w-[200px] leading-relaxed">
+          Converts your size chart screenshot into an HTML table that gets included with the Shopify description when pushed to store.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Filter types ──────────────────────────────────────────────
 
 type StatusFilter = "All" | "Pending" | "Generating" | "Completed" | "Blank";
@@ -302,11 +466,12 @@ type StatusFilter = "All" | "Pending" | "Generating" | "Completed" | "Blank";
 // ── Main sheet component ───────────────────────────────────
 
 export function ProductCopySheet() {
-  const { copyProducts, updateCopyProduct, generateCopy, generateAll, pushToStore, pushAllToStore } =
+  const { copyProducts, updateCopyProduct, generateCopy, generateAll, pushToStore, pushAllToStore, generateSizeChart } =
     useProductCopyStore();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let items = copyProducts;
@@ -444,31 +609,35 @@ export function ProductCopySheet() {
 
       {/* ── Table ── */}
       <div className="overflow-x-auto scrollbar-hide -mx-1">
-        <table className="w-full min-w-[1100px] text-left table-fixed">
+        <table className="w-full min-w-[1200px] text-left table-fixed">
           <colgroup>
             <col className="w-[3%]" />
-            <col className="w-[13%]" />
-            <col className="w-[17%]" />
-            <col className="w-[17%]" />
-            <col className="w-[16%]" />
-            <col className="w-[16%]" />
+            <col className="w-[3%]" />
+            <col className="w-[12%]" />
+            <col className="w-[15%]" />
+            <col className="w-[15%]" />
+            <col className="w-[14%]" />
+            <col className="w-[14%]" />
+            <col className="w-[6%]" />
             <col className="w-[12%]" />
             <col className="w-[4%]" />
           </colgroup>
           <thead>
             <tr className="border-b border-subtle">
               {[
+                "",
                 "Ad",
                 "Product Name",
                 "Product URL",
                 "Image URL",
                 "Shopify",
                 "Facebook",
+                "Size Chart",
                 "Status",
                 "",
               ].map((h) => (
                 <th
-                  key={h}
+                  key={h || "expand"}
                   className="px-3 py-2.5 text-[11px] font-medium text-text-muted uppercase tracking-wider whitespace-nowrap"
                 >
                   {h}
@@ -477,11 +646,29 @@ export function ProductCopySheet() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((product) => (
+            {filtered.map((product) => {
+              const isExpanded = expandedId === product.id;
+              return (
+              <React.Fragment key={product.id}>
               <tr
-                key={product.id}
                 className="border-b border-subtle/50 hover:bg-white/[0.02] transition-colors duration-100"
               >
+                {/* Expand chevron */}
+                <td className="px-3 py-2.5">
+                  <button
+                    onClick={() => setExpandedId(isExpanded ? null : product.id)}
+                    className="flex items-center justify-center w-full text-text-muted hover:text-text-primary transition-colors"
+                  >
+                    <ChevronRight
+                      size={14}
+                      className={cn(
+                        "transition-transform duration-200",
+                        isExpanded && "rotate-90"
+                      )}
+                    />
+                  </button>
+                </td>
+
                 {/* Ad status dot */}
                 <td className="px-3 py-2.5">
                   <AdStatusDot
@@ -551,6 +738,22 @@ export function ProductCopySheet() {
                   />
                 </td>
 
+                {/* Size Chart indicator */}
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center justify-center">
+                    {product.sizeChartStatus === "generating" ? (
+                      <Loader2 size={14} className="animate-spin text-violet-400" />
+                    ) : product.sizeChartStatus === "done" ? (
+                      <div className="flex items-center gap-1.5 text-[var(--accent-emerald)]">
+                        <Check size={14} />
+                        <span className="text-[11px] font-medium">Done</span>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-text-muted">—</span>
+                    )}
+                  </div>
+                </td>
+
                 {/* Status */}
                 <td className="px-3 py-2.5">
                   <CopyStatusCell
@@ -587,7 +790,24 @@ export function ProductCopySheet() {
                   )}
                 </td>
               </tr>
-            ))}
+
+              {/* ── Expanded row: Size Chart upload ── */}
+              {isExpanded && (
+                <tr className="border-b border-subtle/50">
+                  <td colSpan={10} className="px-6 py-4 bg-white/[0.01]">
+                    <SizeChartPanel
+                      product={product}
+                      onImageChange={(url) =>
+                        updateCopyProduct(product.id, { sizeChartImage: url })
+                      }
+                      onGenerate={() => generateSizeChart(product.id)}
+                    />
+                  </td>
+                </tr>
+              )}
+              </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
