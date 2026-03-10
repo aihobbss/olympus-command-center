@@ -249,10 +249,27 @@ function CopyStatusCell({
 function CopyPreviewModal({
   product,
   onClose,
+  onUpdate,
 }: {
   product: ProductCopy;
   onClose: () => void;
+  onUpdate: (updates: Partial<ProductCopy>) => void;
 }) {
+  const [shopify, setShopify] = useState(product.shopifyDescription);
+  const [facebook, setFacebook] = useState(product.facebookCopy);
+
+  const shopifyChanged = shopify !== product.shopifyDescription;
+  const facebookChanged = facebook !== product.facebookCopy;
+  const hasChanges = shopifyChanged || facebookChanged;
+
+  function save() {
+    const updates: Partial<ProductCopy> = {};
+    if (shopifyChanged) updates.shopifyDescription = shopify;
+    if (facebookChanged) updates.facebookCopy = facebook;
+    if (hasChanges) onUpdate(updates);
+    onClose();
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
@@ -276,19 +293,55 @@ function CopyPreviewModal({
             <h4 className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-2">
               Shopify Description
             </h4>
-            <div className="rounded-lg bg-bg-elevated p-4 text-xs text-text-secondary whitespace-pre-wrap leading-relaxed">
-              {product.shopifyDescription || "Not generated yet"}
-            </div>
+            <textarea
+              value={shopify}
+              onChange={(e) => setShopify(e.target.value)}
+              placeholder="Not generated yet"
+              rows={8}
+              className={cn(
+                "w-full rounded-lg bg-bg-elevated p-4 text-xs text-text-secondary leading-relaxed",
+                "border outline-none resize-y",
+                shopifyChanged
+                  ? "border-accent-indigo/40"
+                  : "border-transparent focus:border-accent-indigo/30"
+              )}
+            />
           </div>
 
           <div>
             <h4 className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-2">
               Facebook Ad Copy
             </h4>
-            <div className="rounded-lg bg-bg-elevated p-4 text-xs text-text-secondary whitespace-pre-wrap leading-relaxed">
-              {product.facebookCopy || "Not generated yet"}
-            </div>
+            <textarea
+              value={facebook}
+              onChange={(e) => setFacebook(e.target.value)}
+              placeholder="Not generated yet"
+              rows={6}
+              className={cn(
+                "w-full rounded-lg bg-bg-elevated p-4 text-xs text-text-secondary leading-relaxed",
+                "border outline-none resize-y",
+                facebookChanged
+                  ? "border-accent-indigo/40"
+                  : "border-transparent focus:border-accent-indigo/30"
+              )}
+            />
           </div>
+
+          {hasChanges && (
+            <div className="flex justify-end">
+              <button
+                onClick={save}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium",
+                  "bg-accent-indigo hover:bg-accent-indigo-hover text-white",
+                  "transition-colors duration-150"
+                )}
+              >
+                <Check size={14} />
+                Save Changes
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -306,7 +359,6 @@ function SizeChartPanel({
   onImageChange: (url: string) => void;
   onGenerate: () => void;
 }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
 
@@ -376,8 +428,7 @@ function SizeChartPanel({
             </button>
           </div>
         ) : (
-          <button
-            onClick={() => fileInputRef.current?.click()}
+          <label
             onDragOver={(e) => {
               e.preventDefault();
               setDragOver(true);
@@ -385,7 +436,7 @@ function SizeChartPanel({
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             className={cn(
-              "w-[280px] h-[140px] rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2",
+              "w-[280px] h-[140px] rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer",
               "transition-colors duration-150",
               dragOver
                 ? "border-accent-indigo/60 bg-accent-indigo/5"
@@ -396,18 +447,18 @@ function SizeChartPanel({
             <span className="text-[11px] text-text-muted">
               Drop screenshot, paste, or click to upload
             </span>
-          </button>
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
+                e.target.value = "";
+              }}
+            />
+          </label>
         )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleFile(file);
-          }}
-        />
       </div>
 
       {/* Generate button + status */}
@@ -827,6 +878,7 @@ export function ProductCopySheet() {
         <CopyPreviewModal
           product={previewProduct}
           onClose={() => setPreviewId(null)}
+          onUpdate={(updates) => updateCopyProduct(previewProduct.id, updates)}
         />
       )}
     </div>
