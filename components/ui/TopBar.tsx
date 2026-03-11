@@ -64,7 +64,7 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
             <div className="w-[5px] h-[5px] rounded-full bg-accent-indigo" />
           </div>
           <span className="font-syne text-[11px] font-bold tracking-[0.2em] text-text-primary uppercase">
-            OLYMPUS
+            VANTAGE
           </span>
           <div className="w-px h-5 bg-[var(--border-subtle)] ml-1" />
         </div>

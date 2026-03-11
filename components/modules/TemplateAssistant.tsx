@@ -49,7 +49,7 @@ export function TemplateAssistant({
   classification,
   customerName,
   templates,
-  storePrefix = "OLYMPUS",
+  storePrefix = "VANTAGE",
   value,
   onChange,
 }: TemplateAssistantProps) {

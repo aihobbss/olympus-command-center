@@ -31,11 +31,11 @@ export type MockUser = {
 
 export const mockUsers: MockUser[] = [
   {
-    id: "simo",
-    name: "Simo",
-    initials: "S",
+    id: "aidan",
+    name: "Aidan",
+    initials: "A",
     role: "owner",
-    storeIds: ["olympus-london", "vantage-melbourne"],
+    storeIds: ["vantage-london", "vantage-melbourne"],
     avatarGradient: "from-accent-indigo to-accent-indigo/40",
   },
 ];

@@ -3,7 +3,7 @@ import { AppShell } from "@/components/ui/AppShell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Olympus Command Center",
+  title: "Vantage Command Center",
   description: "Centralized command center for fashion dropshippers",
 };
 

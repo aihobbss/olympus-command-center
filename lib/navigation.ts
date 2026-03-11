@@ -89,6 +89,6 @@ export type MockStore = {
 };
 
 export const mockStores: MockStore[] = [
-  { id: "olympus-london", name: "Olympus London", market: "UK", currency: "£" },
+  { id: "vantage-london", name: "Vantage London", market: "UK", currency: "£" },
   { id: "vantage-melbourne", name: "Vantage Melbourne", market: "AU", currency: "A$" },
 ];

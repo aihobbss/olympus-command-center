@@ -479,7 +479,7 @@ export default function CustomerServicePage() {
                   templates={templates}
                   value={currentResponse}
                   onChange={handleResponseChange}
-                  storePrefix={selectedStore.market === "AU" ? "VANTAGE" : "OLYMPUS"}
+                  storePrefix={selectedStore.market === "AU" ? "VANTAGE" : "VANTAGE"}
                 />
 
                 {/* ── Action Bar ── */}

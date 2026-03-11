@@ -1,7 +1,7 @@
 // ============================================================
-// Olympus Command Center — Mock Data
+// Vantage Command Center — Mock Data
 // All dates are relative to today. All metrics use realistic
-// ranges from Simo's actual store operations.
+// ranges from Aidan's actual store operations.
 // ============================================================
 
 const today = new Date();
@@ -91,7 +91,7 @@ export type ProductType =
   | "Light Pants"
   | "Heavy Pants";
 
-// Simo's pricing table — GBP and AUD prices per product type
+// Aidan's pricing table — GBP and AUD prices per product type
 export const pricingTable: Record<string, { gbp: number; aud: number }> = {
   "Shoes":            { gbp: 38, aud: 78 },
   "Regular Jacket":   { gbp: 38, aud: 78 },
@@ -142,7 +142,7 @@ export const initialSheetProducts: SheetProduct[] = [
     id: "sp-001",
     productName: "Maven Bomber Jacket",
     adLink: "https://facebook.com/ads/library/?id=100003",
-    storeLink: "https://olympus-london.myshopify.com/products/maven-bomber-jacket",
+    storeLink: "https://vantage-london.myshopify.com/products/maven-bomber-jacket",
     testingStatus: "Live",
     creativeSaved: true,
     cog: 18,
@@ -155,7 +155,7 @@ export const initialSheetProducts: SheetProduct[] = [
     id: "sp-002",
     productName: "Haldrin Layered Shirt",
     adLink: "https://facebook.com/ads/library/?id=100005",
-    storeLink: "https://olympus-london.myshopify.com/products/haldrin-layered-shirt",
+    storeLink: "https://vantage-london.myshopify.com/products/haldrin-layered-shirt",
     testingStatus: "Scheduled",
     creativeSaved: true,
     cog: 12,
@@ -168,7 +168,7 @@ export const initialSheetProducts: SheetProduct[] = [
     id: "sp-003",
     productName: "Harrington Trainers",
     adLink: "https://facebook.com/ads/library/?id=100001",
-    storeLink: "https://olympus-london.myshopify.com/products/harrington-trainers",
+    storeLink: "https://vantage-london.myshopify.com/products/harrington-trainers",
     testingStatus: "Imported",
     creativeSaved: false,
     cog: 22,
@@ -194,7 +194,7 @@ export const initialSheetProducts: SheetProduct[] = [
     id: "sp-005",
     productName: "Avalon Puffer Vest",
     adLink: "https://facebook.com/ads/library/?id=100007",
-    storeLink: "https://olympus-london.myshopify.com/products/avalon-puffer-vest",
+    storeLink: "https://vantage-london.myshopify.com/products/avalon-puffer-vest",
     testingStatus: "Killed",
     creativeSaved: true,
     cog: 24,
@@ -302,10 +302,10 @@ export const initialCopyProducts: ProductCopy[] = [
     id: "pc-001",
     adStatus: "green",
     productName: "Aymbr Sweater",
-    productUrl: "https://olympus-london.myshopify.com/products/aymbr",
-    imageUrl: "http://olympus-london.myshopify.com/cdn/shop/files/britt_wit_1_1_720x.jpg",
-    shopifyDescription: "Modern Edge Meets Everyday Comfort\n\nElevate your seasonal wardrobe with a statement knit designed to turn heads. The Aymbr Sweater features distinctive openwork detail and a relaxed silhouette that flatters while keeping things effortlessly stylish.\n\n\u2022 Knitted Design: Cozy construction combines warmth with everyday refinement\n\u2022 Openwork Details: Intricate patterns bring depth and modern flair\n\u2022 Relaxed Fit: Slightly oversized shape with dropped shoulders for easy layering\n\u2022 Round Neck: Classic crew neckline complements any outfit\n\nDesigned in London by Olympus for timeless versatility.",
-    facebookCopy: "Slide Into Textured Sophistication with the Aymbr Sweater\n\nPlayful structure meets confident style in this relaxed must-have. The Aymbr Sweater\u2019s openwork detail and patchwork texture bring effortless elegance to your rotation.\n\nRelaxed. Intricate. Versatile.\n\nhttps://olympus-london.myshopify.com/products/aymbr\nAymbr Sweater\nFree Shipping in the UK\nShop now",
+    productUrl: "https://vantage-london.myshopify.com/products/aymbr",
+    imageUrl: "http://vantage-london.myshopify.com/cdn/shop/files/britt_wit_1_1_720x.jpg",
+    shopifyDescription: "Modern Edge Meets Everyday Comfort\n\nElevate your seasonal wardrobe with a statement knit designed to turn heads. The Aymbr Sweater features distinctive openwork detail and a relaxed silhouette that flatters while keeping things effortlessly stylish.\n\n\u2022 Knitted Design: Cozy construction combines warmth with everyday refinement\n\u2022 Openwork Details: Intricate patterns bring depth and modern flair\n\u2022 Relaxed Fit: Slightly oversized shape with dropped shoulders for easy layering\n\u2022 Round Neck: Classic crew neckline complements any outfit\n\nDesigned in London by Vantage for timeless versatility.",
+    facebookCopy: "Slide Into Textured Sophistication with the Aymbr Sweater\n\nPlayful structure meets confident style in this relaxed must-have. The Aymbr Sweater\u2019s openwork detail and patchwork texture bring effortless elegance to your rotation.\n\nRelaxed. Intricate. Versatile.\n\nhttps://vantage-london.myshopify.com/products/aymbr\nAymbr Sweater\nFree Shipping in the UK\nShop now",
     status: "Completed",
     pushStatus: "",
     sizeChartImage: "",
@@ -316,10 +316,10 @@ export const initialCopyProducts: ProductCopy[] = [
     id: "pc-002",
     adStatus: "green",
     productName: "All-Terrain Canvas Sneaker",
-    productUrl: "https://olympus-london.myshopify.com/products/all-terrain-canvas-sneaker",
-    imageUrl: "http://olympus-london.myshopify.com/cdn/shop/files/S6dba56a87e254678.webp",
-    shopifyDescription: "Warm-Weather Function Meets Everyday Utility\n\nCrafted for comfort and ease, the All-Terrain Canvas Sneaker is ready for anything from daily errands to weekend adventures. The breathable upper and flexible sole support natural movement.\n\n\u2022 Low-Top Construction: Relaxed silhouette with casual styling appeal\n\u2022 Lace-Up Front: Metal eyelets provide secure fit and utility edge\n\u2022 Slip-Resistant Tread: Durable outsole provides reliable traction\n\u2022 Textured Details: Visible stitching and panel design add structure\n\nDesigned in London by Olympus for modern versatility.",
-    facebookCopy: "Slide Into Everyday Motion with the All-Terrain Canvas Sneaker\n\nBuilt to keep pace with your routine, the All-Terrain Canvas Sneaker delivers breathable comfort, structured support, and rugged traction in one easygoing package.\n\nPractical. Breathable. Grounded.\n\nhttps://olympus-london.myshopify.com/products/all-terrain-canvas-sneaker\nAll-Terrain Canvas Sneaker\nFree Shipping in the UK\nShop now",
+    productUrl: "https://vantage-london.myshopify.com/products/all-terrain-canvas-sneaker",
+    imageUrl: "http://vantage-london.myshopify.com/cdn/shop/files/S6dba56a87e254678.webp",
+    shopifyDescription: "Warm-Weather Function Meets Everyday Utility\n\nCrafted for comfort and ease, the All-Terrain Canvas Sneaker is ready for anything from daily errands to weekend adventures. The breathable upper and flexible sole support natural movement.\n\n\u2022 Low-Top Construction: Relaxed silhouette with casual styling appeal\n\u2022 Lace-Up Front: Metal eyelets provide secure fit and utility edge\n\u2022 Slip-Resistant Tread: Durable outsole provides reliable traction\n\u2022 Textured Details: Visible stitching and panel design add structure\n\nDesigned in London by Vantage for modern versatility.",
+    facebookCopy: "Slide Into Everyday Motion with the All-Terrain Canvas Sneaker\n\nBuilt to keep pace with your routine, the All-Terrain Canvas Sneaker delivers breathable comfort, structured support, and rugged traction in one easygoing package.\n\nPractical. Breathable. Grounded.\n\nhttps://vantage-london.myshopify.com/products/all-terrain-canvas-sneaker\nAll-Terrain Canvas Sneaker\nFree Shipping in the UK\nShop now",
     status: "Completed",
     pushStatus: "",
     sizeChartImage: "",
@@ -330,7 +330,7 @@ export const initialCopyProducts: ProductCopy[] = [
     id: "pc-003",
     adStatus: "yellow",
     productName: "Maven Bomber Jacket",
-    productUrl: "https://olympus-london.myshopify.com/products/maven-bomber-jacket",
+    productUrl: "https://vantage-london.myshopify.com/products/maven-bomber-jacket",
     imageUrl: "",
     shopifyDescription: "",
     facebookCopy: "",
@@ -344,7 +344,7 @@ export const initialCopyProducts: ProductCopy[] = [
     id: "pc-004",
     adStatus: "red",
     productName: "Harrington Trainers",
-    productUrl: "https://olympus-london.myshopify.com/products/harrington-trainers",
+    productUrl: "https://vantage-london.myshopify.com/products/harrington-trainers",
     imageUrl: "",
     shopifyDescription: "",
     facebookCopy: "",
@@ -358,7 +358,7 @@ export const initialCopyProducts: ProductCopy[] = [
     id: "pc-005",
     adStatus: "yellow",
     productName: "Haldrin Layered Shirt",
-    productUrl: "https://olympus-london.myshopify.com/products/haldrin-layered-shirt",
+    productUrl: "https://vantage-london.myshopify.com/products/haldrin-layered-shirt",
     imageUrl: "",
     shopifyDescription: "",
     facebookCopy: "",
@@ -412,7 +412,7 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
   {
     id: "adc-001",
     productName: "Aymbr Sweater",
-    productUrl: "https://olympus-london.myshopify.com/products/aymbr",
+    productUrl: "https://vantage-london.myshopify.com/products/aymbr",
     primaryText: "Slide Into Textured Sophistication with the Aymbr Sweater\n\nPlayful structure meets confident style in this relaxed must-have. The Aymbr Sweater\u2019s openwork detail and patchwork texture bring effortless elegance to your rotation.\n\nRelaxed. Intricate. Versatile.",
     headline: "Aymbr Sweater",
     description: "Free Shipping in the UK",
@@ -430,7 +430,7 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
   {
     id: "adc-002",
     productName: "All-Terrain Canvas Sneaker",
-    productUrl: "https://olympus-london.myshopify.com/products/all-terrain-canvas-sneaker",
+    productUrl: "https://vantage-london.myshopify.com/products/all-terrain-canvas-sneaker",
     primaryText: "Slide Into Everyday Motion with the All-Terrain Canvas Sneaker\n\nBuilt to keep pace with your routine, the All-Terrain Canvas Sneaker delivers breathable comfort, structured support, and rugged traction in one easygoing package.\n\nPractical. Breathable. Grounded.",
     headline: "All-Terrain Canvas Sneaker",
     description: "Free Shipping in the UK",
@@ -447,7 +447,7 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
   {
     id: "adc-003",
     productName: "Maven Bomber Jacket",
-    productUrl: "https://olympus-london.myshopify.com/products/maven-bomber-jacket",
+    productUrl: "https://vantage-london.myshopify.com/products/maven-bomber-jacket",
     primaryText: "",
     headline: "Maven Bomber Jacket",
     description: "Free Shipping in the UK",
@@ -461,7 +461,7 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
   {
     id: "adc-004",
     productName: "Harrington Trainers",
-    productUrl: "https://olympus-london.myshopify.com/products/harrington-trainers",
+    productUrl: "https://vantage-london.myshopify.com/products/harrington-trainers",
     primaryText: "",
     headline: "Harrington Trainers",
     description: "Free Shipping in the UK",
@@ -867,11 +867,11 @@ export const profitLogs: ProfitLog[] = [
 // 3b. Per-store data helpers
 // ============================================================
 
-// Olympus London is the main store (~£950K all-time revenue).
+// Vantage London is the main store (~£950K all-time revenue).
 // Vantage Melbourne is the student store (smaller numbers).
-// Scale factor: current Vantage total ≈ £20K over 60 days → Olympus target ≈ £950K → ~47x
+// Scale factor: current Vantage Melbourne total ≈ £20K over 60 days → Vantage London target ≈ £950K → ~47x
 
-const OLYMPUS_SCALE = 47;
+const VANTAGE_LDN_SCALE = 47;
 
 function scaleProfitLog(log: ProfitLog, scale: number): ProfitLog {
   const revenue = Math.round(log.revenue * scale);
@@ -884,10 +884,10 @@ function scaleProfitLog(log: ProfitLog, scale: number): ProfitLog {
   return { ...log, revenue, cog, adSpend, transactionFee, profit, roas, profitPercent };
 }
 
-const olympusProfitLogs: ProfitLog[] = profitLogs.map((l) => scaleProfitLog(l, OLYMPUS_SCALE));
+const vantageLdnProfitLogs: ProfitLog[] = profitLogs.map((l) => scaleProfitLog(l, VANTAGE_LDN_SCALE));
 
-// Olympus London ad campaigns — hand-crafted with realistic $30→$60→$120→$240→$480 budget tiers
-const olympusAdCampaigns: AdCampaign[] = [
+// Vantage London ad campaigns — hand-crafted with realistic $30→$60→$120→$240→$480 budget tiers
+const vantageLdnAdCampaigns: AdCampaign[] = [
   {
     id: "ol-001",
     campaignName: "Harrington Trainers",
@@ -989,7 +989,7 @@ const olympusAdCampaigns: AdCampaign[] = [
 ];
 
 // Default COGs per store
-export const OLYMPUS_DEFAULT_COGS: Record<string, number> = {
+export const VANTAGE_LDN_DEFAULT_COGS: Record<string, number> = {
   "ol-001": 16.0,
   "ol-002": 15.0,
   "ol-003": 20.0,
@@ -1007,17 +1007,17 @@ export const VANTAGE_DEFAULT_COGS: Record<string, number> = {
 
 /** Get profit logs for a given store */
 export function getProfitLogs(storeId: string): ProfitLog[] {
-  return storeId === "olympus-london" ? olympusProfitLogs : profitLogs;
+  return storeId === "vantage-london" ? vantageLdnProfitLogs : profitLogs;
 }
 
 /** Get ad campaigns for a given store */
 export function getAdCampaigns(storeId: string): AdCampaign[] {
-  return storeId === "olympus-london" ? olympusAdCampaigns : adCampaigns;
+  return storeId === "vantage-london" ? vantageLdnAdCampaigns : adCampaigns;
 }
 
 /** Get default COGs for a given store */
 export function getDefaultCogs(storeId: string): Record<string, number> {
-  return storeId === "olympus-london" ? OLYMPUS_DEFAULT_COGS : VANTAGE_DEFAULT_COGS;
+  return storeId === "vantage-london" ? VANTAGE_LDN_DEFAULT_COGS : VANTAGE_DEFAULT_COGS;
 }
 
 // ============================================================
@@ -1093,8 +1093,8 @@ export const customerCases: CustomerCase[] = [
       {
         id: "msg-001-2",
         sender: "agent",
-        senderName: "Claire from Olympus",
-        body: "Hi James,\n\nThank you for reaching out. I'm really sorry to hear you're not fully satisfied with your order \u2014 I'll do everything I can to turn this around and ensure your experience with us ends on a much better note.\n\nWe'd love to help resolve this in a way that's as smooth and stress-free as possible.\n\nHere are a few options we can offer:\n\n\u2022 A 30% refund, processed immediately \u2014 no need to send the product back.\n\u2022 Return the product via Royal Mail Special Delivery Guaranteed. Once we receive and inspect it to ensure it's unused and in original condition, we'll issue a refund minus a 30% restocking fee. Return shipping is at your cost.\n\u2022 A full 100% store credit so you can pick a different item or size.\n\u2022 A free replacement \u2014 no need to return the original item.\n\nPlease let me know which option works best for you \u2014 I'll make sure to have it processed for you as smoothly as possible.\n\nWe're more than willing to help however we can, and our goal is always to ensure you feel fully supported and cared for throughout your experience with us.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+        senderName: "Claire from Vantage",
+        body: "Hi James,\n\nThank you for reaching out. I'm really sorry to hear you're not fully satisfied with your order \u2014 I'll do everything I can to turn this around and ensure your experience with us ends on a much better note.\n\nWe'd love to help resolve this in a way that's as smooth and stress-free as possible.\n\nHere are a few options we can offer:\n\n\u2022 A 30% refund, processed immediately \u2014 no need to send the product back.\n\u2022 Return the product via Royal Mail Special Delivery Guaranteed. Once we receive and inspect it to ensure it's unused and in original condition, we'll issue a refund minus a 30% restocking fee. Return shipping is at your cost.\n\u2022 A full 100% store credit so you can pick a different item or size.\n\u2022 A free replacement \u2014 no need to return the original item.\n\nPlease let me know which option works best for you \u2014 I'll make sure to have it processed for you as smoothly as possible.\n\nWe're more than willing to help however we can, and our goal is always to ensure you feel fully supported and cared for throughout your experience with us.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
         sentAt: hoursAgo(2.5),
       },
       {
@@ -1107,8 +1107,8 @@ export const customerCases: CustomerCase[] = [
       {
         id: "msg-001-4",
         sender: "agent",
-        senderName: "Claire from Olympus",
-        body: "Hi James,\n\nThank you for your response. I've now processed your 30% refund as agreed \u2014 it should appear in your account within a few business days depending on your card provider.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+        senderName: "Claire from Vantage",
+        body: "Hi James,\n\nThank you for your response. I've now processed your 30% refund as agreed \u2014 it should appear in your account within a few business days depending on your card provider.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
         sentAt: hoursAgo(1),
       },
     ],
@@ -1140,8 +1140,8 @@ export const customerCases: CustomerCase[] = [
       {
         id: "msg-002-2",
         sender: "agent",
-        senderName: "Claire from Olympus",
-        body: "Hi Sophie,\n\nI'm really sorry to hear that you received the wrong item.\n\nWe can offer two solutions:\n\n1. Resend the correct item to you free of charge.\n2. Offer a 50% refund if you prefer not to wait for the replacement.\n\nPlease let me know which option you'd prefer, and we'll take care of it right away.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+        senderName: "Claire from Vantage",
+        body: "Hi Sophie,\n\nI'm really sorry to hear that you received the wrong item.\n\nWe can offer two solutions:\n\n1. Resend the correct item to you free of charge.\n2. Offer a 50% refund if you prefer not to wait for the replacement.\n\nPlease let me know which option you'd prefer, and we'll take care of it right away.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
         sentAt: hoursAgo(6),
       },
       {
@@ -1154,8 +1154,8 @@ export const customerCases: CustomerCase[] = [
       {
         id: "msg-002-4",
         sender: "agent",
-        senderName: "Claire from Olympus",
-        body: "Hi Sophie,\n\nApologies again for the mix-up! I've now arranged for the correct item to be sent to you free of charge and you should receive it within the next 7 Business Days.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+        senderName: "Claire from Vantage",
+        body: "Hi Sophie,\n\nApologies again for the mix-up! I've now arranged for the correct item to be sent to you free of charge and you should receive it within the next 7 Business Days.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
         sentAt: hoursAgo(4.5),
       },
     ],
@@ -1253,7 +1253,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Quality Issue",
     name: "Initial Offer",
     subject: "Let's Fix This Together",
-    body: "Hi [Customer's Name],\n\nThank you for reaching out. I'm really sorry to hear you're not fully satisfied with your order \u2014 I'll do everything I can to turn this around and ensure your experience with us ends on a much better note.\n\nWe'd love to help resolve this in a way that's as smooth and stress-free as possible.\n\nHere are a few options we can offer:\n\n\u2022 A 30% refund, processed immediately \u2014 no need to send the product back.\n\u2022 Return the product via Royal Mail Special Delivery Guaranteed. Once we receive and inspect it to ensure it's unused and in original condition, we'll issue a refund minus a 30% restocking fee. Return shipping is at your cost.\n\u2022 A full 100% store credit so you can pick a different item or size.\n\u2022 A free replacement \u2014 no need to return the original item.\n\nPlease let me know which option works best for you \u2014 I'll make sure to have it processed for you as smoothly as possible.\n\nWe're more than willing to help however we can, and our goal is always to ensure you feel fully supported and cared for throughout your experience with us.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nThank you for reaching out. I'm really sorry to hear you're not fully satisfied with your order \u2014 I'll do everything I can to turn this around and ensure your experience with us ends on a much better note.\n\nWe'd love to help resolve this in a way that's as smooth and stress-free as possible.\n\nHere are a few options we can offer:\n\n\u2022 A 30% refund, processed immediately \u2014 no need to send the product back.\n\u2022 Return the product via Royal Mail Special Delivery Guaranteed. Once we receive and inspect it to ensure it's unused and in original condition, we'll issue a refund minus a 30% restocking fee. Return shipping is at your cost.\n\u2022 A full 100% store credit so you can pick a different item or size.\n\u2022 A free replacement \u2014 no need to return the original item.\n\nPlease let me know which option works best for you \u2014 I'll make sure to have it processed for you as smoothly as possible.\n\nWe're more than willing to help however we can, and our goal is always to ensure you feel fully supported and cared for throughout your experience with us.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
   {
@@ -1261,7 +1261,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Quality Issue",
     name: "30% Refund Accepted",
     subject: "Refund Confirmation",
-    body: "Hi [Customer's Name],\n\nThank you for your response. I've now processed your 30% refund as agreed \u2014 it should appear in your account within a few business days depending on your card provider.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nThank you for your response. I've now processed your 30% refund as agreed \u2014 it should appear in your account within a few business days depending on your card provider.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
   {
@@ -1269,7 +1269,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Quality Issue",
     name: "Escalation 50% Offer",
     subject: "Final Refund Offer",
-    body: "Hi [Customer's Name],\n\nI completely understand your concerns and I've double-checked with our management team. As a final gesture, we can offer a 50% refund, which would be the maximum possible on our end.\n\nPlease let me know how you'd like to proceed \u2014 I'll make sure to have it processed for you as smoothly as possible.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nI completely understand your concerns and I've double-checked with our management team. As a final gesture, we can offer a 50% refund, which would be the maximum possible on our end.\n\nPlease let me know how you'd like to proceed \u2014 I'll make sure to have it processed for you as smoothly as possible.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
   {
@@ -1277,7 +1277,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Quality Issue",
     name: "Return Instructions",
     subject: "Return Instructions",
-    body: "Hi [Customer's Name],\n\nThank you for letting me know, I can process the return if none of the other options works for you. Please make sure to use Royal Mail Special Delivery Guaranteed only when sending it back \u2014 this is important for tracking and insurance purposes, we won't be able to process the return if a different shipping method is used.\n\nYou can send your return to:\n\nOlympus London\n71 Shelton Street\nCovent Garden, London, WC2H 9JQ\nUnited Kingdom\n\nOnce we receive the package, we'll inspect the item to confirm it is unused and in original condition. If everything checks out, we'll process your refund minus the 30% restocking fee as per our policy. The inspection process may take a few days.\n\nCan you please share your proof of postage and tracking number in this email? That would be great!\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nThank you for letting me know, I can process the return if none of the other options works for you. Please make sure to use Royal Mail Special Delivery Guaranteed only when sending it back \u2014 this is important for tracking and insurance purposes, we won't be able to process the return if a different shipping method is used.\n\nYou can send your return to:\n\nVantage London\n71 Shelton Street\nCovent Garden, London, WC2H 9JQ\nUnited Kingdom\n\nOnce we receive the package, we'll inspect the item to confirm it is unused and in original condition. If everything checks out, we'll process your refund minus the 30% restocking fee as per our policy. The inspection process may take a few days.\n\nCan you please share your proof of postage and tracking number in this email? That would be great!\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
   // ── Sizing ──
@@ -1286,7 +1286,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Sizing",
     name: "Initial Offer",
     subject: "Let's Fix the Sizing Issue",
-    body: "Hi [Customer's Name],\n\nThank you for your message. I'm sorry to hear that the size wasn't quite right \u2014 we always strive to make sure every customer feels confident and happy with their purchase.\n\nWe'd love to help make this right in a way that's as smooth and helpful as possible.\n\nHere are a few options:\n\n\u2022 A 50% discount on a new order in the correct size.\n\u2022 A full store credit for the amount you paid, so you can choose a different item or size.\n\u2022 A free size replacement \u2014 no need to return the original item.\n\nJust let me know which option works best for you \u2014 I'll make sure we get it sorted as smoothly as possible.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nThank you for your message. I'm sorry to hear that the size wasn't quite right \u2014 we always strive to make sure every customer feels confident and happy with their purchase.\n\nWe'd love to help make this right in a way that's as smooth and helpful as possible.\n\nHere are a few options:\n\n\u2022 A 50% discount on a new order in the correct size.\n\u2022 A full store credit for the amount you paid, so you can choose a different item or size.\n\u2022 A free size replacement \u2014 no need to return the original item.\n\nJust let me know which option works best for you \u2014 I'll make sure we get it sorted as smoothly as possible.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
   {
@@ -1294,7 +1294,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Sizing",
     name: "50% Discount Accepted",
     subject: "Exclusive Discount for Size Exchange",
-    body: "Hi [Customer's Name],\n\nThanks again! I've now created your 50% discount code: [CODE] \u2014 you can apply it at checkout for your new order.\n\nIf you need help selecting the right size, feel free to ask.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nThanks again! I've now created your 50% discount code: [CODE] \u2014 you can apply it at checkout for your new order.\n\nIf you need help selecting the right size, feel free to ask.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
   {
@@ -1302,7 +1302,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Sizing",
     name: "Store Credit Accepted",
     subject: "Store Credit Issued",
-    body: "Hi [Customer's Name],\n\nThanks for confirming! I've just issued a store credit for the full amount of your original order. You're welcome to use it anytime to pick something else you love.\n\nLet me know if you need help browsing or with sizing \u2014 I'm here for you!\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nThanks for confirming! I've just issued a store credit for the full amount of your original order. You're welcome to use it anytime to pick something else you love.\n\nLet me know if you need help browsing or with sizing \u2014 I'm here for you!\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
   {
@@ -1310,7 +1310,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Sizing",
     name: "Free Replacement Accepted",
     subject: "Size Replacement Sent",
-    body: "Hi [Customer's Name],\n\nI've just sent out a new size for your order \u2014 no need to return the original. You'll get a tracking number shortly so you can keep an eye on delivery.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nI've just sent out a new size for your order \u2014 no need to return the original. You'll get a tracking number shortly so you can keep an eye on delivery.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
   // ── Wrong Item ──
@@ -1319,7 +1319,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Wrong Item",
     name: "Initial Offer",
     subject: "Let's Make It Right",
-    body: "Hi [Customer's Name],\n\nI'm really sorry to hear that you received the wrong item.\n\nWe can offer two solutions:\n\n1. Resend the correct item to you free of charge.\n2. Offer a 50% refund if you prefer not to wait for the replacement.\n\nPlease let me know which option you'd prefer, and we'll take care of it right away.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nI'm really sorry to hear that you received the wrong item.\n\nWe can offer two solutions:\n\n1. Resend the correct item to you free of charge.\n2. Offer a 50% refund if you prefer not to wait for the replacement.\n\nPlease let me know which option you'd prefer, and we'll take care of it right away.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
   {
@@ -1327,7 +1327,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Wrong Item",
     name: "Reshipment Chosen",
     subject: "Replacement on the Way",
-    body: "Hi [Customer's Name],\n\nApologies again for the mix-up! I've now arranged for the correct item to be sent to you free of charge and you should receive it within the next 7 Business Days.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nApologies again for the mix-up! I've now arranged for the correct item to be sent to you free of charge and you should receive it within the next 7 Business Days.\n\nWe'd really appreciate your feedback \u2014 how would you rate your experience with our customer support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
   {
@@ -1335,7 +1335,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Wrong Item",
     name: "50% Refund Chosen",
     subject: "Refund Processed \u2013 Wrong Item",
-    body: "Hi [Customer's Name],\n\nThank you for your understanding. I've just processed your 50% refund for the order \u2014 it should reflect on your account shortly.\n\nIf you don't mind me asking, how would you rate your experience with our support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nThank you for your understanding. I've just processed your 50% refund for the order \u2014 it should reflect on your account shortly.\n\nIf you don't mind me asking, how would you rate your experience with our support?\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
   // ── Delivery ──
@@ -1344,7 +1344,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Delivery",
     name: "Initial Response",
     subject: "We're Looking Into It",
-    body: "Hi [Customer's Name],\n\nThank you for reaching out. I completely understand how frustrating it must be to wait this long for your order \u2014 I'll look into this right away.\n\nI've escalated this with our shipping partner and will have an update for you within 24 hours. If the parcel can't be located, I'll arrange for a replacement to be sent to you immediately at no extra cost.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nThank you for reaching out. I completely understand how frustrating it must be to wait this long for your order \u2014 I'll look into this right away.\n\nI've escalated this with our shipping partner and will have an update for you within 24 hours. If the parcel can't be located, I'll arrange for a replacement to be sent to you immediately at no extra cost.\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
   // ── Trustpilot ──
@@ -1353,7 +1353,7 @@ export const DEFAULT_SOP_TEMPLATES: SOPTemplate[] = [
     category: "Trustpilot",
     name: "5-Star Follow-Up",
     subject: "Thanks Again \u2013 One Last Favour",
-    body: "Hi [Customer's Name],\n\nThat's wonderful to hear \u2014 thank you so much for the 5-star feedback!\n\nIf you have a moment, we'd be incredibly grateful if you could share your experience in a short review on Trustpilot. It really helps a small business like ours grow and continue improving.\n\nYou can leave your review here:\nhttps://www.trustpilot.com/review/olympuslondon.com\n\nThanks again for your support \u2014 it means the world to us!\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Olympus",
+    body: "Hi [Customer's Name],\n\nThat's wonderful to hear \u2014 thank you so much for the 5-star feedback!\n\nIf you have a moment, we'd be incredibly grateful if you could share your experience in a short review on Trustpilot. It really helps a small business like ours grow and continue improving.\n\nYou can leave your review here:\nhttps://www.trustpilot.com/review/vantagelondon.com\n\nThanks again for your support \u2014 it means the world to us!\n\nPlease let me know if you have any other questions or concerns, I would be happy to help!\n\nLooking forward to hearing from you,\n\nBest Regards,\nClaire from Vantage",
     isDefault: true,
   },
 ];
@@ -1468,9 +1468,9 @@ export const INCOMING_COLLAB_REQUESTS: Record<string, CollabRequest[]> = {
   jake: [
     {
       id: "req-001",
-      requesterId: "simo",
-      requesterName: "Simo",
-      requesterInitials: "S",
+      requesterId: "aidan",
+      requesterName: "Aidan",
+      requesterInitials: "A",
       targetStoreId: "vantage-melbourne",
       sentAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
       status: "pending",
@@ -1485,12 +1485,12 @@ export const INCOMING_COLLAB_REQUESTS: Record<string, CollabRequest[]> = {
       status: "pending",
     },
   ],
-  simo: [],
+  aidan: [],
 };
 
 // Stores where the user has approved collaborator access
 export const MY_COLLAB_ACCESS: Record<string, CollabAccess[]> = {
-  simo: [
+  aidan: [
     {
       id: "ca-001",
       storeId: "vantage-melbourne",
@@ -1557,7 +1557,7 @@ export const MY_COLLAB_ACCESS: Record<string, CollabAccess[]> = {
 
 // Sent requests — what you've sent out (for the "Request Access" section)
 export const SENT_COLLAB_REQUESTS: Record<string, SentCollabRequest[]> = {
-  simo: [
+  aidan: [
     {
       id: "sr-001",
       targetStoreName: "Vantage Melbourne",
@@ -1592,6 +1592,6 @@ export const SENT_COLLAB_REQUESTS: Record<string, SentCollabRequest[]> = {
 
 // Store IDs for the "share your store ID" helper text
 export const USER_STORE_IDS: Record<string, string> = {
-  jake: "OLY-VMB-001",
-  simo: "OLY-LDN-000",
+  jake: "VNT-VMB-001",
+  aidan: "VNT-LDN-000",
 };

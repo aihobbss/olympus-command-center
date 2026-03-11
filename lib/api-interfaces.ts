@@ -1,5 +1,5 @@
 // ============================================================
-// Olympus Command Center — API Interfaces
+// Vantage Command Center — API Interfaces
 // ============================================================
 //
 // This file documents the mock API interfaces that will be
@@ -779,7 +779,7 @@ export interface StoreContextApi {
 // ────────────────────────────────────────────────────────────
 
 /**
- * Complete API surface for the Olympus Command Center.
+ * Complete API surface for the Vantage Command Center.
  *
  * A concrete implementation would satisfy this interface by
  * wiring each method to a Supabase client call, Edge Function,
@@ -789,11 +789,11 @@ export interface StoreContextApi {
  * Example usage in a service factory:
  *
  * ```ts
- * const api: OlympusApi = createSupabaseApi(supabase);
+ * const api: VantageApi = createSupabaseApi(supabase);
  * const { data, error } = await api.research.fetchProducts();
  * ```
  */
-export interface OlympusApi {
+export interface VantageApi {
   research: ResearchApi;
   adManager: AdManagerApi;
   profitTracker: ProfitTrackerApi;

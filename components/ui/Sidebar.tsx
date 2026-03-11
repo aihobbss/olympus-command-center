@@ -62,7 +62,7 @@ export function Sidebar({ collapsed, onToggle, bannerOffset = 0, highlightedNavI
           <div className="w-[7px] h-[7px] rounded-full bg-accent-indigo animate-[pulse-glow_3s_ease-in-out_infinite]" />
         </div>
 
-        {/* OLYMPUS text — collapses with sidebar */}
+        {/* VANTAGE text — collapses with sidebar */}
         <span
           className={cn(
             "font-syne text-[13px] font-bold tracking-[0.25em] text-text-primary uppercase whitespace-nowrap",
@@ -70,7 +70,7 @@ export function Sidebar({ collapsed, onToggle, bannerOffset = 0, highlightedNavI
             collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
           )}
         >
-          OLYMPUS
+          VANTAGE
         </span>
       </motion.div>
 

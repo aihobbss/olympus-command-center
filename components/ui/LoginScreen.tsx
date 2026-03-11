@@ -11,8 +11,8 @@ export function LoginScreen() {
   const login = useAuthStore((s) => s.login);
   const setSelectedStore = useStoreContext((s) => s.setSelectedStore);
 
-  const [username, setUsername] = useState("simo");
-  const [password, setPassword] = useState("olympus");
+  const [username, setUsername] = useState("aidan");
+  const [password, setPassword] = useState("vantage");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,12 +21,12 @@ export function LoginScreen() {
     e.preventDefault();
     setError("");
 
-    // Demo validation — accepts "simo" / "olympus" (case-insensitive)
+    // Demo validation — accepts "aidan" / "vantage" (case-insensitive)
     const user = mockUsers.find(
       (u) => u.name.toLowerCase() === username.trim().toLowerCase()
     );
 
-    if (!user || password !== "olympus") {
+    if (!user || password !== "vantage") {
       setError("Invalid username or password");
       return;
     }
@@ -58,7 +58,7 @@ export function LoginScreen() {
         </div>
 
         <h1 className="font-syne text-2xl sm:text-3xl font-bold tracking-[0.15em] text-text-primary uppercase mb-2">
-          OLYMPUS
+          VANTAGE
         </h1>
         <p className="text-sm text-text-secondary">
           Sign in to your command center
@@ -171,7 +171,7 @@ export function LoginScreen() {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6 }}
       >
-        Demo: username <span className="text-text-secondary font-medium">simo</span> &middot; password <span className="text-text-secondary font-medium">olympus</span>
+        Demo: username <span className="text-text-secondary font-medium">aidan</span> &middot; password <span className="text-text-secondary font-medium">vantage</span>
       </motion.p>
     </div>
   );

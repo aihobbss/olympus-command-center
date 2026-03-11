@@ -1,4 +1,4 @@
-# Olympus Command Center
+# Vantage Command Center
 
 Centralized command center for fashion dropshipping operations — manage product research, ad campaigns, profit tracking, creative generation, customer service, and coaching from a single dashboard.
 
@@ -17,7 +17,7 @@ Centralized command center for fashion dropshipping operations — manage produc
 ```bash
 # Clone the repository
 git clone <repo-url>
-cd olympus-command-center
+cd vantage-command-center
 
 # Install dependencies
 npm install
@@ -50,7 +50,7 @@ Use the **"Take a Tour"** button in the top bar to start a guided 8-step walkthr
 ## Project Structure
 
 ```
-olympus-command-center/
+vantage-command-center/
 ├── app/                    Next.js App Router pages
 ├── components/
 │   ├── ui/                 Reusable UI primitives
