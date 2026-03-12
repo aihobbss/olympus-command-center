@@ -60,7 +60,7 @@ export const SERVICE_REGISTRY: ServiceMeta[] = [
 export async function fetchConnections(userId: string): Promise<ServiceConnection[]> {
   const { data, error } = await supabase
     .from("oauth_tokens")
-    .select("id, service, expires_at")
+    .select("id, service, expires_at, access_token")
     .eq("user_id", userId);
 
   if (error) {
@@ -68,12 +68,15 @@ export async function fetchConnections(userId: string): Promise<ServiceConnectio
     return [];
   }
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    service: row.service as ServiceId,
-    connected: true,
-    expiresAt: row.expires_at,
-  }));
+  // Only mark as connected if access_token is actually set
+  return (data ?? [])
+    .filter((row) => !!row.access_token)
+    .map((row) => ({
+      id: row.id,
+      service: row.service as ServiceId,
+      connected: true,
+      expiresAt: row.expires_at,
+    }));
 }
 
 export async function disconnectService(userId: string, service: ServiceId): Promise<boolean> {

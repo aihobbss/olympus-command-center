@@ -241,16 +241,16 @@ export default function AdManagerPage() {
   const liveCount = useMemo(() => campaigns.filter(isLive).length, [campaigns]);
   const pausedCount = campaigns.length - liveCount;
 
-  // ── Aggregated metrics (from filtered view) ──
+  // ── Aggregated metrics (independent of Live/Paused filter) ──
 
-  // Total ad spend from Meta campaigns (filtered view)
+  // Total ad spend from ALL campaigns (not filtered — so metrics stay consistent)
   const totalSpend = useMemo(() => {
     let spend = 0;
-    for (const c of filteredCampaigns) spend += c.spend;
+    for (const c of campaigns) spend += c.spend;
     return spend;
-  }, [filteredCampaigns]);
+  }, [campaigns]);
 
-  // Revenue, Orders, Profit come from Shopify profit logs (store-wide, not per-campaign)
+  // Revenue, Orders, Profit come from Shopify profit logs (store-wide, period-matched)
   const totals = useMemo(() => {
     const roas = totalSpend > 0 ? parseFloat((shopifyTotals.revenue / totalSpend).toFixed(2)) : 0;
     return { spend: totalSpend, revenue: shopifyTotals.revenue, profit: shopifyTotals.profit, orders: shopifyTotals.orders, roas };

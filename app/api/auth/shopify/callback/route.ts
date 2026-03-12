@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     );
   }
 
-  // Decode userId from state
+  // Decode userId and shop from state
   let userId: string | null = null;
   try {
     const decoded = JSON.parse(Buffer.from(stateParam, "base64url").toString());
@@ -65,6 +65,20 @@ export async function GET(request: Request) {
 
     const tokenData = await tokenResponse.json();
 
+    // Look up the user's active store to get store_id
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("active_store_id")
+      .eq("id", userId)
+      .single();
+
+    const storeId = profile?.active_store_id;
+    if (!storeId) {
+      return NextResponse.redirect(
+        new URL("/settings?error=shopify_no_store", request.url)
+      );
+    }
+
     // Store token in oauth_tokens (Shopify offline tokens don't expire)
     const { error: upsertError } = await supabaseAdmin
       .from("oauth_tokens")
@@ -72,10 +86,13 @@ export async function GET(request: Request) {
         {
           user_id: userId,
           service: "shopify",
+          store_id: storeId,
           access_token: tokenData.access_token,
+          scopes: tokenData.scope || "read_products,write_products,read_orders",
           expires_at: null,
+          meta: { shopify_domain: shop },
         },
-        { onConflict: "user_id,service" }
+        { onConflict: "store_id,service" }
       );
 
     if (upsertError) {
