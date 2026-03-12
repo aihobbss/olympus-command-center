@@ -21,7 +21,7 @@ import {
   passCampaign,
   getLastSyncedAt,
 } from "@/lib/services/meta-campaigns";
-import { fetchProfitLogs, triggerProfitSync } from "@/lib/services/profit-tracker";
+import { fetchProfitLogsByDateRange, triggerProfitSync } from "@/lib/services/profit-tracker";
 
 type AdTab = "live" | "creator";
 
@@ -136,7 +136,7 @@ export default function AdManagerPage() {
 
   const storeId = selectedStore?.id ?? "";
 
-  // ── Map period to Meta date_preset ──
+  // ── Map period to Meta date_preset + days back for profit sync ──
   const DATE_PRESET: Record<TimePeriod, string> = {
     today: "today",
     "3d": "last_3d",
@@ -144,20 +144,34 @@ export default function AdManagerPage() {
     "30d": "last_30d",
     all: "maximum",
   };
+  const DAYS_BACK: Record<TimePeriod, number> = {
+    today: 1,
+    "3d": 3,
+    "7d": 7,
+    "30d": 30,
+    all: 365,
+  };
 
-  // ── Load campaigns from Supabase on mount + after sync ──
-  const loadCampaigns = useCallback(async () => {
-    if (!storeId || !user) return;
+  // Helper: compute date range string for the selected period
+  function getDateRange(p: TimePeriod): { start: string; end: string } {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - DAYS_BACK[p]);
+    return {
+      start: start.toISOString().split("T")[0],
+      end: end.toISOString().split("T")[0],
+    };
+  }
 
-    // Sync Shopify profit data first so profit_logs table is populated
-    await triggerProfitSync(user.id, storeId).catch(() => {});
-
+  // ── Load just data from Supabase (no external API calls) ──
+  const loadData = useCallback(async (p: TimePeriod) => {
+    if (!storeId) return;
+    const { start, end } = getDateRange(p);
     const [data, profitLogs, synced] = await Promise.all([
       fetchLiveCampaigns(storeId),
-      fetchProfitLogs(storeId),
+      fetchProfitLogsByDateRange(storeId, start, end),
       getLastSyncedAt(storeId),
     ]);
-    // Re-compute SOP recommendations on the client
     const withRecs = data.map((c) => {
       const { status, recommendation } = computeRecommendation(c);
       return { ...c, status, recommendation };
@@ -165,7 +179,6 @@ export default function AdManagerPage() {
     setCampaigns(withRecs);
     setLastSynced(synced);
 
-    // Aggregate Shopify revenue/orders/profit from profit logs
     let rev = 0, ord = 0, prof = 0;
     for (const log of profitLogs) {
       rev += log.revenue;
@@ -173,26 +186,31 @@ export default function AdManagerPage() {
       prof += log.profit;
     }
     setShopifyTotals({ revenue: rev, orders: ord, profit: prof });
-  }, [storeId, user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
 
-  useEffect(() => {
-    if (metaConnected && storeId) loadCampaigns();
-  }, [metaConnected, storeId, loadCampaigns]);
-
-  // ── Sync from Meta ──
+  // ── Sync: pull fresh data from Meta + Shopify, then reload ──
   const handleSync = useCallback(async () => {
     if (!user || !storeId) return;
     setSyncing(true);
     setSyncError(null);
-    const result = await triggerMetaSync(user.id, storeId, DATE_PRESET[period]);
-    if (result.error) {
-      setSyncError(result.error);
-    } else {
-      await loadCampaigns();
+    try {
+      // Run Meta campaign sync and Shopify profit sync in parallel
+      const [metaResult] = await Promise.all([
+        triggerMetaSync(user.id, storeId, DATE_PRESET[period]),
+        triggerProfitSync(user.id, storeId, DAYS_BACK[period]),
+      ]);
+      if (metaResult.error) {
+        setSyncError(metaResult.error);
+      }
+      // Reload data from Supabase
+      await loadData(period);
+    } catch {
+      setSyncError("Sync failed — check your connections in Settings");
     }
     setSyncing(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, storeId, period, loadCampaigns]);
+  }, [user, storeId, period, loadData]);
 
   // ── Auto-sync on first load if connected ──
   const [hasAutoSynced, setHasAutoSynced] = useState(false);
@@ -256,33 +274,33 @@ export default function AdManagerPage() {
     setPanelOpen(false);
     const result = await scaleCampaign(user.id, id, newBudget);
     if (result.success) {
-      await loadCampaigns();
+      await loadData(period);
     } else {
       setSyncError(result.error || "Failed to scale campaign");
     }
-  }, [user, loadCampaigns]);
+  }, [user, period, loadData]);
 
   const handleKill = useCallback(async (id: string) => {
     if (!user) return;
     setPanelOpen(false);
     const result = await killCampaign(user.id, id);
     if (result.success) {
-      await loadCampaigns();
+      await loadData(period);
     } else {
       setSyncError(result.error || "Failed to kill campaign");
     }
-  }, [user, loadCampaigns]);
+  }, [user, period, loadData]);
 
   const handlePass = useCallback(async (id: string) => {
     if (!user) return;
     setPanelOpen(false);
     const result = await passCampaign(user.id, id);
     if (result.success) {
-      await loadCampaigns();
+      await loadData(period);
     } else {
       setSyncError(result.error || "Failed to pass campaign");
     }
-  }, [user, loadCampaigns]);
+  }, [user, period, loadData]);
 
   const tabs: { key: AdTab; label: string }[] = [
     { key: "live", label: "Live Campaigns" },

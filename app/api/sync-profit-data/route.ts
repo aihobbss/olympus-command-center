@@ -61,18 +61,21 @@ export async function POST(request: Request) {
 
       if (shopifyDomain) {
         try {
-          const ordersUrl =
+          // Paginate through all Shopify orders in the date range
+          let pageUrl: string | null =
             `https://${shopifyDomain}/admin/api/2024-01/orders.json` +
             `?status=any&created_at_min=${startStr}T00:00:00Z&created_at_max=${endStr}T23:59:59Z&limit=250`;
 
-          const ordersRes = await fetch(ordersUrl, {
-            headers: {
-              "X-Shopify-Access-Token": shopifyToken.access_token,
-              "Content-Type": "application/json",
-            },
-          });
+          while (pageUrl) {
+            const ordersRes: Response = await fetch(pageUrl, {
+              headers: {
+                "X-Shopify-Access-Token": shopifyToken.access_token,
+                "Content-Type": "application/json",
+              },
+            });
 
-          if (ordersRes.ok) {
+            if (!ordersRes.ok) break;
+
             const ordersData = await ordersRes.json();
             const orders = ordersData.orders || [];
 
@@ -82,10 +85,14 @@ export async function POST(request: Request) {
 
               const bucket = dailyData.get(date)!;
               const totalPrice = parseFloat(order.total_price || "0");
-              // Shopify returns in store currency; we'll convert to USD below
               bucket.revenue += totalPrice;
               bucket.orders += 1;
             }
+
+            // Check for next page via Link header
+            const linkHeader = ordersRes.headers.get("link") || "";
+            const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+            pageUrl = nextMatch ? nextMatch[1] : null;
           }
         } catch (err) {
           console.error("Shopify orders fetch error:", err);

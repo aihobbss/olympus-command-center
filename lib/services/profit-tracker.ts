@@ -132,12 +132,13 @@ export async function upsertCog(
 
 export async function triggerProfitSync(
   userId: string,
-  storeId: string
+  storeId: string,
+  daysBack?: number
 ): Promise<{ synced: number; error?: string }> {
   const res = await fetch("/api/sync-profit-data", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, storeId }),
+    body: JSON.stringify({ userId, storeId, daysBack }),
   });
 
   const data = await res.json();
