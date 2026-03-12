@@ -78,7 +78,20 @@ export async function POST(request: Request) {
 
               const bucket = dailyData.get(date)!;
               const totalPrice = parseFloat(order.total_price || "0");
-              bucket.revenue += totalPrice;
+
+              // Subtract refunds for accurate net revenue
+              let refundTotal = 0;
+              if (order.refunds && Array.isArray(order.refunds)) {
+                for (const refund of order.refunds) {
+                  if (refund.transactions && Array.isArray(refund.transactions)) {
+                    for (const txn of refund.transactions) {
+                      refundTotal += parseFloat(txn.amount || "0");
+                    }
+                  }
+                }
+              }
+
+              bucket.revenue += totalPrice - refundTotal;
               bucket.orders += 1;
             }
 

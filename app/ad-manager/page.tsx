@@ -155,12 +155,15 @@ export default function AdManagerPage() {
     "3d": 3,
     "7d": 7,
     "30d": 30,
-    all: 730,
+    all: 3650,
   };
 
   // Helper: compute date range string for the selected period
   function getDateRange(p: TimePeriod): { start: string; end: string } {
     const end = new Date();
+    if (p === "all") {
+      return { start: "2000-01-01", end: end.toISOString().split("T")[0] };
+    }
     const start = new Date();
     start.setDate(start.getDate() - DAYS_BACK[p]);
     return {
@@ -202,9 +205,11 @@ export default function AdManagerPage() {
     setSyncError(null);
     try {
       // Run Meta campaign sync and Shopify profit sync in parallel
+      // Cap sync to 90 days to avoid Vercel timeout — older data is already in DB
+      const syncDays = Math.min(DAYS_BACK[period], 90);
       const [metaResult] = await Promise.all([
         triggerMetaSync(user.id, storeId, DATE_PRESET[period]),
-        triggerProfitSync(user.id, storeId, DAYS_BACK[period]),
+        triggerProfitSync(user.id, storeId, syncDays),
       ]);
       if (metaResult.error) {
         setSyncError(metaResult.error);
