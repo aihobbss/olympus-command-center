@@ -156,14 +156,14 @@ export default function SettingsPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setShopifyError(data.message || "Failed to start Shopify OAuth.");
+        setShopifyError(data.message || "Failed to connect Shopify.");
         return;
       }
 
-      // Redirect to Shopify OAuth
-      if (data.redirect) {
-        window.location.href = data.redirect;
-      }
+      // Success — refresh connections and close modal
+      const conns = await fetchConnections(user.id);
+      setConnections(conns);
+      setShopifyModal(false);
     } catch {
       setShopifyError("Network error. Please try again.");
     } finally {

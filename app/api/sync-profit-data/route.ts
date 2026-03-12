@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { getShopifyToken } from "@/lib/shopify-token";
 
 // Profit Data Sync — pulls Shopify orders + Meta ad spend, computes daily P&L
 // Writes daily rows to profit_logs table (all values in USD)
@@ -48,28 +49,20 @@ export async function POST(request: Request) {
 
     // ── 1. Pull Shopify orders ──────────────────────────────
 
-    const { data: shopifyToken } = await supabaseAdmin
-      .from("oauth_tokens")
-      .select("access_token, meta")
-      .eq("user_id", userId)
-      .eq("service", "shopify")
-      .single();
+    const shopify = await getShopifyToken(userId);
 
-    if (shopifyToken?.access_token) {
-      const shopifyMeta = (shopifyToken.meta as Record<string, string>) || {};
-      const shopifyDomain = shopifyMeta.shopify_domain;
-
-      if (shopifyDomain) {
+    if (shopify) {
+      {
         try {
           // Paginate through all Shopify orders in the date range
           let pageUrl: string | null =
-            `https://${shopifyDomain}/admin/api/2024-01/orders.json` +
+            `https://${shopify.shopifyDomain}/admin/api/2024-01/orders.json` +
             `?status=any&created_at_min=${startStr}T00:00:00Z&created_at_max=${endStr}T23:59:59Z&limit=250`;
 
           while (pageUrl) {
             const ordersRes: Response = await fetch(pageUrl, {
               headers: {
-                "X-Shopify-Access-Token": shopifyToken.access_token,
+                "X-Shopify-Access-Token": shopify.accessToken,
                 "Content-Type": "application/json",
               },
             });

@@ -44,24 +44,21 @@ export async function GET(request: Request) {
 
   try {
     // Exchange code for access token
-    const tokenResponse = await fetch(
-      `https://${shop}/admin/oauth/access_token`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client_id: clientId,
-          client_secret: clientSecret,
-          code,
-        }),
-      }
-    );
+    const tokenUrl = `https://${shop}/admin/oauth/access_token`;
+    const tokenBody = { client_id: clientId, client_secret: clientSecret, code };
+    console.log("Shopify token exchange:", { url: tokenUrl, shop, codeLength: code.length, clientId: clientId.slice(0, 8) + "..." });
+
+    const tokenResponse = await fetch(tokenUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(tokenBody),
+    });
 
     if (!tokenResponse.ok) {
       const errBody = await tokenResponse.text().catch(() => "no body");
-      console.error("Shopify token exchange failed:", tokenResponse.status, errBody);
+      console.error("Shopify token exchange failed:", tokenResponse.status, tokenResponse.statusText, errBody);
       return NextResponse.redirect(
-        new URL("/settings?error=shopify_token_exchange_failed", request.url)
+        new URL(`/settings?error=shopify_token_exchange_failed&detail=${encodeURIComponent(tokenResponse.status + ": " + errBody.slice(0, 200))}`, request.url)
       );
     }
 

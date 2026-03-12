@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { getShopifyToken } from "@/lib/shopify-token";
 
 // Push a product to Shopify via Admin API
 // Requires: user has a connected Shopify store (token in oauth_tokens)
@@ -50,40 +51,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch user's Shopify token
-    const { data: tokenRow, error: tokenError } = await supabaseAdmin
-      .from("oauth_tokens")
-      .select("access_token")
-      .eq("user_id", userId)
-      .eq("service", "shopify")
-      .single();
+    // Fetch user's Shopify token (auto-refreshes if expired)
+    const shopify = await getShopifyToken(userId);
 
-    if (tokenError || !tokenRow?.access_token) {
+    if (!shopify) {
       return NextResponse.json(
         { error: "NO_SHOPIFY_TOKEN", message: "Connect your Shopify store in Settings first." },
         { status: 401 }
       );
     }
 
-    // Fetch user's store domain from their profile or oauth metadata
-    // For now, we look up the store domain from the user's stores table
-    const { data: storeRow } = await supabaseAdmin
-      .from("stores")
-      .select("shopify_domain")
-      .eq("owner_id", userId)
-      .not("shopify_domain", "is", null)
-      .limit(1)
-      .single();
-
-    if (!storeRow?.shopify_domain) {
-      return NextResponse.json(
-        { error: "NO_STORE_DOMAIN", message: "No Shopify store domain found. Reconnect Shopify in Settings." },
-        { status: 400 }
-      );
-    }
-
-    const shopDomain = storeRow.shopify_domain;
-    const accessToken = tokenRow.access_token;
+    const shopDomain = shopify.shopifyDomain;
+    const accessToken = shopify.accessToken;
 
     // Build the product description (Shopify-formatted HTML)
     // Combine the AI-generated description with the size chart table if present
