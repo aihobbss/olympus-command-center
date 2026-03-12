@@ -44,6 +44,7 @@ function rowToCampaign(row: AdCampaignRow): AdCampaign {
     orders: row.orders ?? 0,
     profit: row.profit ?? 0,
     status: (row.status as AdCampaign["status"]) ?? "Watch",
+    campaignStatus: (row.status as AdCampaign["campaignStatus"]) ?? "Active",
     recommendation: row.recommendation ?? "",
     budgetHistory: Array.isArray(row.budget_history) ? row.budget_history : [],
   };

@@ -493,6 +493,8 @@ export type BudgetTierSnapshot = {
   atc: number;
 };
 
+export type CampaignStatus = "Active" | "Paused" | "Killed" | "Scaling";
+
 export type AdCampaign = {
   id: string;
   campaignName: string;
@@ -506,6 +508,7 @@ export type AdCampaign = {
   orders: number;
   profit: number;
   status: "Scaling" | "Kill" | "Watch";
+  campaignStatus: CampaignStatus;
   recommendation: string;
   budgetHistory?: BudgetTierSnapshot[];
 };
@@ -524,6 +527,7 @@ export const adCampaigns: AdCampaign[] = [
     orders: 6,
     profit: 58,
     status: "Scaling",
+    campaignStatus: "Active",
     recommendation: "ROAS above 2.0 with strong ATC — SOP: Scale +100%",
     budgetHistory: [
       { budgetPerDay: 30, status: "historical", spend: 145, revenue: 380, orders: 10, profit: 95, roas: 2.62, cpc: 0.68, atc: 12 },
@@ -543,6 +547,7 @@ export const adCampaigns: AdCampaign[] = [
     orders: 1,
     profit: -18,
     status: "Kill",
+    campaignStatus: "Active",
     recommendation: "$34 spent, CPC > $1, only 2 ATC — SOP: Kill",
     budgetHistory: [
       { budgetPerDay: 30, status: "current", spend: 34, revenue: 31, orders: 1, profit: -18, roas: 0.9, cpc: 1.12, atc: 2 },
@@ -561,6 +566,7 @@ export const adCampaigns: AdCampaign[] = [
     orders: 3,
     profit: 12,
     status: "Watch",
+    campaignStatus: "Active",
     recommendation: "$61 spent, ROAS under 2.0 but ATC promising — SOP: Watch",
     budgetHistory: [
       { budgetPerDay: 30, status: "current", spend: 61, revenue: 119, orders: 3, profit: 12, roas: 1.95, cpc: 0.88, atc: 9 },
@@ -579,6 +585,7 @@ export const adCampaigns: AdCampaign[] = [
     orders: 0,
     profit: -22,
     status: "Kill",
+    campaignStatus: "Killed",
     recommendation: "$22 spent, CPC > $1, 0 ATC — SOP: Kill",
     budgetHistory: [
       { budgetPerDay: 30, status: "current", spend: 22, revenue: 0, orders: 0, profit: -22, roas: 0, cpc: 1.34, atc: 0 },
@@ -597,6 +604,7 @@ export const adCampaigns: AdCampaign[] = [
     orders: 14,
     profit: 148,
     status: "Scaling",
+    campaignStatus: "Active",
     recommendation: "ROAS above 2.5 across all tiers — SOP: Continue scaling",
     budgetHistory: [
       { budgetPerDay: 30, status: "historical", spend: 128, revenue: 342, orders: 9, profit: 102, roas: 2.67, cpc: 0.71, atc: 10 },
@@ -850,6 +858,7 @@ const vantageLdnAdCampaigns: AdCampaign[] = [
     orders: 19,
     profit: 274,
     status: "Scaling",
+    campaignStatus: "Active",
     recommendation: "ROAS above 3.0 across all tiers — SOP: Scale to $480/day",
     budgetHistory: [
       { budgetPerDay: 30, status: "historical", spend: 145, revenue: 412, orders: 11, profit: 142, roas: 2.84, cpc: 0.68, atc: 12 },
@@ -871,6 +880,7 @@ const vantageLdnAdCampaigns: AdCampaign[] = [
     orders: 1,
     profit: -18,
     status: "Kill",
+    campaignStatus: "Killed",
     recommendation: "$34 spent, CPC > $1, only 2 ATC — SOP: Kill",
     budgetHistory: [
       { budgetPerDay: 30, status: "current", spend: 34, revenue: 31, orders: 1, profit: -18, roas: 0.91, cpc: 1.12, atc: 2 },
@@ -889,6 +899,7 @@ const vantageLdnAdCampaigns: AdCampaign[] = [
     orders: 3,
     profit: 22,
     status: "Watch",
+    campaignStatus: "Active",
     recommendation: "ROAS just above 2.0 at $60 — SOP: Watch before scaling",
     budgetHistory: [
       { budgetPerDay: 30, status: "historical", spend: 142, revenue: 348, orders: 9, profit: 98, roas: 2.45, cpc: 0.78, atc: 14 },
@@ -908,6 +919,7 @@ const vantageLdnAdCampaigns: AdCampaign[] = [
     orders: 0,
     profit: -22,
     status: "Kill",
+    campaignStatus: "Killed",
     recommendation: "$22 spent, CPC > $1, 0 ATC — SOP: Kill",
     budgetHistory: [
       { budgetPerDay: 30, status: "current", spend: 22, revenue: 0, orders: 0, profit: -22, roas: 0, cpc: 1.34, atc: 0 },
@@ -926,6 +938,7 @@ const vantageLdnAdCampaigns: AdCampaign[] = [
     orders: 42,
     profit: 612,
     status: "Scaling",
+    campaignStatus: "Active",
     recommendation: "Top performer — ROAS above 3.0 at $480/day, monitor for fatigue",
     budgetHistory: [
       { budgetPerDay: 30, status: "historical", spend: 138, revenue: 396, orders: 11, profit: 138, roas: 2.87, cpc: 0.71, atc: 10 },

@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { BarChart3, RefreshCw } from "lucide-react";
+import type { CampaignStatus } from "@/data/mock";
+import { cn } from "@/lib/utils";
 import { MetricCard, TimePeriodSelector } from "@/components/ui";
 import type { TimePeriod } from "@/components/ui";
 import { CampaignCard } from "@/components/modules/CampaignCard";
@@ -122,6 +124,7 @@ export default function AdManagerPage() {
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<CampaignStatus | "all">("Active");
 
   const storeCurrency = selectedStore?.currency ?? "";
   const rate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
@@ -191,16 +194,29 @@ export default function AdManagerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
-  const scaledCampaigns = campaigns;
+  // ── Filter campaigns by status ──
+  const filteredCampaigns = useMemo(() => {
+    if (statusFilter === "all") return campaigns;
+    return campaigns.filter((c) => c.campaignStatus === statusFilter);
+  }, [campaigns, statusFilter]);
 
-  // ── Aggregated metrics ──
+  // ── Status counts for filter pills ──
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: campaigns.length };
+    for (const c of campaigns) {
+      counts[c.campaignStatus] = (counts[c.campaignStatus] ?? 0) + 1;
+    }
+    return counts;
+  }, [campaigns]);
+
+  // ── Aggregated metrics (from filtered view) ──
 
   const totals = useMemo(() => {
     let spend = 0,
       revenue = 0,
       profit = 0,
       orders = 0;
-    for (const c of scaledCampaigns) {
+    for (const c of filteredCampaigns) {
       spend += c.spend;
       revenue += c.revenue;
       profit += c.profit;
@@ -208,7 +224,7 @@ export default function AdManagerPage() {
     }
     const roas = spend > 0 ? parseFloat((revenue / spend).toFixed(2)) : 0;
     return { spend, revenue, profit, orders, roas };
-  }, [scaledCampaigns]);
+  }, [filteredCampaigns]);
 
   // ── Card click → open panel ──
 
@@ -365,9 +381,35 @@ export default function AdManagerPage() {
                 />
               </div>
 
-              {/* ─── Sync Status ─── */}
-              {(lastSynced || syncError) && (
-                <div className="flex items-center justify-between mb-4 text-xs">
+              {/* ─── Status Filter + Sync Status ─── */}
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <div className="flex items-center gap-1.5">
+                  {(["Active", "Paused", "Killed", "all"] as const).map((s) => {
+                    const count = statusCounts[s] ?? 0;
+                    if (s !== "all" && count === 0) return null;
+                    const label = s === "all" ? "All" : s;
+                    const active = statusFilter === s;
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => setStatusFilter(s)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                          active
+                            ? s === "Active" ? "bg-accent-emerald/15 text-accent-emerald border border-accent-emerald/30"
+                            : s === "Killed" ? "bg-accent-red/15 text-accent-red border border-accent-red/30"
+                            : s === "Paused" ? "bg-accent-amber/15 text-accent-amber border border-accent-amber/30"
+                            : "bg-accent-indigo/15 text-accent-indigo border border-accent-indigo/30"
+                            : "bg-white/[0.04] text-text-muted border border-transparent hover:text-text-secondary"
+                        )}
+                      >
+                        {label}
+                        <span className="ml-1 opacity-60">{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-3 text-xs">
                   {lastSynced && (
                     <span className="text-text-muted">
                       Last synced: {new Date(lastSynced).toLocaleString()}
@@ -377,21 +419,25 @@ export default function AdManagerPage() {
                     <span className="text-accent-red">{syncError}</span>
                   )}
                 </div>
-              )}
+              </div>
 
               {/* ─── Empty state ─── */}
-              {scaledCampaigns.length === 0 && !syncing && (
+              {filteredCampaigns.length === 0 && !syncing && (
                 <div className="text-center py-16 text-text-muted">
-                  <p className="text-lg font-medium mb-2">No campaigns found</p>
+                  <p className="text-lg font-medium mb-2">
+                    {campaigns.length === 0 ? "No campaigns found" : `No ${statusFilter === "all" ? "" : statusFilter.toLowerCase()} campaigns`}
+                  </p>
                   <p className="text-sm">
-                    Click &ldquo;Sync Now&rdquo; to pull campaigns from Meta, or create campaigns in the Ad Creator tab.
+                    {campaigns.length === 0
+                      ? 'Click "Sync Now" to pull campaigns from Meta, or create campaigns in the Ad Creator tab.'
+                      : "Try changing the filter above to see other campaigns."}
                   </p>
                 </div>
               )}
 
               {/* ─── Campaign Grid ─── */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-                {scaledCampaigns.map((campaign) => (
+                {filteredCampaigns.map((campaign) => (
                   <CampaignCard
                     key={campaign.id}
                     campaign={campaign}
@@ -403,7 +449,7 @@ export default function AdManagerPage() {
               </div>
 
               {/* ─── ROAS Trend Chart ─── */}
-              <AdCharts campaigns={scaledCampaigns} />
+              <AdCharts campaigns={filteredCampaigns} />
 
               {/* ─── Action Panel ─── */}
               <AdActionPanel
