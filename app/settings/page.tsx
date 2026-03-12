@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Settings, Shield, X, Key } from "lucide-react";
 import { useAuthStore } from "@/lib/store";
 import {
@@ -23,8 +24,10 @@ function isApiKeyService(service: ServiceId) {
 
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
+  const searchParams = useSearchParams();
   const [connections, setConnections] = useState<ServiceConnection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [autoConnectHandled, setAutoConnectHandled] = useState(false);
 
   // API key modal state
   const [apiKeyModal, setApiKeyModal] = useState<{
@@ -49,6 +52,33 @@ export default function SettingsPage() {
       setLoading(false);
     });
   }, [user]);
+
+  // Auto-open connect modal when redirected from module pages (?connect=shopify)
+  useEffect(() => {
+    if (loading || autoConnectHandled || !user) return;
+    const connectService = searchParams.get("connect") as ServiceId | null;
+    if (!connectService) return;
+    setAutoConnectHandled(true);
+
+    // Only open if not already connected
+    if (isServiceConnected(connections, connectService)) return;
+
+    const meta = SERVICE_REGISTRY.find((s) => s.id === connectService);
+    if (!meta) return;
+
+    if (isApiKeyService(connectService)) {
+      setApiKeyInput("");
+      setApiKeyError("");
+      setApiKeyModal({ service: connectService, label: meta.label });
+    } else if (connectService === "shopify") {
+      setShopifyDomain("");
+      setShopifyError("");
+      setShopifyModal(true);
+    } else {
+      // OAuth (facebook) — redirect with userId
+      window.location.href = `${meta.connectUrl}?userId=${user.id}`;
+    }
+  }, [loading, autoConnectHandled, user, searchParams, connections]);
 
   const handleConnect = useCallback(
     (service: ServiceId) => {

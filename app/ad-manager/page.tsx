@@ -355,7 +355,7 @@ export default function AdManagerPage() {
           services={missingServices.map(({ service, meta }) => ({
             service,
             description: meta.description,
-            onConnect: () => { window.location.href = meta.connectUrl; },
+            onConnect: () => { window.location.href = `/settings?connect=${service}`; },
           }))}
         />
       ) : (

@@ -339,7 +339,7 @@ export default function CreativeGeneratorPage() {
             {
               service: "nanobanana",
               description: nanobananaMeta.description,
-              onConnect: () => { window.location.href = nanobananaMeta.connectUrl; },
+              onConnect: () => { window.location.href = "/settings?connect=nanobanana"; },
             },
           ]}
         />
