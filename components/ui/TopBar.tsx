@@ -1,9 +1,9 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { Bell, ChevronDown, Compass, LogOut } from "lucide-react";
+import { Bell, ChevronDown, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useStoreContext, useDemoStore, useAuthStore, useConnectionsStore } from "@/lib/store";
+import { useStoreContext, useAuthStore, useConnectionsStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const marketColors: Record<string, string> = {
@@ -29,7 +29,6 @@ type TopBarProps = {
 
 export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
   const { stores, selectedStore, setSelectedStore, loadStores } = useStoreContext();
-  const { startTour } = useDemoStore();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout) as () => void;
   const { getExpiryDaysLeft, loadConnections } = useConnectionsStore();
@@ -206,20 +205,6 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
 
       {/* Right section */}
       <div className="flex items-center gap-1.5">
-        {/* Take a Tour */}
-        <button
-          onClick={startTour}
-          className={cn(
-            "hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors duration-150",
-            "text-text-muted hover:text-text-secondary hover:bg-white/[0.04]"
-          )}
-        >
-          <Compass size={13} strokeWidth={2} />
-          Take a Tour
-        </button>
-
-        <div className="hidden sm:block w-px h-5 bg-[var(--border-subtle)]" />
-
         {/* Notification bell */}
         <button
           className={cn(

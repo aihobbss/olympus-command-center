@@ -1,5 +1,5 @@
 // Usage: node supabase/approve-user.mjs <email>
-// Approves a user and makes them admin + creates a default store
+// Approves a user — they create their own store on first login via StoreSetup
 
 import postgres from "postgres";
 
@@ -34,31 +34,13 @@ try {
   const userId = authUser.id;
   console.log(`Found user: ${userId}`);
 
-  // Approve + make admin
+  // Approve user (they'll create their own store on first login)
   await sql.unsafe(
-    `UPDATE public.profiles SET approved = true, role = 'admin' WHERE id = $1`,
+    `UPDATE public.profiles SET approved = true WHERE id = $1`,
     [userId]
   );
-  console.log("✓ Approved and set role to admin");
-
-  // Create default store (Vantage Melbourne)
-  const [melbourneStore] = await sql.unsafe(
-    `INSERT INTO public.stores (name, market, currency, owner_id)
-     VALUES ('Vantage Melbourne', 'AU', 'AUD', $1)
-     ON CONFLICT DO NOTHING
-     RETURNING id`,
-    [userId]
-  );
-
-  if (melbourneStore) {
-    await sql.unsafe(
-      `INSERT INTO public.user_stores (user_id, store_id, role) VALUES ($1, $2, 'owner') ON CONFLICT DO NOTHING`,
-      [userId, melbourneStore.id]
-    );
-    console.log(`✓ Created store: Vantage Melbourne (${melbourneStore.id})`);
-  }
-
-  console.log("\nDone! You can now sign in.");
+  console.log("✓ Approved user");
+  console.log("\nDone! User will set up their store on first login.");
 } catch (e) {
   console.error("Error:", e.message);
 }

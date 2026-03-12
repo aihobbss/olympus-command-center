@@ -6,11 +6,9 @@ import { Store, ArrowLeft, Clock } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { MobileNav } from "./MobileNav";
-import { DemoBanner } from "./DemoBanner";
-import { TourOverlay, TOUR_STEPS } from "./TourOverlay";
 import { LoginScreen } from "./LoginScreen";
 import { StoreSetup } from "./StoreSetup";
-import { useDemoStore, useAuthStore, useCoachViewStore } from "@/lib/store";
+import { useAuthStore, useCoachViewStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 function ApprovalGate() {
@@ -50,7 +48,6 @@ function ApprovalGate() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
-  const { bannerVisible, tourActive, tourStep } = useDemoStore();
   const user = useAuthStore((s) => s.user);
   const loading = useAuthStore((s) => s.loading);
   const initialized = useAuthStore((s) => s.initialized);
@@ -93,8 +90,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return <StoreSetup />;
   }
 
-  const bannerOffset = (coachActive || bannerVisible) ? 32 : 0;
-  const highlightedNavId = tourActive ? TOUR_STEPS[tourStep].navId : null;
+  const bannerOffset = coachActive ? 32 : 0;
 
   return (
     <div className="min-h-screen bg-bg-primary">
@@ -119,14 +115,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Exit
           </button>
         </div>
-      ) : (
-        <DemoBanner />
-      )}
+      ) : null}
       <Sidebar
         collapsed={collapsed}
         onToggle={() => setCollapsed(!collapsed)}
         bannerOffset={bannerOffset}
-        highlightedNavId={highlightedNavId}
       />
       <TopBar sidebarCollapsed={collapsed} bannerOffset={bannerOffset} />
 
@@ -143,7 +136,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
 
       <MobileNav />
-      <TourOverlay />
     </div>
   );
 }
