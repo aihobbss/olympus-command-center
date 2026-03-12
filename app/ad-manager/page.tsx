@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { BarChart3, RefreshCw, ChevronDown } from "lucide-react";
+import { BarChart3, RefreshCw, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MetricCard, TimePeriodSelector } from "@/components/ui";
 import type { TimePeriod } from "@/components/ui";
@@ -128,10 +128,30 @@ export default function AdManagerPage() {
   const [statusFilter, setStatusFilter] = useState<"live" | "paused" | "all">("live");
   const [shopifyTotals, setShopifyTotals] = useState({ revenue: 0, orders: 0, profit: 0 });
 
-  // ── Ad account switcher state ──
+  // ── Ad account switcher state (multi-select) ──
   const [adAccounts, setAdAccounts] = useState<UserAdAccount[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>("all"); // "all" or specific ad_account_id
+  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set()); // empty = all
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+
+  const allSelected = selectedAccountIds.size === 0 || selectedAccountIds.size === adAccounts.length;
+
+  const toggleAccount = useCallback((accountId: string) => {
+    setSelectedAccountIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(accountId)) {
+        next.delete(accountId);
+      } else {
+        next.add(accountId);
+      }
+      // If all are now selected, reset to empty (= "all")
+      if (next.size === adAccounts.length) return new Set();
+      return next;
+    });
+  }, [adAccounts.length]);
+
+  const toggleAll = useCallback(() => {
+    setSelectedAccountIds(new Set()); // empty = all
+  }, []);
 
   const storeCurrency = selectedStore?.currency ?? "";
   const rate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
@@ -270,11 +290,11 @@ export default function AdManagerPage() {
   // ── Filter campaigns by account + status ──
   const isLive = (c: AdCampaign) => c.campaignStatus === "Active" || c.campaignStatus === "Scaling";
 
-  // First filter by selected ad account
+  // First filter by selected ad accounts (empty set = all)
   const accountFilteredCampaigns = useMemo(() => {
-    if (selectedAccountId === "all") return campaigns;
-    return campaigns.filter((c) => c.adAccountId === selectedAccountId);
-  }, [campaigns, selectedAccountId]);
+    if (allSelected) return campaigns;
+    return campaigns.filter((c) => c.adAccountId && selectedAccountIds.has(c.adAccountId));
+  }, [campaigns, selectedAccountIds, allSelected]);
 
   // Then filter by status
   const filteredCampaigns = useMemo(() => {
@@ -353,9 +373,11 @@ export default function AdManagerPage() {
   ];
 
   // Selected account label for the switcher
-  const selectedAccountLabel = selectedAccountId === "all"
+  const selectedAccountLabel = allSelected
     ? "All Accounts"
-    : adAccounts.find((a) => a.ad_account_id === selectedAccountId)?.account_name || "Account";
+    : selectedAccountIds.size === 1
+      ? adAccounts.find((a) => selectedAccountIds.has(a.ad_account_id))?.account_name || "1 Account"
+      : `${selectedAccountIds.size} Accounts`;
 
   if (!selectedStore) return null;
 
@@ -392,12 +414,12 @@ export default function AdManagerPage() {
                   onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all border",
-                    selectedAccountId !== "all"
+                    !allSelected
                       ? "bg-accent-indigo/10 text-accent-indigo border-accent-indigo/30"
                       : "bg-bg-elevated text-text-secondary border-subtle hover:text-text-primary hover:bg-border-subtle"
                   )}
                 >
-                  <span className="max-w-[140px] truncate">{selectedAccountLabel}</span>
+                  <span className="max-w-[160px] truncate">{selectedAccountLabel}</span>
                   <ChevronDown size={12} className={cn("transition-transform", accountDropdownOpen && "rotate-180")} />
                 </button>
 
@@ -407,37 +429,56 @@ export default function AdManagerPage() {
                       className="fixed inset-0 z-40"
                       onClick={() => setAccountDropdownOpen(false)}
                     />
-                    <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-lg bg-bg-card border border-subtle shadow-xl overflow-hidden">
+                    <div className="absolute right-0 top-full mt-1 z-50 w-64 rounded-lg bg-bg-card border border-subtle shadow-xl overflow-hidden">
+                      {/* All Accounts toggle */}
                       <button
-                        onClick={() => { setSelectedAccountId("all"); setAccountDropdownOpen(false); }}
+                        onClick={toggleAll}
                         className={cn(
-                          "w-full text-left px-3 py-2.5 text-xs transition-colors",
-                          selectedAccountId === "all"
+                          "w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors",
+                          allSelected
                             ? "bg-accent-indigo/10 text-accent-indigo font-medium"
                             : "text-text-secondary hover:bg-white/[0.04] hover:text-text-primary"
                         )}
                       >
+                        <div className={cn(
+                          "w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0",
+                          allSelected ? "bg-accent-indigo border-accent-indigo" : "border-text-muted"
+                        )}>
+                          {allSelected && <Check size={10} className="text-white" strokeWidth={3} />}
+                        </div>
                         All Accounts
-                        <span className="ml-1.5 text-text-muted">({adAccounts.length})</span>
+                        <span className="ml-auto text-text-muted">({adAccounts.length})</span>
                       </button>
                       <div className="border-t border-subtle" />
-                      {adAccounts.map((acct) => (
-                        <button
-                          key={acct.ad_account_id}
-                          onClick={() => { setSelectedAccountId(acct.ad_account_id); setAccountDropdownOpen(false); }}
-                          className={cn(
-                            "w-full text-left px-3 py-2.5 text-xs transition-colors",
-                            selectedAccountId === acct.ad_account_id
-                              ? "bg-accent-indigo/10 text-accent-indigo font-medium"
-                              : "text-text-secondary hover:bg-white/[0.04] hover:text-text-primary"
-                          )}
-                        >
-                          <span className="block truncate">{acct.account_name}</span>
-                          <span className="text-[10px] text-text-muted font-mono-metric">
-                            {acct.ad_account_id.replace("act_", "")}
-                          </span>
-                        </button>
-                      ))}
+                      {/* Individual accounts */}
+                      {adAccounts.map((acct) => {
+                        const checked = allSelected || selectedAccountIds.has(acct.ad_account_id);
+                        return (
+                          <button
+                            key={acct.ad_account_id}
+                            onClick={() => toggleAccount(acct.ad_account_id)}
+                            className={cn(
+                              "w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors",
+                              checked && !allSelected
+                                ? "bg-accent-indigo/5 text-accent-indigo"
+                                : "text-text-secondary hover:bg-white/[0.04] hover:text-text-primary"
+                            )}
+                          >
+                            <div className={cn(
+                              "w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0",
+                              checked ? "bg-accent-indigo border-accent-indigo" : "border-text-muted"
+                            )}>
+                              {checked && <Check size={10} className="text-white" strokeWidth={3} />}
+                            </div>
+                            <div className="min-w-0 text-left">
+                              <span className="block truncate">{acct.account_name}</span>
+                              <span className="text-[10px] text-text-muted font-mono-metric">
+                                {acct.ad_account_id.replace("act_", "")}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </>
                 )}
