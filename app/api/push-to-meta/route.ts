@@ -30,9 +30,10 @@ const CTA_MAP: Record<string, string> = {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { userId, campaignId } = body as {
+    const { userId, campaignId, adAccountId: selectedAdAccountId } = body as {
       userId: string;
       campaignId: string; // ad_creator_campaigns.id
+      adAccountId?: string; // Optional: specific ad account to publish to
     };
 
     if (!userId || !campaignId) {
@@ -79,12 +80,31 @@ export async function POST(request: Request) {
     }
 
     const accessToken = tokenRow.access_token;
-    const metaData = (tokenRow.meta as Record<string, string>) || {};
-    const adAccountId = metaData.ad_account_id;
+
+    // Resolve ad account: use selected account, or fall back to first active account
+    let adAccountId = selectedAdAccountId;
+
+    if (!adAccountId) {
+      // Try user_ad_accounts table first
+      const { data: adAccounts } = await supabaseAdmin
+        .from("user_ad_accounts")
+        .select("ad_account_id")
+        .eq("user_id", userId)
+        .eq("active", true)
+        .limit(1);
+
+      if (adAccounts && adAccounts.length > 0) {
+        adAccountId = adAccounts[0].ad_account_id;
+      } else {
+        // Fallback to legacy oauth_tokens.meta
+        const metaData = (tokenRow.meta as Record<string, string>) || {};
+        adAccountId = metaData.ad_account_id;
+      }
+    }
 
     if (!adAccountId) {
       return NextResponse.json(
-        { error: "No ad account found. Sync campaigns first to auto-discover your ad account." },
+        { error: "No ad account found. Discover accounts in Settings after connecting Facebook." },
         { status: 400 }
       );
     }
@@ -225,12 +245,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // 8. Update our DB: mark campaign as Live + store Meta campaign ID
+    // 8. Update our DB: mark campaign as Live + store Meta campaign ID + ad account
     await supabaseAdmin
       .from("ad_creator_campaigns")
       .update({
         status: "Live",
         meta_campaign_id: metaCampaignId,
+        ad_account_id: adAccountId,
       })
       .eq("id", campaignId);
 
@@ -240,6 +261,7 @@ export async function POST(request: Request) {
       .upsert({
         store_id: campaign.store_id,
         meta_campaign_id: metaCampaignId,
+        ad_account_id: adAccountId,
         campaign_name: campaign.product_name || "Vantage Campaign",
         product: campaign.product_name,
         budget: campaign.daily_budget || 30,
@@ -254,7 +276,7 @@ export async function POST(request: Request) {
         profit: 0,
         last_synced_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      }, { onConflict: "meta_campaign_id" });
+      }, { onConflict: "store_id,meta_campaign_id" });
 
     return NextResponse.json({
       success: true,

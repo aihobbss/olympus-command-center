@@ -7,6 +7,7 @@ type AdCampaignRow = {
   id: string;
   store_id: string;
   meta_campaign_id: string | null;
+  ad_account_id: string | null;
   campaign_name: string | null;
   product: string | null;
   spend: number;
@@ -26,7 +27,7 @@ type AdCampaignRow = {
 };
 
 const SELECT_COLS =
-  "id, store_id, meta_campaign_id, campaign_name, product, spend, budget, cpc, ctr, atc, roas, revenue, orders, profit, status, recommendation, recommendation_reason, last_synced_at, budget_history";
+  "id, store_id, meta_campaign_id, ad_account_id, campaign_name, product, spend, budget, cpc, ctr, atc, roas, revenue, orders, profit, status, recommendation, recommendation_reason, last_synced_at, budget_history";
 
 // ── Mappers ────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ function rowToCampaign(row: AdCampaignRow): AdCampaign {
     id: row.id,
     campaignName: row.campaign_name ?? "",
     product: row.product ?? "",
+    adAccountId: row.ad_account_id ?? undefined,
     spend: row.spend ?? 0,
     budget: row.budget ?? 0,
     cpc: row.cpc ?? 0,

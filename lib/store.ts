@@ -557,8 +557,8 @@ interface AdCreatorStore {
   updateCampaign: (id: string, updates: Partial<AdCreatorCampaign>) => void;
   addCampaign: () => void;
   removeCampaign: (id: string) => void;
-  pushCampaign: (id: string) => void;
-  pushAll: () => void;
+  pushCampaign: (id: string, adAccountId?: string) => void;
+  pushAll: (adAccountId?: string) => void;
 }
 
 // Debounce timers for ad creator updates
@@ -621,7 +621,7 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
     import("@/lib/services/ad-creator").then((m) => m.deleteAdCreatorCampaign(id));
   },
 
-  pushCampaign: async (id) => {
+  pushCampaign: async (id, adAccountId) => {
     const campaign = get().campaigns.find((c) => c.id === id);
     if (!campaign || campaign.status !== "Ready") return;
     const store = useStoreContext.getState().selectedStore;
@@ -638,7 +638,7 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
       const res = await fetch("/api/push-to-meta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user?.id, campaignId: id }),
+        body: JSON.stringify({ userId: user?.id, campaignId: id, adAccountId }),
       });
 
       if (res.ok) {
@@ -669,11 +669,11 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
     }
   },
 
-  pushAll: () => {
+  pushAll: (adAccountId) => {
     const { campaigns, pushCampaign } = get();
     const ready = campaigns.filter((c) => c.status === "Ready");
     ready.forEach((c, i) => {
-      setTimeout(() => pushCampaign(c.id), i * 500);
+      setTimeout(() => pushCampaign(c.id, adAccountId), i * 500);
     });
   },
 }));

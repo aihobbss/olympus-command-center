@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { BarChart3, RefreshCw } from "lucide-react";
+import { BarChart3, RefreshCw, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MetricCard, TimePeriodSelector } from "@/components/ui";
 import type { TimePeriod } from "@/components/ui";
@@ -22,6 +22,7 @@ import {
   getLastSyncedAt,
 } from "@/lib/services/meta-campaigns";
 import { fetchProfitLogsByDateRange, triggerProfitSync } from "@/lib/services/profit-tracker";
+import { fetchAdAccounts, type UserAdAccount } from "@/lib/services/ad-accounts";
 
 type AdTab = "live" | "creator";
 
@@ -127,6 +128,11 @@ export default function AdManagerPage() {
   const [statusFilter, setStatusFilter] = useState<"live" | "paused" | "all">("live");
   const [shopifyTotals, setShopifyTotals] = useState({ revenue: 0, orders: 0, profit: 0 });
 
+  // ── Ad account switcher state ──
+  const [adAccounts, setAdAccounts] = useState<UserAdAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("all"); // "all" or specific ad_account_id
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+
   const storeCurrency = selectedStore?.currency ?? "";
   const rate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
   const currencySymbol = storeCurrency === "AUD" ? "A$" : storeCurrency === "GBP" ? "£" : "$";
@@ -141,6 +147,13 @@ export default function AdManagerPage() {
   );
 
   const storeId = selectedStore?.id ?? "";
+
+  // ── Load ad accounts ──
+  useEffect(() => {
+    if (user && storeId && metaConnected) {
+      fetchAdAccounts(user.id, storeId).then(setAdAccounts);
+    }
+  }, [user, storeId, metaConnected]);
 
   // ── Map period to Meta date_preset + days back for profit sync ──
   const DATE_PRESET: Record<TimePeriod, string> = {
@@ -242,28 +255,35 @@ export default function AdManagerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
-  // ── Filter campaigns: "live" = Active/Scaling, "paused" = Paused/Killed ──
+  // ── Filter campaigns by account + status ──
   const isLive = (c: AdCampaign) => c.campaignStatus === "Active" || c.campaignStatus === "Scaling";
 
+  // First filter by selected ad account
+  const accountFilteredCampaigns = useMemo(() => {
+    if (selectedAccountId === "all") return campaigns;
+    return campaigns.filter((c) => c.adAccountId === selectedAccountId);
+  }, [campaigns, selectedAccountId]);
+
+  // Then filter by status
   const filteredCampaigns = useMemo(() => {
-    if (statusFilter === "all") return campaigns;
-    if (statusFilter === "live") return campaigns.filter(isLive);
-    return campaigns.filter((c) => !isLive(c));
-  }, [campaigns, statusFilter]);
+    if (statusFilter === "all") return accountFilteredCampaigns;
+    if (statusFilter === "live") return accountFilteredCampaigns.filter(isLive);
+    return accountFilteredCampaigns.filter((c) => !isLive(c));
+  }, [accountFilteredCampaigns, statusFilter]);
 
-  const liveCount = useMemo(() => campaigns.filter(isLive).length, [campaigns]);
-  const pausedCount = campaigns.length - liveCount;
+  const liveCount = useMemo(() => accountFilteredCampaigns.filter(isLive).length, [accountFilteredCampaigns]);
+  const pausedCount = accountFilteredCampaigns.length - liveCount;
 
-  // ── Aggregated metrics (independent of Live/Paused filter) ──
+  // ── Aggregated metrics ──
 
-  // Total ad spend from ALL campaigns (not filtered — so metrics stay consistent)
+  // Total ad spend from account-filtered campaigns (spend depends on selected account)
   const totalSpend = useMemo(() => {
     let spend = 0;
-    for (const c of campaigns) spend += c.spend;
+    for (const c of accountFilteredCampaigns) spend += c.spend;
     return spend;
-  }, [campaigns]);
+  }, [accountFilteredCampaigns]);
 
-  // Revenue, Orders, Profit come from Shopify profit logs (store-wide, period-matched)
+  // Revenue, Orders, Profit come from Shopify profit logs (store-wide, NOT filtered by ad account)
   const totals = useMemo(() => {
     const roas = totalSpend > 0 ? parseFloat((shopifyTotals.revenue / totalSpend).toFixed(2)) : 0;
     return { spend: totalSpend, revenue: shopifyTotals.revenue, profit: shopifyTotals.profit, orders: shopifyTotals.orders, roas };
@@ -320,6 +340,11 @@ export default function AdManagerPage() {
     { key: "creator", label: "Ad Creator" },
   ];
 
+  // Selected account label for the switcher
+  const selectedAccountLabel = selectedAccountId === "all"
+    ? "All Accounts"
+    : adAccounts.find((a) => a.ad_account_id === selectedAccountId)?.account_name || "Account";
+
   if (!selectedStore) return null;
 
   return (
@@ -348,6 +373,65 @@ export default function AdManagerPage() {
 
         {activeTab === "live" && allConnected && (
           <div className="flex items-center gap-3">
+            {/* ─── Ad Account Switcher ─── */}
+            {adAccounts.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all border",
+                    selectedAccountId !== "all"
+                      ? "bg-accent-indigo/10 text-accent-indigo border-accent-indigo/30"
+                      : "bg-bg-elevated text-text-secondary border-subtle hover:text-text-primary hover:bg-border-subtle"
+                  )}
+                >
+                  <span className="max-w-[140px] truncate">{selectedAccountLabel}</span>
+                  <ChevronDown size={12} className={cn("transition-transform", accountDropdownOpen && "rotate-180")} />
+                </button>
+
+                {accountDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setAccountDropdownOpen(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-lg bg-bg-card border border-subtle shadow-xl overflow-hidden">
+                      <button
+                        onClick={() => { setSelectedAccountId("all"); setAccountDropdownOpen(false); }}
+                        className={cn(
+                          "w-full text-left px-3 py-2.5 text-xs transition-colors",
+                          selectedAccountId === "all"
+                            ? "bg-accent-indigo/10 text-accent-indigo font-medium"
+                            : "text-text-secondary hover:bg-white/[0.04] hover:text-text-primary"
+                        )}
+                      >
+                        All Accounts
+                        <span className="ml-1.5 text-text-muted">({adAccounts.length})</span>
+                      </button>
+                      <div className="border-t border-subtle" />
+                      {adAccounts.map((acct) => (
+                        <button
+                          key={acct.ad_account_id}
+                          onClick={() => { setSelectedAccountId(acct.ad_account_id); setAccountDropdownOpen(false); }}
+                          className={cn(
+                            "w-full text-left px-3 py-2.5 text-xs transition-colors",
+                            selectedAccountId === acct.ad_account_id
+                              ? "bg-accent-indigo/10 text-accent-indigo font-medium"
+                              : "text-text-secondary hover:bg-white/[0.04] hover:text-text-primary"
+                          )}
+                        >
+                          <span className="block truncate">{acct.account_name}</span>
+                          <span className="text-[10px] text-text-muted font-mono-metric">
+                            {acct.ad_account_id.replace("act_", "")}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             <TimePeriodSelector value={period} onChange={setPeriod} />
             <button
               onClick={handleSync}
@@ -399,7 +483,7 @@ export default function AdManagerPage() {
                   {([
                     { key: "live" as const, label: "Live", count: liveCount, active: "bg-accent-emerald/15 text-accent-emerald border-accent-emerald/30" },
                     { key: "paused" as const, label: "Paused", count: pausedCount, active: "bg-accent-amber/15 text-accent-amber border-accent-amber/30" },
-                    { key: "all" as const, label: "All", count: campaigns.length, active: "bg-accent-indigo/15 text-accent-indigo border-accent-indigo/30" },
+                    { key: "all" as const, label: "All", count: accountFilteredCampaigns.length, active: "bg-accent-indigo/15 text-accent-indigo border-accent-indigo/30" },
                   ]).map(({ key, label, count, active }) => (
                     <button
                       key={key}
@@ -463,10 +547,10 @@ export default function AdManagerPage() {
               {filteredCampaigns.length === 0 && !syncing && (
                 <div className="text-center py-16 text-text-muted">
                   <p className="text-lg font-medium mb-2">
-                    {campaigns.length === 0 ? "No campaigns found" : `No ${statusFilter} campaigns`}
+                    {accountFilteredCampaigns.length === 0 ? "No campaigns found" : `No ${statusFilter} campaigns`}
                   </p>
                   <p className="text-sm">
-                    {campaigns.length === 0
+                    {accountFilteredCampaigns.length === 0
                       ? 'Click "Sync Now" to pull campaigns from Meta, or create campaigns in the Ad Creator tab.'
                       : "Try changing the filter above to see other campaigns."}
                   </p>

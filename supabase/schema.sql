@@ -95,6 +95,28 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
 );
 
 -- ============================================
+-- 4b. USER AD ACCOUNTS (multiple Meta ad accounts per user)
+-- ============================================
+-- Users can connect multiple Meta ad accounts (accounts get banned,
+-- new ones are created). All active accounts are synced for metrics.
+
+CREATE TABLE IF NOT EXISTS user_ad_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  ad_account_id TEXT NOT NULL,       -- Meta format: "act_123456789"
+  account_name TEXT DEFAULT '',
+  account_status INTEGER DEFAULT 1,  -- Meta: 1=ACTIVE, 2=DISABLED
+  active BOOLEAN DEFAULT true,       -- User toggle for sync inclusion
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, ad_account_id)
+);
+
+CREATE INDEX idx_user_ad_accounts_user ON user_ad_accounts(user_id);
+CREATE INDEX idx_user_ad_accounts_store ON user_ad_accounts(store_id);
+
+-- ============================================
 -- 5. RESEARCH PRODUCTS
 -- ============================================
 CREATE TABLE IF NOT EXISTS research_products (
@@ -169,6 +191,7 @@ CREATE TABLE IF NOT EXISTS ad_creator_campaigns (
   creatives JSONB DEFAULT '[]',
   status TEXT DEFAULT 'Queued',
   meta_campaign_id TEXT,
+  ad_account_id TEXT,              -- Which Meta ad account this was pushed to
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -182,6 +205,7 @@ CREATE TABLE IF NOT EXISTS ad_campaigns (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
   meta_campaign_id TEXT,
+  ad_account_id TEXT,              -- Which Meta ad account owns this campaign
   campaign_name TEXT,
   product TEXT,
   spend NUMERIC DEFAULT 0,
@@ -204,6 +228,7 @@ CREATE TABLE IF NOT EXISTS ad_campaigns (
 );
 
 CREATE INDEX idx_ad_campaigns_store ON ad_campaigns(store_id);
+CREATE INDEX idx_ad_campaigns_ad_account ON ad_campaigns(ad_account_id);
 
 -- ============================================
 -- 9. AD ACTIONS (audit trail)
@@ -353,7 +378,7 @@ BEGIN
     SELECT unnest(ARRAY[
       'profiles', 'research_products', 'product_copies',
       'ad_creator_campaigns', 'ad_campaigns', 'oauth_tokens',
-      'customer_cases'
+      'customer_cases', 'user_ad_accounts'
     ])
   LOOP
     EXECUTE format('

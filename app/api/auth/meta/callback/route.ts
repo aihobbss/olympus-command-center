@@ -87,13 +87,14 @@ export async function GET(request: Request) {
     ).toISOString();
 
     // Store token in oauth_tokens
+    const finalToken = longLived.access_token || access_token;
     const { error: upsertError } = await supabaseAdmin
       .from("oauth_tokens")
       .upsert(
         {
           user_id: userId,
           service: "facebook",
-          access_token: longLived.access_token || access_token,
+          access_token: finalToken,
           expires_at: expiresAt,
         },
         { onConflict: "user_id,service" }
@@ -104,6 +105,44 @@ export async function GET(request: Request) {
       return NextResponse.redirect(
         new URL("/settings?error=meta_save_failed", request.url)
       );
+    }
+
+    // Auto-discover ad accounts after successful OAuth
+    try {
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("active_store_id")
+        .eq("id", userId)
+        .single();
+
+      if (profile?.active_store_id) {
+        const meRes = await fetch(
+          `https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_status,currency,business_name&limit=100&access_token=${finalToken}`
+        );
+
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          const accounts = meData.data || [];
+
+          if (accounts.length > 0) {
+            const rows = accounts.map((acct: { id: string; name?: string; account_status?: number; business_name?: string }) => ({
+              user_id: userId,
+              store_id: profile.active_store_id,
+              ad_account_id: acct.id,
+              account_name: acct.name || acct.business_name || acct.id,
+              account_status: acct.account_status ?? 1,
+              active: true,
+            }));
+
+            await supabaseAdmin
+              .from("user_ad_accounts")
+              .upsert(rows, { onConflict: "user_id,ad_account_id" });
+          }
+        }
+      }
+    } catch (discoverErr) {
+      // Non-fatal: ad accounts can be discovered later via Settings
+      console.error("Auto-discover ad accounts failed (non-fatal):", discoverErr);
     }
 
     return NextResponse.redirect(

@@ -17,9 +17,10 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import { useAdCreatorStore, useCreativeGeneratorStore, useStoreContext } from "@/lib/store";
+import { useAdCreatorStore, useCreativeGeneratorStore, useStoreContext, useAuthStore, useConnectionsStore } from "@/lib/store";
 import { type AdCreatorCampaign, type AdCreatorStatus, type AdGender } from "@/data/mock";
 import { cn } from "@/lib/utils";
+import { fetchAdAccounts, type UserAdAccount } from "@/lib/services/ad-accounts";
 
 // ── Status badge ────────────────────────────────────────────
 
@@ -345,15 +346,35 @@ type StatusFilter = "All" | "Queued" | "Ready" | "Live";
 export function AdCreatorSheet() {
   const { campaigns, loading, loadCampaigns, pushCampaign, pushAll, updateCampaign, addCampaign, removeCampaign } = useAdCreatorStore();
   const { selectedStore } = useStoreContext();
+  const user = useAuthStore((s) => s.user);
+  const metaConnected = useConnectionsStore((s) => s.isConnected("facebook"));
   const storeId = selectedStore?.id;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
+  // Ad account selection for publishing
+  const [adAccounts, setAdAccounts] = useState<UserAdAccount[]>([]);
+  const [selectedAdAccountId, setSelectedAdAccountId] = useState<string>("");
+
   // Load campaigns from Supabase when store changes
   useEffect(() => {
     if (storeId) loadCampaigns(storeId);
   }, [storeId, loadCampaigns]);
+
+  // Load ad accounts for the publish dropdown
+  useEffect(() => {
+    if (user && storeId && metaConnected) {
+      fetchAdAccounts(user.id, storeId).then((accts) => {
+        setAdAccounts(accts);
+        // Auto-select first account if none selected
+        if (accts.length > 0 && !selectedAdAccountId) {
+          setSelectedAdAccountId(accts[0].ad_account_id);
+        }
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, storeId, metaConnected]);
 
   const filtered = useMemo(() => {
     let items = campaigns;
@@ -461,10 +482,36 @@ export function AdCreatorSheet() {
           </select>
         </div>
 
+        {/* Ad Account selector for publishing */}
+        {adAccounts.length > 1 && (
+          <select
+            value={selectedAdAccountId}
+            onChange={(e) => setSelectedAdAccountId(e.target.value)}
+            className={cn(
+              "text-xs px-3 py-2 rounded-lg",
+              "bg-bg-elevated border border-subtle outline-none cursor-pointer",
+              "text-text-primary",
+              "hover:border-[var(--border-hover)] transition-colors duration-150",
+              "appearance-none bg-[length:12px] bg-[right_8px_center] bg-no-repeat pr-7"
+            )}
+            style={{
+              color: "#F1F1F3",
+              backgroundColor: "#1A1A24",
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+            }}
+          >
+            {adAccounts.map((acct) => (
+              <option key={acct.ad_account_id} value={acct.ad_account_id}>
+                {acct.account_name}
+              </option>
+            ))}
+          </select>
+        )}
+
         {/* Push All button */}
         {readyCount > 0 && (
           <button
-            onClick={pushAll}
+            onClick={() => pushAll(selectedAdAccountId || undefined)}
             className={cn(
               "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
               "bg-accent-indigo hover:bg-accent-indigo-hover text-white",
@@ -644,7 +691,7 @@ export function AdCreatorSheet() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            pushCampaign(campaign.id);
+                            pushCampaign(campaign.id, selectedAdAccountId || undefined);
                           }}
                           className={cn(
                             "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium",

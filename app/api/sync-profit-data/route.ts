@@ -106,7 +106,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── 2. Pull Meta ad spend ───────────────────────────────
+    // ── 2. Pull Meta ad spend (from ALL active ad accounts) ──
 
     const { data: metaToken } = await supabaseAdmin
       .from("oauth_tokens")
@@ -116,10 +116,25 @@ export async function POST(request: Request) {
       .single();
 
     if (metaToken?.access_token) {
-      const metaData = (metaToken.meta as Record<string, string>) || {};
-      const adAccountId = metaData.ad_account_id;
+      // Get all active ad accounts for this user+store
+      const { data: adAccounts } = await supabaseAdmin
+        .from("user_ad_accounts")
+        .select("ad_account_id")
+        .eq("user_id", userId)
+        .eq("store_id", storeId)
+        .eq("active", true);
 
-      if (adAccountId) {
+      // Fallback to legacy oauth_tokens.meta if no accounts in new table
+      let accountIds: string[] = (adAccounts || []).map((a) => a.ad_account_id);
+      if (accountIds.length === 0) {
+        const metaData = (metaToken.meta as Record<string, string>) || {};
+        if (metaData.ad_account_id) {
+          accountIds = [metaData.ad_account_id];
+        }
+      }
+
+      // Fetch spend from each active ad account
+      for (const adAccountId of accountIds) {
         try {
           const insightsUrl =
             `${META_API}/${adAccountId}/insights` +
@@ -144,7 +159,7 @@ export async function POST(request: Request) {
             }
           }
         } catch (err) {
-          console.error("Meta insights fetch error:", err);
+          console.error(`Meta insights fetch error for ${adAccountId}:`, err);
         }
       }
     }

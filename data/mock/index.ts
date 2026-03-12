@@ -499,6 +499,7 @@ export type AdCampaign = {
   id: string;
   campaignName: string;
   product: string;
+  adAccountId?: string;
   spend: number;
   budget: number;
   cpc: number;
