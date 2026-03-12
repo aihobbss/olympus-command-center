@@ -58,6 +58,8 @@ export async function GET(request: Request) {
     );
 
     if (!tokenResponse.ok) {
+      const errBody = await tokenResponse.text().catch(() => "no body");
+      console.error("Shopify token exchange failed:", tokenResponse.status, errBody);
       return NextResponse.redirect(
         new URL("/settings?error=shopify_token_exchange_failed", request.url)
       );
