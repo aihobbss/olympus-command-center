@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
@@ -16,23 +16,26 @@ import {
   Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStoreContext, useCreativeGeneratorStore } from "@/lib/store";
+import { useStoreContext, useCreativeGeneratorStore, useProductCopyStore, useAuthStore, useConnectionsStore } from "@/lib/store";
 import { ActionSlider } from "@/components/ui";
 import { PROMPT_TEMPLATES as SHARED_PROMPT_TEMPLATES } from "@/data/mock";
 import { CreativeBatchQueue } from "@/components/modules/CreativeBatchQueue";
+import { ServiceConnectionOverlay } from "@/components/modules/ServiceConnectionCard";
+import { SERVICE_REGISTRY } from "@/lib/services/connections";
+import { createCreative, fetchSavedCreatives, updateCreativeStatus } from "@/lib/services/creative-generator";
 
 // ─── Types ──────────────────────────────────────────────────
 
 type ProductOption = {
   id: string;
   name: string;
-  salePrice: number;
-  originalPrice: number;
+  imageUrl: string;
 };
 
 type CreativeCard = {
   id: string;
   concept: string;
+  dbId?: string; // Supabase creative ID when persisted
 };
 
 type ActivePrompt = {
@@ -50,31 +53,6 @@ type LibraryItem = {
 };
 
 // ─── Constants ──────────────────────────────────────────────
-
-const PRODUCTS: ProductOption[] = [
-  { id: "p-1", name: "Harrington Trainers", salePrice: 48, originalPrice: 89 },
-  {
-    id: "p-2",
-    name: "Durango Road Sneakers",
-    salePrice: 38,
-    originalPrice: 72,
-  },
-  { id: "p-3", name: "Maven Bomber Jacket", salePrice: 65, originalPrice: 120 },
-  { id: "p-4", name: "Matteo Cotton Pants", salePrice: 32, originalPrice: 58 },
-  {
-    id: "p-5",
-    name: "Haldrin Layered Shirt",
-    salePrice: 42,
-    originalPrice: 78,
-  },
-  { id: "p-6", name: "Enzo Suede Loafers", salePrice: 55, originalPrice: 95 },
-  {
-    id: "p-7",
-    name: "Kensington Wool Overcoat",
-    salePrice: 85,
-    originalPrice: 165,
-  },
-];
 
 const PROMPT_TEMPLATES = SHARED_PROMPT_TEMPLATES;
 
@@ -95,7 +73,58 @@ type CreativeTab = "single" | "batch";
 
 export default function CreativeGeneratorPage() {
   const { selectedStore } = useStoreContext();
-  const currency = selectedStore.currency;
+  const user = useAuthStore((s) => s.user);
+  const { loadConnections, isConnected } = useConnectionsStore();
+  const { loadBatchQueue } = useCreativeGeneratorStore();
+  const copyProducts = useProductCopyStore((s) => s.copyProducts);
+  const loadCopyProducts = useProductCopyStore((s) => s.loadProducts);
+
+  useEffect(() => {
+    if (user) loadConnections();
+  }, [user, loadConnections]);
+
+  // Load product copies from Supabase to populate the product selector
+  useEffect(() => {
+    if (selectedStore) {
+      loadCopyProducts(selectedStore.id);
+      loadBatchQueue(selectedStore.id);
+    }
+  }, [selectedStore, loadCopyProducts, loadBatchQueue]);
+
+  // Build product options from Supabase product_copies (pushed products preferred)
+  const products: ProductOption[] = useMemo(() => {
+    return copyProducts
+      .filter((p) => p.productName)
+      .map((p) => ({
+        id: p.id,
+        name: p.productName,
+        imageUrl: p.imageUrl,
+      }));
+  }, [copyProducts]);
+
+  // Load saved creatives from Supabase as library items
+  const [library, setLibrary] = useState<LibraryItem[]>([]);
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!selectedStore || libraryLoaded) return;
+    (async () => {
+      const saved = await fetchSavedCreatives(selectedStore.id);
+      setLibrary(
+        saved.map((c) => ({
+          id: c.id,
+          concept: c.concept,
+          product: c.productName,
+          savedAt: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+        }))
+      );
+      setLibraryLoaded(true);
+    })();
+  }, [selectedStore, libraryLoaded]);
+
+  const nanobananaConnected = isConnected("nanobanana");
+  const nanobananaMeta = SERVICE_REGISTRY.find((s) => s.id === "nanobanana")!;
+
   const [activeTab, setActiveTab] = useState<CreativeTab>("single");
   const batchQueueCount = useCreativeGeneratorStore((s) => s.batchQueue.length);
 
@@ -121,9 +150,6 @@ export default function CreativeGeneratorPage() {
   // ── Selection state ──
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());
-
-  // ── Library state ──
-  const [library, setLibrary] = useState<LibraryItem[]>([]);
 
   // ── Derived ──
 
@@ -152,10 +178,6 @@ export default function CreativeGeneratorPage() {
 
   const canGenerate =
     productName.trim().length > 0 &&
-    typeof salePrice === "number" &&
-    salePrice > 0 &&
-    typeof originalPrice === "number" &&
-    originalPrice > 0 &&
     activePrompts.length > 0 &&
     !generating;
 
@@ -164,14 +186,12 @@ export default function CreativeGeneratorPage() {
   const handleProductSelect = useCallback(
     (id: string) => {
       setSelectedProductId(id);
-      const p = PRODUCTS.find((x) => x.id === id);
+      const p = products.find((x) => x.id === id);
       if (p) {
         setProductName(p.name);
-        setSalePrice(p.salePrice);
-        setOriginalPrice(p.originalPrice);
       }
     },
-    []
+    [products]
   );
 
   const handleFileDrop = useCallback(
@@ -197,7 +217,7 @@ export default function CreativeGeneratorPage() {
   );
 
   const handleGenerate = useCallback(async () => {
-    if (!canGenerate) return;
+    if (!canGenerate || !selectedStore) return;
     setGenerating(true);
     setCards([]);
     setSelectedIds(new Set());
@@ -208,9 +228,17 @@ export default function CreativeGeneratorPage() {
 
     for (const ap of activePrompts) {
       for (let i = 0; i < ap.count; i++) {
+        // Persist creative to Supabase
+        const dbCreative = await createCreative(selectedStore.id, {
+          productName,
+          promptTemplate: ap.label,
+          prompt: ap.prompt,
+        });
+
         const card: CreativeCard = {
           id: `cr-${Date.now()}-${idx}`,
           concept: ap.label,
+          dbId: dbCreative?.id || undefined,
         };
         newCards.push(card);
         idx++;
@@ -218,11 +246,16 @@ export default function CreativeGeneratorPage() {
         // Stagger: reveal one card at a time with 200ms gap
         await new Promise((r) => setTimeout(r, 200));
         setCards([...newCards]);
+
+        // Mark as ready immediately (placeholder until Nanobanana generates real images)
+        if (dbCreative?.id) {
+          await updateCreativeStatus(dbCreative.id, "ready");
+        }
       }
     }
 
     setGenerating(false);
-  }, [canGenerate, activePrompts]);
+  }, [canGenerate, activePrompts, selectedStore, productName]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -242,20 +275,27 @@ export default function CreativeGeneratorPage() {
     });
   }, []);
 
-  const handleSaveToLibrary = useCallback(() => {
+  const handleSaveToLibrary = useCallback(async () => {
     const now = new Date().toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
       year: "numeric",
     });
-    const newItems: LibraryItem[] = cards
-      .filter((c) => selectedIds.has(c.id))
-      .map((c) => ({
-        id: c.id,
-        concept: c.concept,
-        product: productName,
-        savedAt: now,
-      }));
+    const selectedCards = cards.filter((c) => selectedIds.has(c.id));
+
+    // Persist "saved" status to Supabase for each selected creative
+    for (const card of selectedCards) {
+      if (card.dbId) {
+        await updateCreativeStatus(card.dbId, "saved");
+      }
+    }
+
+    const newItems: LibraryItem[] = selectedCards.map((c) => ({
+      id: c.dbId || c.id,
+      concept: c.concept,
+      product: productName,
+      savedAt: now,
+    }));
 
     setLibrary((prev) => [...newItems, ...prev]);
     // Remove saved cards from gallery
@@ -264,6 +304,9 @@ export default function CreativeGeneratorPage() {
   }, [cards, selectedIds, productName]);
 
   // ─── Render ───────────────────────────────────────────────
+
+  if (!selectedStore) return null;
+  const currency = selectedStore.currency;
 
   return (
     <div className="relative">
@@ -282,11 +325,25 @@ export default function CreativeGeneratorPage() {
           </h1>
           <p className="text-sm text-text-secondary">
             {activeTab === "single"
-              ? "AI-powered ad creatives via Higgsfield"
+              ? "AI-powered ad creatives via Nanobanana Pro"
               : "Bulk generate creatives for pushed products"}
           </p>
         </div>
       </div>
+
+      {/* ─── Connection gate ─── */}
+      {!nanobananaConnected ? (
+        <ServiceConnectionOverlay
+          moduleName="Creative Generator"
+          services={[
+            {
+              service: "nanobanana",
+              description: nanobananaMeta.description,
+              onConnect: () => { window.location.href = nanobananaMeta.connectUrl; },
+            },
+          ]}
+        />
+      ) : (<>
 
       {/* ─── Tab Switcher ─── */}
       <div className="flex gap-1 p-1 rounded-xl bg-bg-elevated/60 w-fit mb-6">
@@ -344,9 +401,9 @@ export default function CreativeGeneratorPage() {
               )}
             >
               <option value="" className="bg-bg-card text-text-muted">
-                Select a product...
+                {products.length === 0 ? "No products yet — add in Product Creation" : "Select a product..."}
               </option>
-              {PRODUCTS.map((p) => (
+              {products.map((p) => (
                 <option
                   key={p.id}
                   value={p.id}
@@ -1062,6 +1119,8 @@ export default function CreativeGeneratorPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      </>)}
     </div>
   );
 }

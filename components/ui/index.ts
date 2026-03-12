@@ -36,6 +36,7 @@ export type { EmptyStateProps } from "./EmptyState";
 
 // ─── Auth ────────────────────────────────────────────────
 export { LoginScreen } from "./LoginScreen";
+export { StoreSetup } from "./StoreSetup";
 
 // ─── Demo Mode ──────────────────────────────────────────
 export { DemoBanner } from "./DemoBanner";

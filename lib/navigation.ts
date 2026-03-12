@@ -7,6 +7,7 @@ import {
   Sparkles,
   MessageSquare,
   Users,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -61,6 +62,13 @@ export const navItems: NavItem[] = [
     icon: Sparkles,
     group: "main",
   },
+  {
+    id: "settings",
+    label: "Settings",
+    href: "/settings",
+    icon: Settings,
+    group: "admin",
+  },
 ];
 
 // Phase 2/3 modules — kept for later implementation
@@ -81,14 +89,3 @@ export const deferredNavItems: NavItem[] = [
   },
 ];
 
-export type MockStore = {
-  id: string;
-  name: string;
-  market: "UK" | "AU" | "USA";
-  currency: string;
-};
-
-export const mockStores: MockStore[] = [
-  { id: "vantage-london", name: "Vantage London", market: "UK", currency: "£" },
-  { id: "vantage-melbourne", name: "Vantage Melbourne", market: "AU", currency: "A$" },
-];

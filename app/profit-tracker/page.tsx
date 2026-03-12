@@ -9,20 +9,29 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  Download,
 } from "lucide-react";
-import { MetricCard, TimePeriodSelector } from "@/components/ui";
+import { MetricCard, TimePeriodSelector, EmptyState } from "@/components/ui";
 import type { TimePeriod } from "@/components/ui";
 import ProfitChart from "@/components/modules/ProfitChart";
 import { PerAdCard } from "@/components/modules/PerAdCard";
+import { ServiceConnectionOverlay } from "@/components/modules/ServiceConnectionCard";
 import {
-  getProfitLogs,
-  getAdCampaigns,
-  getDefaultCogs,
   type AdCampaign,
   type BudgetTierSnapshot,
+  type ProfitLog,
 } from "@/data/mock";
 import { cn } from "@/lib/utils";
-import { useStoreContext } from "@/lib/store";
+import { useStoreContext, useAuthStore, useConnectionsStore } from "@/lib/store";
+import { SERVICE_REGISTRY } from "@/lib/services/connections";
+import {
+  fetchProfitLogs,
+  fetchCogs,
+  upsertCog,
+  triggerProfitSync,
+  getLastProfitSync,
+} from "@/lib/services/profit-tracker";
+import { fetchLiveCampaigns } from "@/lib/services/meta-campaigns";
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -79,30 +88,70 @@ type TierGroup = {
 
 export default function ProfitTrackerPage() {
   const { selectedStore } = useStoreContext();
+  const user = useAuthStore((s) => s.user);
+  const { loadConnections, isConnected } = useConnectionsStore();
+
+  useEffect(() => {
+    if (user) loadConnections();
+  }, [user, loadConnections]);
+
+  const shopifyConnected = isConnected("shopify");
+  const facebookConnected = isConnected("facebook");
+  const allConnected = shopifyConnected && facebookConnected;
+
+  const missingServices = [
+    ...(!shopifyConnected
+      ? [{ service: "shopify" as const, meta: SERVICE_REGISTRY.find((s) => s.id === "shopify")! }]
+      : []),
+    ...(!facebookConnected
+      ? [{ service: "facebook" as const, meta: SERVICE_REGISTRY.find((s) => s.id === "facebook")! }]
+      : []),
+  ];
 
   const [view, setView] = useState<View>("store-logs");
   const [period, setPeriod] = useState<TimePeriod>("all");
   const [syncing, setSyncing] = useState(false);
-  const [lastSynced, setLastSynced] = useState(() => new Date());
-  const [cogs, setCogs] = useState<Record<string, number>>(() => getDefaultCogs(selectedStore.id));
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [cogs, setCogs] = useState<Record<string, number>>({});
   const [tableMonth, setTableMonth] = useState<Date>(() => new Date());
-  const storeCurrency = selectedStore.currency;
-  const ptRate = STORE_TO_USD[selectedStore.market] ?? 1;
-  const currencyCode = selectedStore.market === "UK" ? "GBP" : "AUD";
+  const [profitLogs, setProfitLogs] = useState<ProfitLog[]>([]);
+  const [liveCampaigns, setLiveCampaigns] = useState<AdCampaign[]>([]);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const storeCurrency = selectedStore?.currency ?? "";
+  const ptRate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
+  const currencyCode = selectedStore?.market === "UK" ? "GBP" : "AUD";
   const convertToUsd = useCallback(
     (localAmount: number) => Math.round(localAmount * ptRate),
     [ptRate]
   );
 
-  // ── Time-filtered logs (feeds metric cards + chart) ──
+  const storeId = selectedStore?.id ?? "";
 
-  // Reset COGs when store changes
+  // ── Load real data from Supabase ──
+  const loadData = useCallback(async () => {
+    if (!storeId) return;
+
+    const [logs, campaigns, cogData, lastSync] = await Promise.all([
+      fetchProfitLogs(storeId),
+      fetchLiveCampaigns(storeId),
+      fetchCogs(storeId),
+      getLastProfitSync(storeId),
+    ]);
+
+    setProfitLogs(logs);
+    setLiveCampaigns(campaigns);
+    setCogs(cogData);
+
+    if (lastSync) setLastSynced(new Date(lastSync));
+  }, [storeId]);
+
   useEffect(() => {
-    setCogs(getDefaultCogs(selectedStore.id));
-  }, [selectedStore.id]);
+    loadData();
+  }, [loadData]);
 
-  const storeProfitLogs = useMemo(() => getProfitLogs(selectedStore.id), [selectedStore.id]);
-  const storeAdCampaigns = useMemo(() => getAdCampaigns(selectedStore.id), [selectedStore.id]);
+  const storeProfitLogs = profitLogs;
+  const storeAdCampaigns = liveCampaigns;
 
   const filteredLogs = useMemo(() => {
     if (period === "all") return storeProfitLogs;
@@ -231,25 +280,61 @@ export default function ProfitTrackerPage() {
       .map(([budgetPerDay, entries]) => ({ budgetPerDay, entries }));
   }, [storeAdCampaigns]);
 
-  // ── Sync simulation ──
+  // ── Real sync ──
 
   const handleSync = useCallback(async () => {
-    if (syncing) return;
+    if (syncing || !user || !storeId) return;
     setSyncing(true);
-    await new Promise((r) => setTimeout(r, 2000));
-    setLastSynced(new Date());
+    setSyncError(null);
+
+    const result = await triggerProfitSync(user.id, storeId);
+    if (result.error) {
+      setSyncError(result.error);
+    } else {
+      await loadData();
+      setLastSynced(new Date());
+    }
     setSyncing(false);
-  }, [syncing]);
+  }, [syncing, user, storeId, loadData]);
 
-  // ── COG change ──
+  // ── COG change (persisted to Supabase) ──
 
-  const handleCogChange = useCallback((id: string, newCog: number) => {
-    setCogs((prev) => ({ ...prev, [id]: newCog }));
-  }, []);
+  const handleCogChange = useCallback((productName: string, newCog: number) => {
+    setCogs((prev) => ({ ...prev, [productName]: newCog }));
+    if (storeId) {
+      upsertCog(storeId, productName, newCog);
+    }
+  }, [storeId]);
+
+  // ── CSV export ──
+
+  const handleExportCsv = useCallback(() => {
+    if (storeProfitLogs.length === 0) return;
+    const headers = ["Date", "Revenue", "COG", "Ad Spend", "Transaction Fee", "Profit", "ROAS", "Profit %"];
+    const rows = storeProfitLogs.map((log) => [
+      log.date,
+      log.revenue,
+      log.cog,
+      log.adSpend,
+      log.transactionFee,
+      log.profit,
+      log.roas,
+      log.profitPercent,
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `profit-tracker-${selectedStore?.name?.replace(/\s+/g, "-").toLowerCase() || "store"}-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [storeProfitLogs, selectedStore]);
 
   // ── Last synced label ──
 
   const syncLabel = useMemo(() => {
+    if (!lastSynced) return "Never";
     return `Today ${lastSynced
       .toLocaleTimeString("en-GB", {
         hour: "2-digit",
@@ -262,6 +347,40 @@ export default function ProfitTrackerPage() {
   // ── Chart title ──
 
   const chartTitle = `Revenue vs Profit — ${PERIOD_LABEL[period]}`;
+
+  if (!selectedStore) return null;
+
+  // ── Connection gating ──
+  if (!allConnected) {
+    return (
+      <div>
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-accent-emerald/10 flex items-center justify-center">
+            <TrendingUp className="text-accent-emerald" size={20} strokeWidth={1.8} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-syne font-bold tracking-tight">
+              Profit Tracker
+            </h1>
+            <p className="text-sm text-text-secondary">
+              Daily P&amp;L, ROAS, and per-product breakdown
+            </p>
+          </div>
+        </div>
+        <ServiceConnectionOverlay
+          moduleName="Profit Tracker"
+          services={missingServices.map(({ service, meta }) => ({
+            service,
+            description: meta.description,
+            onConnect: () => { window.location.href = meta.connectUrl; },
+          }))}
+        />
+      </div>
+    );
+  }
+
+  // ── Empty state when no data ──
+  const hasData = storeProfitLogs.length > 0;
 
   return (
     <div>
@@ -313,8 +432,26 @@ export default function ProfitTrackerPage() {
               </>
             )}
           </button>
+          {hasData && (
+            <button
+              onClick={handleExportCsv}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary bg-white/[0.04] hover:bg-white/[0.08] border border-subtle transition-all duration-200"
+            >
+              <Download size={13} />
+              CSV
+            </button>
+          )}
         </div>
       </div>
+
+      {!hasData ? (
+        <EmptyState
+          icon={TrendingUp}
+          title="No profit data yet"
+          description="Click Sync Now to pull data from Shopify and Meta."
+        />
+      ) : (
+      <>
 
       {/* ─── Metric Cards ─── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-2">
@@ -346,11 +483,18 @@ export default function ProfitTrackerPage() {
         />
       </div>
 
-      {/* Currency rate note */}
-      <p className="text-[10px] text-text-muted mb-6 pl-1">
-        Displaying in {currencyCode} ({storeCurrency}) · {storeCurrency}1 ≈ $
-        {ptRate.toFixed(2)} USD
-      </p>
+      {/* Currency rate note + status */}
+      <div className="flex items-center justify-between mb-6 pl-1">
+        <p className="text-[10px] text-text-muted">
+          Displaying in {currencyCode} ({storeCurrency}) · {storeCurrency}1 ≈ $
+          {ptRate.toFixed(2)} USD
+        </p>
+        <div className="flex items-center gap-3 text-[10px]">
+          {syncError && (
+            <span className="text-accent-red">{syncError}</span>
+          )}
+        </div>
+      </div>
 
       {/* ─── View Toggle + Time Period Selector ─── */}
       <div className="flex items-center justify-between gap-4 flex-wrap mb-5">
@@ -585,6 +729,8 @@ export default function ProfitTrackerPage() {
             </div>
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );

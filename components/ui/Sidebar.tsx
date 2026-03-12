@@ -82,14 +82,19 @@ export function Sidebar({ collapsed, onToggle, bannerOffset = 0, highlightedNavI
         animate="visible"
       >
         <div className="space-y-0.5">
-          {visibleNavItems.map((item) => {
+          {visibleNavItems.map((item, idx) => {
             const isActive =
               pathname === item.href ||
               (item.href !== "/" && pathname.startsWith(item.href));
             const Icon = item.icon;
+            const prevItem = idx > 0 ? visibleNavItems[idx - 1] : null;
+            const showDivider = prevItem && prevItem.group !== item.group;
 
             return (
               <motion.div key={item.id} variants={itemVariants}>
+                {showDivider && (
+                  <div className="my-2 border-t border-subtle" />
+                )}
                 <Link
                   href={item.href}
                   data-tour-id={item.id}

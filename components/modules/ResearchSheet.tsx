@@ -224,7 +224,7 @@ function ProductTypeCell({
   onChange,
 }: {
   productType: ProductType;
-  market: "UK" | "AU" | "USA";
+  market: string;
   onChange: (pt: ProductType, price: number | null, discount: number) => void;
 }) {
   return (
@@ -342,12 +342,20 @@ type TestingStatusFilter =
 // ── Main sheet component ───────────────────────────────────
 
 export function ResearchSheet() {
-  const { sheetProducts, updateSheetProduct, importAllUnimported, addSheetProduct } =
+  const { sheetProducts, updateSheetProduct, importAllUnimported, addSheetProduct, loadProducts, loading } =
     useResearchStore();
   const { selectedStore } = useStoreContext();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TestingStatusFilter>("All");
   const [scrapingIds, setScrapingIds] = useState<Set<string>>(new Set());
+
+  // Load products from Supabase when store changes
+  const storeId = selectedStore?.id;
+  useEffect(() => {
+    if (storeId) {
+      loadProducts(storeId);
+    }
+  }, [storeId, loadProducts]);
 
   // Auto-fill product data when an afterlib/winninghunter link is pasted
   const handleAdLinkSave = useCallback(
@@ -426,19 +434,18 @@ export function ResearchSheet() {
     [sheetProducts]
   );
 
-  if (sheetProducts.length === 0) {
+  if (!selectedStore) return null;
+
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-12 h-12 rounded-xl bg-bg-elevated flex items-center justify-center mb-4">
-          <Upload size={20} className="text-text-muted" />
-        </div>
-        <p className="text-sm text-text-secondary mb-1">No products on the sheet yet</p>
-        <p className="text-xs text-text-muted">
-          Add products from your research to get started
-        </p>
+        <div className="w-8 h-8 border-2 border-accent-indigo/30 border-t-accent-indigo rounded-full animate-spin mb-4" />
+        <p className="text-sm text-text-secondary">Loading products...</p>
       </div>
     );
   }
+
+  // No empty-state gate — always show the table with Add Product button
 
   return (
     <div>

@@ -99,7 +99,6 @@ function initials(name: string): string {
 
 export default function CustomerServicePage() {
   const { selectedStore } = useStoreContext();
-  const currency = selectedStore.currency;
 
   const [activeTab, setActiveTab] = useState<Tab>("inbox");
   const [selectedId, setSelectedId] = useState<string>(customerCases[0].id);
@@ -204,6 +203,9 @@ export default function CustomerServicePage() {
   }, [selectedCase]);
 
   // ─── Render ───────────────────────────────────────────────
+
+  if (!selectedStore) return null;
+  const currency = selectedStore.currency;
 
   return (
     <div>

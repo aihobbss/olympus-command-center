@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import {
   Search,
   SlidersHorizontal,
@@ -343,11 +343,17 @@ type StatusFilter = "All" | "Queued" | "Ready" | "Live";
 // ── Main component ──────────────────────────────────────────
 
 export function AdCreatorSheet() {
-  const { campaigns, pushCampaign, pushAll, updateCampaign, addCampaign, removeCampaign } = useAdCreatorStore();
+  const { campaigns, loading, loadCampaigns, pushCampaign, pushAll, updateCampaign, addCampaign, removeCampaign } = useAdCreatorStore();
   const { selectedStore } = useStoreContext();
+  const storeId = selectedStore?.id;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // Load campaigns from Supabase when store changes
+  useEffect(() => {
+    if (storeId) loadCampaigns(storeId);
+  }, [storeId, loadCampaigns]);
 
   const filtered = useMemo(() => {
     let items = campaigns;
@@ -378,6 +384,17 @@ export function AdCreatorSheet() {
       else next.add(id);
       return next;
     });
+  }
+
+  if (!selectedStore) return null;
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <Loader2 size={24} className="animate-spin text-accent-indigo mb-3" />
+        <p className="text-sm text-text-secondary">Loading campaigns…</p>
+      </div>
+    );
   }
 
   if (campaigns.length === 0) {

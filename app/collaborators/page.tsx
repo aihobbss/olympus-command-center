@@ -286,8 +286,8 @@ export default function CollaboratorsPage() {
         storeName: user?.name ? `${user.name}'s Store` : "My Store",
         ownerName: req.requesterName,
         ownerInitials: req.requesterInitials,
-        market: selectedStore.market,
-        currency: selectedStore.currency,
+        market: selectedStore?.market ?? "UK",
+        currency: selectedStore?.currency ?? "£",
         revenue: 0,
         adSpend: 0,
         profit: 0,
@@ -297,7 +297,7 @@ export default function CollaboratorsPage() {
       };
       setApprovedCollabs((prev) => [...prev, newAccess]);
     },
-    [userId, user?.name, selectedStore.market, selectedStore.currency]
+    [userId, user?.name, selectedStore?.market, selectedStore?.currency]
   );
 
   const handleDenyConfirm = useCallback(() => {
@@ -333,6 +333,8 @@ export default function CollaboratorsPage() {
   }, [requestInput]);
 
   // ─── Render ──────────────────────────────────────────────
+
+  if (!selectedStore) return null;
 
   return (
     <div>

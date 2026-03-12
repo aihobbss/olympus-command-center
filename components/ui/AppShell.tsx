@@ -1,30 +1,96 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Store, ArrowLeft } from "lucide-react";
+import { Store, ArrowLeft, Clock } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { MobileNav } from "./MobileNav";
 import { DemoBanner } from "./DemoBanner";
 import { TourOverlay, TOUR_STEPS } from "./TourOverlay";
 import { LoginScreen } from "./LoginScreen";
+import { StoreSetup } from "./StoreSetup";
 import { useDemoStore, useAuthStore, useCoachViewStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+
+function ApprovalGate() {
+  const logout = useAuthStore((s) => s.logout);
+  const user = useAuthStore((s) => s.user);
+
+  return (
+    <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center px-6">
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_center,_var(--accent-indigo)_0%,_transparent_70%)] opacity-[0.03] pointer-events-none" />
+      <div className="relative z-10 w-full max-w-[420px] rounded-2xl p-8 bg-bg-card border border-subtle text-center">
+        <div className="w-14 h-14 rounded-full bg-accent-amber/15 flex items-center justify-center mx-auto mb-5">
+          <Clock size={24} className="text-accent-amber" />
+        </div>
+        <h2 className="font-syne text-xl font-bold text-text-primary mb-2">
+          Pending Approval
+        </h2>
+        <p className="text-sm text-text-secondary mb-1">
+          Hey {user?.name}, your account has been created successfully.
+        </p>
+        <p className="text-sm text-text-secondary mb-6">
+          An admin needs to approve your account before you can access the command center. Check back soon.
+        </p>
+        <button
+          onClick={() => logout()}
+          className={cn(
+            "w-full px-4 py-3 rounded-xl text-sm font-medium",
+            "bg-white/[0.06] text-text-secondary border border-subtle",
+            "hover:bg-white/[0.08] transition-all duration-200"
+          )}
+        >
+          Sign Out
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const { bannerVisible, tourActive, tourStep } = useDemoStore();
   const user = useAuthStore((s) => s.user);
+  const loading = useAuthStore((s) => s.loading);
+  const initialized = useAuthStore((s) => s.initialized);
+  const initialize = useAuthStore((s) => s.initialize);
   const router = useRouter();
   const coachActive = useCoachViewStore((s) => s.active);
   const coachStoreName = useCoachViewStore((s) => s.storeName);
   const coachOwnerName = useCoachViewStore((s) => s.ownerName);
   const exitCoachView = useCoachViewStore((s) => s.exit);
 
-  // Show login screen if no user is logged in
+  // Initialize auth on mount
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
+  // Show loading spinner while checking auth
+  if (!initialized || loading) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-accent-indigo/30 border-t-accent-indigo rounded-full animate-spin" />
+          <p className="text-sm text-text-muted">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login screen if no user
   if (!user) {
     return <LoginScreen />;
+  }
+
+  // Show approval gate if user isn't approved
+  if (!user.approved) {
+    return <ApprovalGate />;
+  }
+
+  // Show store setup if user has no stores
+  if (user.storeIds.length === 0) {
+    return <StoreSetup />;
   }
 
   const bannerOffset = (coachActive || bannerVisible) ? 32 : 0;

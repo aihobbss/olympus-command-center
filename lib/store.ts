@@ -1,11 +1,6 @@
 import { create } from "zustand";
 import {
-  discoveryPool,
-  initialSheetProducts,
-  initialCopyProducts,
-  initialAdCreatorCampaigns,
   PROMPT_TEMPLATES,
-  type DiscoveryProduct,
   type SheetProduct,
   type ProductCopy,
   type AdCreatorCampaign,
@@ -13,200 +8,395 @@ import {
   type ProductCreative,
   type PromptAllocation,
 } from "@/data/mock";
-import { mockStores, type MockStore } from "@/lib/navigation";
+import { supabase } from "@/lib/supabase";
 
 // ─── Auth Store ──────────────────────────────────────────
-// Mock user profiles for the demo login screen.
+// Supabase-backed auth with approval gate.
 
-export type UserRole = "owner";
+export type UserRole = "owner" | "admin" | "member";
 
-export type MockUser = {
+export type AppUser = {
   id: string;
+  email: string;
   name: string;
   initials: string;
   role: UserRole;
-  storeIds: string[];       // which stores this user can access
-  avatarGradient: string;   // tailwind gradient classes
+  approved: boolean;
+  storeIds: string[];
+  avatarGradient: string;
 };
 
-export const mockUsers: MockUser[] = [
-  {
-    id: "aidan",
-    name: "Aidan",
-    initials: "A",
-    role: "owner",
-    storeIds: ["vantage-london", "vantage-melbourne"],
-    avatarGradient: "from-accent-indigo to-accent-indigo/40",
-  },
+// Backward compat alias (other files may reference MockUser)
+export type MockUser = AppUser;
+export const mockUsers: AppUser[] = [];
+
+const AVATAR_GRADIENTS = [
+  "from-accent-indigo to-accent-indigo/40",
+  "from-accent-emerald to-accent-emerald/40",
+  "from-accent-amber to-accent-amber/40",
+  "from-rose-500 to-rose-500/40",
+  "from-cyan-500 to-cyan-500/40",
+  "from-violet-500 to-violet-500/40",
 ];
 
-interface AuthStore {
-  user: MockUser | null;
-  login: (user: MockUser) => void;
-  logout: () => void;
+function pickGradient(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  return AVATAR_GRADIENTS[Math.abs(hash) % AVATAR_GRADIENTS.length];
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+async function buildAppUser(userId: string, email: string): Promise<AppUser> {
+  // Fetch profile
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, role, approved, active_store_id")
+    .eq("id", userId)
+    .single();
+
+  // Fetch user's store IDs
+  const { data: userStores } = await supabase
+    .from("user_stores")
+    .select("store_id")
+    .eq("user_id", userId);
+
+  const name = profile?.full_name || email.split("@")[0];
+  const storeIds = userStores?.map((us) => us.store_id) ?? [];
+
+  return {
+    id: userId,
+    email,
+    name,
+    initials: getInitials(name),
+    role: (profile?.role as UserRole) ?? "owner",
+    approved: profile?.approved ?? false,
+    storeIds,
+    avatarGradient: pickGradient(userId),
+  };
+}
+
+interface AuthStore {
+  user: AppUser | null;
+  loading: boolean;
+  initialized: boolean;
+
+  // Actions
+  initialize: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<{ error?: string }>;
+  signUpWithEmail: (email: string, password: string, fullName: string) => Promise<{ error?: string }>;
+  logout: () => Promise<void>;
+
+  // Backward compat
+  login: (user: AppUser) => void;
+}
+
+export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
+  loading: true,
+  initialized: false,
+
+  initialize: async () => {
+    if (get().initialized) return;
+
+    try {
+      // Check existing session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const appUser = await buildAppUser(session.user.id, session.user.email!);
+        set({ user: appUser, loading: false, initialized: true });
+      } else {
+        set({ user: null, loading: false, initialized: true });
+      }
+    } catch (err) {
+      console.error("Auth initialization failed:", err);
+      set({ user: null, loading: false, initialized: true });
+    }
+
+    // Listen for auth changes (login, logout, token refresh)
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        const appUser = await buildAppUser(session.user.id, session.user.email!);
+        set({ user: appUser, loading: false });
+      } else if (event === "SIGNED_OUT") {
+        set({ user: null, loading: false });
+      }
+    });
+  },
+
+  signInWithEmail: async (email, password) => {
+    set({ loading: true });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      set({ loading: false });
+      return { error: error.message };
+    }
+    // onAuthStateChange will handle setting the user
+    return {};
+  },
+
+  signUpWithEmail: async (email, password, fullName) => {
+    set({ loading: true });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    });
+    if (error) {
+      set({ loading: false });
+      return { error: error.message };
+    }
+    // Update profile with full name if signup succeeded
+    if (data.user) {
+      await supabase
+        .from("profiles")
+        .update({ full_name: fullName })
+        .eq("id", data.user.id);
+    }
+    return {};
+  },
+
+  logout: async () => {
+    await supabase.auth.signOut();
+    set({ user: null });
+  },
+
+  // Backward compat — direct set (used nowhere in prod, kept for type safety)
   login: (user) => set({ user }),
-  logout: () => set({ user: null }),
 }));
 
 // ─── Research Store ──────────────────────────────────────
 // Manages the Research Sheet (product research tracking).
+// Persisted to Supabase via lib/services/research.ts.
+
+import {
+  fetchResearchProducts,
+  createResearchProduct,
+  updateResearchProduct as updateResearchProductDB,
+  bulkUpdateStatus,
+} from "@/lib/services/research";
+
+// Debounce map for batching rapid edits before writing to DB
+const updateTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
 interface ResearchStore {
-  // Discovery (kept for potential future use)
-  discoveryResults: DiscoveryProduct[];
-  runResearch: (count: number) => void;
-  removeDiscovery: (id: string) => void;
-  importToSheet: (id: string) => void;
-
   // Research Sheet
   sheetProducts: SheetProduct[];
+  loading: boolean;
+  loadProducts: (storeId: string) => Promise<void>;
   updateSheetProduct: (id: string, updates: Partial<SheetProduct>) => void;
   importAllUnimported: () => void;
   addSheetProduct: () => void;
+  deleteSheetProduct: (id: string) => void;
 }
 
 export const useResearchStore = create<ResearchStore>((set, get) => ({
-  discoveryResults: [],
+  sheetProducts: [],
+  loading: false,
 
-  runResearch: (count) => {
-    const sheetNames = new Set(get().sheetProducts.map((p) => p.productName));
-    const available = discoveryPool.filter((p) => !sheetNames.has(p.productName));
-    const shuffled = [...available].sort(() => Math.random() - 0.5);
-    set({ discoveryResults: shuffled.slice(0, Math.min(count, shuffled.length)) });
+  loadProducts: async (storeId) => {
+    // Only show loading spinner if we have no cached data yet
+    const hasData = get().sheetProducts.length > 0;
+    if (!hasData) {
+      set({ loading: true });
+    }
+    try {
+      const products = await fetchResearchProducts(storeId);
+      set({ sheetProducts: products, loading: false });
+    } catch {
+      // Ensure loading is always cleared even on unexpected errors
+      set({ loading: false });
+    }
   },
 
-  removeDiscovery: (id) =>
-    set((s) => ({
-      discoveryResults: s.discoveryResults.filter((p) => p.id !== id),
-    })),
-
-  importToSheet: (id) => {
-    const product = get().discoveryResults.find((p) => p.id === id);
-    if (!product) return;
-    const newSheet: SheetProduct = {
-      id: `sp-${Date.now()}`,
-      productName: product.productName,
-      adLink: product.adLink,
-      storeLink: "",
-      testingStatus: "",
-      creativeSaved: false,
-      cog: null,
-      productType: "",
-      pricing: null,
-      discountPercent: 42,
-      notes: "",
-    };
-    set((s) => ({
-      discoveryResults: s.discoveryResults.filter((p) => p.id !== id),
-      sheetProducts: [...s.sheetProducts, newSheet],
-    }));
-  },
-
-  sheetProducts: initialSheetProducts.map((p) => ({ ...p })),
-
-  updateSheetProduct: (id, updates) =>
+  updateSheetProduct: (id, updates) => {
+    // Optimistic local update
     set((s) => ({
       sheetProducts: s.sheetProducts.map((p) =>
         p.id === id ? { ...p, ...updates } : p
       ),
-    })),
+    }));
 
-  importAllUnimported: () =>
+    // Debounced DB write (300ms) — batches rapid edits
+    clearTimeout(updateTimers[id]);
+    updateTimers[id] = setTimeout(() => {
+      const store = useStoreContext.getState().selectedStore;
+      if (store) {
+        updateResearchProductDB(id, updates, store.id);
+      }
+    }, 300);
+  },
+
+  importAllUnimported: () => {
+    const unimported = get().sheetProducts.filter((p) => !p.testingStatus);
+    if (unimported.length === 0) return;
+
+    // Optimistic update
     set((s) => ({
       sheetProducts: s.sheetProducts.map((p) =>
         !p.testingStatus ? { ...p, testingStatus: "Queued" as const } : p
       ),
-    })),
+    }));
 
-  addSheetProduct: () =>
+    // Persist to DB
+    const ids = unimported.map((p) => p.id);
+    bulkUpdateStatus(ids, "Queued");
+  },
+
+  addSheetProduct: async () => {
+    const store = useStoreContext.getState().selectedStore;
+    if (!store) return;
+
+    const product = await createResearchProduct(store.id);
+    if (product) {
+      set((s) => ({
+        sheetProducts: [...s.sheetProducts, product],
+      }));
+    }
+  },
+
+  deleteSheetProduct: (id) => {
     set((s) => ({
-      sheetProducts: [
-        ...s.sheetProducts,
-        {
-          id: `sp-${Date.now()}`,
-          productName: "",
-          adLink: "",
-          storeLink: "",
-          testingStatus: "" as const,
-          creativeSaved: false,
-          cog: null,
-          productType: "" as const,
-          pricing: null,
-          discountPercent: 42,
-          notes: "",
-        },
-      ],
-    })),
+      sheetProducts: s.sheetProducts.filter((p) => p.id !== id),
+    }));
+    // Fire-and-forget DB delete
+    import("@/lib/services/research").then((m) => m.deleteResearchProduct(id));
+  },
 }));
 
 // ─── Product Copy Store ─────────────────────────────────
 // Manages the Product Creation / Copy Generation sheet.
+// Loads from Supabase, debounced writes on edits.
 
 interface ProductCopyStore {
   copyProducts: ProductCopy[];
+  loading: boolean;
+  loadProducts: (storeId: string) => Promise<void>;
   updateCopyProduct: (id: string, updates: Partial<ProductCopy>) => void;
-  generateCopy: (id: string) => void;
+  generateCopy: (id: string) => Promise<void>;
   generateAll: () => void;
-  pushToStore: (id: string) => void;
+  pushToStore: (id: string) => Promise<void>;
   pushAllToStore: () => void;
-  generateSizeChart: (id: string) => void;
+  generateSizeChart: (id: string) => Promise<void>;
 }
 
-const MOCK_SHOPIFY = "Timeless Style Meets Modern Craft\n\nElevate your wardrobe with a versatile piece designed for everyday confidence. Premium materials and refined details make this a go-to for any occasion.\n\n\u2022 Quality Construction: Built to last with premium stitching\n\u2022 Modern Fit: Tailored silhouette flatters every frame\n\u2022 Versatile Design: Pairs effortlessly with any outfit\n\nDesigned for those who value style and substance.";
+// Debounce timers for product copy updates
+const copyUpdateTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
-const MOCK_FACEBOOK = "Step Into Effortless Style\n\nPremium quality meets everyday wearability. This versatile piece was designed to elevate your look without trying too hard.\n\nClean. Confident. Versatile.\n\nFree Shipping\nShop now";
+async function updateProductCopyDB(id: string, updates: Partial<ProductCopy>, storeId: string) {
+  const { updateProductCopy } = await import("@/lib/services/product-copy");
+  await updateProductCopy(id, updates, storeId);
+}
 
-const MOCK_SIZE_CHART = `<table style="border-collapse:collapse;width:100%;text-align:center;font-size:14px">
-<thead><tr style="background:#f3f4f6">
-<th style="border:1px solid #e5e7eb;padding:8px 12px">Size</th>
-<th style="border:1px solid #e5e7eb;padding:8px 12px">Chest (cm)</th>
-<th style="border:1px solid #e5e7eb;padding:8px 12px">Length (cm)</th>
-<th style="border:1px solid #e5e7eb;padding:8px 12px">Shoulder (cm)</th>
-<th style="border:1px solid #e5e7eb;padding:8px 12px">Sleeve (cm)</th>
-</tr></thead>
-<tbody>
-<tr><td style="border:1px solid #e5e7eb;padding:8px 12px">S</td><td style="border:1px solid #e5e7eb;padding:8px 12px">96</td><td style="border:1px solid #e5e7eb;padding:8px 12px">68</td><td style="border:1px solid #e5e7eb;padding:8px 12px">44</td><td style="border:1px solid #e5e7eb;padding:8px 12px">60</td></tr>
-<tr><td style="border:1px solid #e5e7eb;padding:8px 12px">M</td><td style="border:1px solid #e5e7eb;padding:8px 12px">102</td><td style="border:1px solid #e5e7eb;padding:8px 12px">70</td><td style="border:1px solid #e5e7eb;padding:8px 12px">46</td><td style="border:1px solid #e5e7eb;padding:8px 12px">62</td></tr>
-<tr><td style="border:1px solid #e5e7eb;padding:8px 12px">L</td><td style="border:1px solid #e5e7eb;padding:8px 12px">108</td><td style="border:1px solid #e5e7eb;padding:8px 12px">72</td><td style="border:1px solid #e5e7eb;padding:8px 12px">48</td><td style="border:1px solid #e5e7eb;padding:8px 12px">64</td></tr>
-<tr><td style="border:1px solid #e5e7eb;padding:8px 12px">XL</td><td style="border:1px solid #e5e7eb;padding:8px 12px">114</td><td style="border:1px solid #e5e7eb;padding:8px 12px">74</td><td style="border:1px solid #e5e7eb;padding:8px 12px">50</td><td style="border:1px solid #e5e7eb;padding:8px 12px">66</td></tr>
-</tbody></table>`;
+export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
+  copyProducts: [],
+  loading: false,
 
-export const useProductCopyStore = create<ProductCopyStore>((set) => ({
-  copyProducts: initialCopyProducts.map((p) => ({ ...p })),
+  loadProducts: async (storeId: string) => {
+    const hasData = get().copyProducts.length > 0;
+    if (!hasData) {
+      set({ loading: true });
+    }
+    try {
+      const { fetchProductCopies } = await import("@/lib/services/product-copy");
+      const products = await fetchProductCopies(storeId);
+      set({ copyProducts: products, loading: false });
+    } catch {
+      set({ loading: false });
+    }
+  },
 
-  updateCopyProduct: (id, updates) =>
+  updateCopyProduct: (id, updates) => {
+    // Optimistic update
     set((s) => ({
       copyProducts: s.copyProducts.map((p) =>
         p.id === id ? { ...p, ...updates } : p
       ),
-    })),
+    }));
 
-  generateCopy: (id) => {
+    // Debounced DB write
+    const store = useStoreContext.getState().selectedStore;
+    if (store) {
+      clearTimeout(copyUpdateTimers[id]);
+      copyUpdateTimers[id] = setTimeout(() => {
+        updateProductCopyDB(id, updates, store.id);
+      }, 300);
+    }
+  },
+
+  generateCopy: async (id) => {
+    // Guard: skip if already generating
+    const current = get().copyProducts.find((p) => p.id === id);
+    if (current?.status === "Generating") return;
+
+    const store = useStoreContext.getState().selectedStore;
+    const user = useAuthStore.getState().user;
     // Set to Generating immediately
     set((s) => ({
       copyProducts: s.copyProducts.map((p) =>
         p.id === id ? { ...p, status: "Generating" as const } : p
       ),
     }));
-    // Simulate generation after 2s
-    setTimeout(() => {
+    if (store) updateProductCopyDB(id, { status: "Generating" }, store.id);
+
+    const product = get().copyProducts.find((p) => p.id === id);
+
+    try {
+      const res = await fetch("/api/generate-copy", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          productName: product?.productName || "Product",
+          productType: "",
+          market: store?.market || "UK",
+          currency: store?.currency || "GBP",
+          price: null,
+          discount: null,
+          userId: user?.id,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const updates: Partial<ProductCopy> = {
+          status: "Completed" as const,
+          shopifyDescription: data.shopifyDescription || "",
+          facebookCopy: data.facebookCopy || "",
+        };
+        set((s) => ({
+          copyProducts: s.copyProducts.map((p) =>
+            p.id === id ? { ...p, ...updates } : p
+          ),
+        }));
+        if (store) updateProductCopyDB(id, updates, store.id);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error("Copy generation failed:", err.message || res.statusText);
+        const updates: Partial<ProductCopy> = { status: "Error" as const };
+        set((s) => ({
+          copyProducts: s.copyProducts.map((p) =>
+            p.id === id ? { ...p, ...updates } : p
+          ),
+        }));
+        if (store) updateProductCopyDB(id, updates, store.id);
+      }
+    } catch (error) {
+      console.error("Copy generation error:", error);
+      const updates: Partial<ProductCopy> = { status: "Error" as const };
       set((s) => ({
         copyProducts: s.copyProducts.map((p) =>
-          p.id === id
-            ? {
-                ...p,
-                status: "Completed" as const,
-                shopifyDescription: p.shopifyDescription || MOCK_SHOPIFY,
-                facebookCopy: p.facebookCopy || MOCK_FACEBOOK,
-              }
-            : p
+          p.id === id ? { ...p, ...updates } : p
         ),
       }));
-    }, 2000);
+      if (store) updateProductCopyDB(id, updates, store.id);
+    }
   },
 
   generateAll: () => {
@@ -219,19 +409,69 @@ export const useProductCopyStore = create<ProductCopyStore>((set) => ({
     });
   },
 
-  pushToStore: (id) => {
+  pushToStore: async (id) => {
+    // Guard: skip if already pushing or pushed
+    const current = get().copyProducts.find((p) => p.id === id);
+    if (current?.pushStatus === "pushing" || current?.pushStatus === "pushed") return;
+
+    const store = useStoreContext.getState().selectedStore;
+    const user = useAuthStore.getState().user;
     set((s) => ({
       copyProducts: s.copyProducts.map((p) =>
         p.id === id ? { ...p, pushStatus: "pushing" as const } : p
       ),
     }));
-    setTimeout(() => {
+    if (store) updateProductCopyDB(id, { pushStatus: "pushing" }, store.id);
+
+    const product = get().copyProducts.find((p) => p.id === id);
+
+    try {
+      const res = await fetch("/api/push-to-shopify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          productName: product?.productName || "Product",
+          shopifyDescription: product?.shopifyDescription || "",
+          sizeChartTable: product?.sizeChartTable || "",
+          imageUrl: product?.imageUrl || "",
+          userId: user?.id,
+          storeId: store?.id,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const updates: Partial<ProductCopy> = {
+          pushStatus: "pushed" as const,
+          shopifyProductId: data.shopifyProductId || undefined,
+        };
+        set((s) => ({
+          copyProducts: s.copyProducts.map((p) =>
+            p.id === id ? { ...p, ...updates } : p
+          ),
+        }));
+        if (store) updateProductCopyDB(id, updates, store.id);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error("Shopify push failed:", err.message || res.statusText);
+        const updates: Partial<ProductCopy> = { pushStatus: "error" as const };
+        set((s) => ({
+          copyProducts: s.copyProducts.map((p) =>
+            p.id === id ? { ...p, ...updates } : p
+          ),
+        }));
+        if (store) updateProductCopyDB(id, updates, store.id);
+      }
+    } catch (error) {
+      console.error("Shopify push error:", error);
+      const updates: Partial<ProductCopy> = { pushStatus: "error" as const };
       set((s) => ({
         copyProducts: s.copyProducts.map((p) =>
-          p.id === id ? { ...p, pushStatus: "pushed" as const } : p
+          p.id === id ? { ...p, ...updates } : p
         ),
       }));
-    }, 1500);
+      if (store) updateProductCopyDB(id, updates, store.id);
+    }
   },
 
   pushAllToStore: () => {
@@ -244,29 +484,76 @@ export const useProductCopyStore = create<ProductCopyStore>((set) => ({
     });
   },
 
-  generateSizeChart: (id) => {
+  generateSizeChart: async (id) => {
+    // Guard: skip if already generating
+    const current = get().copyProducts.find((p) => p.id === id);
+    if (current?.sizeChartStatus === "generating") return;
+
+    const store = useStoreContext.getState().selectedStore;
+    const user = useAuthStore.getState().user;
     set((s) => ({
       copyProducts: s.copyProducts.map((p) =>
         p.id === id ? { ...p, sizeChartStatus: "generating" as const } : p
       ),
     }));
-    setTimeout(() => {
+    if (store) updateProductCopyDB(id, { sizeChartStatus: "generating" }, store.id);
+
+    const product = get().copyProducts.find((p) => p.id === id);
+
+    try {
+      const res = await fetch("/api/generate-size-chart", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: product?.sizeChartImage || "",
+          userId: user?.id,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const updates: Partial<ProductCopy> = {
+          sizeChartStatus: "done" as const,
+          sizeChartTable: data.sizeChartTable || "",
+        };
+        set((s) => ({
+          copyProducts: s.copyProducts.map((p) =>
+            p.id === id ? { ...p, ...updates } : p
+          ),
+        }));
+        if (store) updateProductCopyDB(id, updates, store.id);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error("Size chart generation failed:", err.message || res.statusText);
+        const updates: Partial<ProductCopy> = { sizeChartStatus: "error" as const };
+        set((s) => ({
+          copyProducts: s.copyProducts.map((p) =>
+            p.id === id ? { ...p, ...updates } : p
+          ),
+        }));
+        if (store) updateProductCopyDB(id, updates, store.id);
+      }
+    } catch (error) {
+      console.error("Size chart generation error:", error);
+      const updates: Partial<ProductCopy> = { sizeChartStatus: "error" as const };
       set((s) => ({
         copyProducts: s.copyProducts.map((p) =>
-          p.id === id
-            ? { ...p, sizeChartStatus: "done" as const, sizeChartTable: MOCK_SIZE_CHART }
-            : p
+          p.id === id ? { ...p, ...updates } : p
         ),
       }));
-    }, 2500);
+      if (store) updateProductCopyDB(id, updates, store.id);
+    }
   },
 }));
 
 // ─── Ad Creator Store ────────────────────────────────────
 // Manages test campaign creation for Meta Ads.
+// Loads from Supabase, debounced writes on edits.
 
 interface AdCreatorStore {
   campaigns: AdCreatorCampaign[];
+  loading: boolean;
+  loadCampaigns: (storeId: string) => Promise<void>;
   updateCampaign: (id: string, updates: Partial<AdCreatorCampaign>) => void;
   addCampaign: () => void;
   removeCampaign: (id: string) => void;
@@ -274,59 +561,112 @@ interface AdCreatorStore {
   pushAll: () => void;
 }
 
-export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
-  campaigns: initialAdCreatorCampaigns.map((c) => ({ ...c })),
+// Debounce timers for ad creator updates
+const adCreatorUpdateTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
-  updateCampaign: (id, updates) =>
+async function updateAdCreatorDB(id: string, updates: Partial<AdCreatorCampaign>, storeId: string) {
+  const { updateAdCreatorCampaign } = await import("@/lib/services/ad-creator");
+  await updateAdCreatorCampaign(id, updates, storeId);
+}
+
+export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
+  campaigns: [],
+  loading: false,
+
+  loadCampaigns: async (storeId: string) => {
+    set({ loading: true });
+    try {
+      const { fetchAdCreatorCampaigns } = await import("@/lib/services/ad-creator");
+      const campaigns = await fetchAdCreatorCampaigns(storeId);
+      set({ campaigns, loading: false });
+    } catch (err) {
+      console.error("Failed to load ad creator campaigns:", err);
+      set({ campaigns: [], loading: false });
+    }
+  },
+
+  updateCampaign: (id, updates) => {
+    // Optimistic update
     set((s) => ({
       campaigns: s.campaigns.map((c) =>
         c.id === id ? { ...c, ...updates } : c
       ),
-    })),
+    }));
 
-  addCampaign: () =>
-    set((s) => ({
-      campaigns: [
-        ...s.campaigns,
-        {
-          id: `ac-${Date.now()}`,
-          productName: "",
-          productUrl: "",
-          primaryText: "",
-          headline: "",
-          description: "",
-          cta: "Shop Now",
-          country: "",
-          budget: 30,
-          gender: "" as const,
-          creatives: [],
-          status: "Queued" as const,
-        },
-      ],
-    })),
+    // Debounced DB write
+    const store = useStoreContext.getState().selectedStore;
+    if (store) {
+      clearTimeout(adCreatorUpdateTimers[id]);
+      adCreatorUpdateTimers[id] = setTimeout(() => {
+        updateAdCreatorDB(id, updates, store.id);
+      }, 300);
+    }
+  },
 
-  removeCampaign: (id) =>
+  addCampaign: async () => {
+    const store = useStoreContext.getState().selectedStore;
+    if (!store) return;
+
+    const { createAdCreatorCampaign } = await import("@/lib/services/ad-creator");
+    const campaign = await createAdCreatorCampaign(store.id);
+    if (campaign) {
+      set((s) => ({ campaigns: [...s.campaigns, campaign] }));
+    }
+  },
+
+  removeCampaign: (id) => {
     set((s) => ({
       campaigns: s.campaigns.filter((c) => c.id !== id),
-    })),
+    }));
+    import("@/lib/services/ad-creator").then((m) => m.deleteAdCreatorCampaign(id));
+  },
 
-  pushCampaign: (id) => {
+  pushCampaign: async (id) => {
     const campaign = get().campaigns.find((c) => c.id === id);
     if (!campaign || campaign.status !== "Ready") return;
+    const store = useStoreContext.getState().selectedStore;
+    const user = useAuthStore.getState().user;
 
     set((s) => ({
       campaigns: s.campaigns.map((c) =>
         c.id === id ? { ...c, status: "Pushing" as const } : c
       ),
     }));
+    if (store) updateAdCreatorDB(id, { status: "Pushing" }, store.id);
 
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/push-to-meta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user?.id, campaignId: id }),
+      });
+
+      if (res.ok) {
+        set((s) => ({
+          campaigns: s.campaigns.map((c) =>
+            c.id === id ? { ...c, status: "Live" as const } : c
+          ),
+        }));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error("Push to Meta failed:", err.error);
+        // Revert to Ready on failure
+        set((s) => ({
+          campaigns: s.campaigns.map((c) =>
+            c.id === id ? { ...c, status: "Ready" as const } : c
+          ),
+        }));
+        if (store) updateAdCreatorDB(id, { status: "Ready" }, store.id);
+      }
+    } catch (err) {
+      console.error("Push to Meta error:", err);
       set((s) => ({
         campaigns: s.campaigns.map((c) =>
-          c.id === id ? { ...c, status: "Live" as const } : c
+          c.id === id ? { ...c, status: "Ready" as const } : c
         ),
       }));
-    }, 2000);
+      if (store) updateAdCreatorDB(id, { status: "Ready" }, store.id);
+    }
   },
 
   pushAll: () => {
@@ -355,12 +695,23 @@ interface CreativeGeneratorStore {
   productCreatives: ProductCreative[];
   imagesPerProduct: number;
   promptAllocations: PromptAllocation[];
+  loaded: boolean;
 
+  loadBatchQueue: (storeId: string) => Promise<void>;
+  loadCreatives: (storeId: string) => Promise<void>;
   setImagesPerProduct: (n: number) => void;
   setPromptAllocations: (allocs: PromptAllocation[]) => void;
   generateBatch: (productIds: string[]) => void;
   removeCreative: (creativeId: string) => void;
+  saveCreative: (creativeId: string) => Promise<void>;
 }
+
+import {
+  fetchBatchQueue,
+  fetchCreatives as fetchCreativesFromDb,
+  updateCreativeStatus,
+  deleteCreative as deleteCreativeFromDb,
+} from "@/lib/services/creative-generator";
 
 export const useCreativeGeneratorStore = create<CreativeGeneratorStore>(
   (set, get) => ({
@@ -371,6 +722,17 @@ export const useCreativeGeneratorStore = create<CreativeGeneratorStore>(
       { templateId: PROMPT_TEMPLATES[10].id, label: PROMPT_TEMPLATES[10].label, count: 2 },
       { templateId: PROMPT_TEMPLATES[2].id, label: PROMPT_TEMPLATES[2].label, count: 1 },
     ],
+    loaded: false,
+
+    loadBatchQueue: async (storeId: string) => {
+      const queue = await fetchBatchQueue(storeId);
+      set({ batchQueue: queue });
+    },
+
+    loadCreatives: async (storeId: string) => {
+      const creatives = await fetchCreativesFromDb(storeId);
+      set({ productCreatives: creatives, loaded: true });
+    },
 
     setImagesPerProduct: (n) => set({ imagesPerProduct: n }),
     setPromptAllocations: (allocs) => set({ promptAllocations: allocs }),
@@ -405,7 +767,7 @@ export const useCreativeGeneratorStore = create<CreativeGeneratorStore>(
         productCreatives: [...s.productCreatives, ...newCreatives],
       }));
 
-      // Stagger-reveal creatives
+      // Stagger-reveal creatives (placeholder until Nanobanana API is wired)
       newCreatives.forEach((c, i) => {
         setTimeout(() => {
           set((s) => ({
@@ -427,10 +789,28 @@ export const useCreativeGeneratorStore = create<CreativeGeneratorStore>(
       }, totalTime);
     },
 
-    removeCreative: (creativeId) =>
+    removeCreative: async (creativeId) => {
       set((s) => ({
         productCreatives: s.productCreatives.filter((c) => c.id !== creativeId),
-      })),
+      }));
+      // Delete from DB if it's a real UUID (not a temp pcr- id)
+      if (!creativeId.startsWith("pcr-")) {
+        await deleteCreativeFromDb(creativeId);
+      }
+    },
+
+    saveCreative: async (creativeId: string) => {
+      // Mark as saved locally
+      set((s) => ({
+        productCreatives: s.productCreatives.map((c) =>
+          c.id === creativeId ? { ...c, status: "completed" as const } : c
+        ),
+      }));
+      // Persist to DB if it's a real UUID
+      if (!creativeId.startsWith("pcr-")) {
+        await updateCreativeStatus(creativeId, "saved");
+      }
+    },
   })
 );
 
@@ -491,14 +871,94 @@ useCreativeGeneratorStore.subscribe((state) => {
 // Global store selector state so that the chosen store
 // propagates across every module without prop-drilling.
 
+export type AppStore = {
+  id: string;
+  name: string;
+  market: string;
+  currency: string;
+};
+
 interface StoreContext {
-  selectedStore: MockStore;
-  setSelectedStore: (store: MockStore) => void;
+  stores: AppStore[];
+  selectedStore: AppStore | null;
+  setSelectedStore: (store: AppStore) => void;
+  loadStores: () => Promise<void>;
 }
 
 export const useStoreContext = create<StoreContext>((set) => ({
-  selectedStore: mockStores[0],
+  stores: [],
+  selectedStore: null,
+  loadStores: async () => {
+    const user = useAuthStore.getState().user;
+    if (!user || user.storeIds.length === 0) {
+      set({ stores: [], selectedStore: null });
+      return;
+    }
+    const { data } = await supabase
+      .from("stores")
+      .select("id, name, market, currency")
+      .in("id", user.storeIds);
+    const stores: AppStore[] = (data ?? []).map((s) => ({
+      id: s.id,
+      name: s.name,
+      market: s.market,
+      currency: s.currency,
+    }));
+    set((prev) => ({
+      stores,
+      selectedStore: prev.selectedStore && stores.find((s) => s.id === prev.selectedStore!.id)
+        ? prev.selectedStore
+        : stores[0] ?? null,
+    }));
+  },
   setSelectedStore: (store) => set({ selectedStore: store }),
+}));
+
+// ─── Connections Store ──────────────────────────────────
+// Tracks which external services are connected for the current user.
+
+import {
+  fetchConnections,
+  isServiceConnected,
+  type ServiceConnection,
+  type ServiceId,
+} from "@/lib/services/connections";
+
+interface ConnectionsStore {
+  connections: ServiceConnection[];
+  loading: boolean;
+  loadConnections: () => Promise<void>;
+  isConnected: (service: ServiceId) => boolean;
+  removeConnection: (service: ServiceId) => void;
+  getExpiryDaysLeft: (service: ServiceId) => number | null;
+}
+
+export const useConnectionsStore = create<ConnectionsStore>((set, get) => ({
+  connections: [],
+  loading: false,
+
+  loadConnections: async () => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+    set({ loading: true });
+    const connections = await fetchConnections(user.id);
+    set({ connections, loading: false });
+  },
+
+  isConnected: (service) => isServiceConnected(get().connections, service),
+
+  getExpiryDaysLeft: (service) => {
+    const conn = get().connections.find((c) => c.service === service);
+    if (!conn?.expiresAt) return null;
+    const diff = new Date(conn.expiresAt).getTime() - Date.now();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  },
+
+  removeConnection: (service) => {
+    set((s) => ({
+      connections: s.connections.filter((c) => c.service !== service),
+    }));
+  },
 }));
 
 // ─── Demo Mode ──────────────────────────────────────────
@@ -516,7 +976,7 @@ interface DemoStore {
 }
 
 export const useDemoStore = create<DemoStore>((set) => ({
-  bannerVisible: true,
+  bannerVisible: false,
   dismissBanner: () => set({ bannerVisible: false }),
   tourActive: false,
   tourStep: 0,

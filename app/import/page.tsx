@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -12,15 +12,24 @@ import {
   RotateCcw,
   CheckCheck,
 } from "lucide-react";
-import { useResearchStore } from "@/lib/store";
+import { useResearchStore, useStoreContext } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui";
 import { ImportQueueCard } from "@/components/modules/ImportQueueCard";
 
 export default function ImportPage() {
   const router = useRouter();
-  const { sheetProducts, updateSheetProduct } = useResearchStore();
+  const { sheetProducts, updateSheetProduct, loadProducts } = useResearchStore();
+  const { selectedStore } = useStoreContext();
   const [csvGenerated, setCsvGenerated] = useState(false);
+
+  // Ensure research products are loaded (user may navigate here directly)
+  const storeId = selectedStore?.id;
+  useEffect(() => {
+    if (storeId && sheetProducts.length === 0) {
+      loadProducts(storeId);
+    }
+  }, [storeId, loadProducts, sheetProducts.length]);
 
   const queuedProducts = useMemo(
     () => sheetProducts.filter((p) => p.testingStatus === "Queued"),

@@ -3,14 +3,23 @@
 import { useRef, useEffect, useState } from "react";
 import { Bell, ChevronDown, Compass, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { mockStores } from "@/lib/navigation";
-import { useStoreContext, useDemoStore, useAuthStore } from "@/lib/store";
+import { useStoreContext, useDemoStore, useAuthStore, useConnectionsStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const marketColors: Record<string, string> = {
   UK: "bg-accent-emerald/15 text-accent-emerald",
   AU: "bg-accent-amber/15 text-accent-amber",
   USA: "bg-accent-indigo/15 text-accent-indigo",
+  EU: "bg-violet-500/15 text-violet-400",
+  CA: "bg-rose-500/15 text-rose-400",
+};
+
+const marketDotColors: Record<string, string> = {
+  UK: "bg-accent-emerald",
+  AU: "bg-accent-amber",
+  USA: "bg-accent-indigo",
+  EU: "bg-violet-400",
+  CA: "bg-rose-400",
 };
 
 type TopBarProps = {
@@ -19,18 +28,27 @@ type TopBarProps = {
 };
 
 export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
-  const { selectedStore, setSelectedStore } = useStoreContext();
+  const { stores, selectedStore, setSelectedStore, loadStores } = useStoreContext();
   const { startTour } = useDemoStore();
   const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
+  const logout = useAuthStore((s) => s.logout) as () => void;
+  const { getExpiryDaysLeft, loadConnections } = useConnectionsStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Only show stores the current user has access to
-  const userStores = mockStores.filter(
-    (s) => user?.storeIds.includes(s.id)
-  );
-  const hasMultipleStores = userStores.length > 1;
+  // Load connections to check expiry
+  useEffect(() => {
+    if (user) loadConnections();
+  }, [user, loadConnections]);
+
+  const metaDaysLeft = getExpiryDaysLeft("facebook");
+
+  const hasMultipleStores = stores.length > 1;
+
+  // Load stores on mount / when user changes
+  useEffect(() => {
+    loadStores();
+  }, [loadStores, user?.storeIds]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -44,6 +62,8 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  if (!selectedStore) return null;
 
   return (
     <header
@@ -83,11 +103,7 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
             <div
               className={cn(
                 "w-2 h-2 rounded-full shrink-0",
-                selectedStore.market === "UK"
-                  ? "bg-accent-emerald"
-                  : selectedStore.market === "AU"
-                    ? "bg-accent-amber"
-                    : "bg-accent-indigo"
+                marketDotColors[selectedStore.market] ?? "bg-accent-indigo"
               )}
             />
 
@@ -103,7 +119,7 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
             <span
               className={cn(
                 "text-[10px] font-jetbrains font-semibold px-1.5 py-0.5 rounded",
-                marketColors[selectedStore.market]
+                marketColors[selectedStore.market] ?? "bg-accent-indigo/15 text-accent-indigo"
               )}
             >
               {selectedStore.market}
@@ -130,7 +146,7 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
                 transition={{ duration: 0.15 }}
                 className="absolute top-full left-0 mt-1.5 w-60 rounded-xl bg-bg-card border border-subtle shadow-2xl shadow-black/50 py-1.5 z-50"
               >
-                {userStores.map((store) => (
+                {stores.map((store) => (
                   <button
                     key={store.id}
                     onClick={() => {
@@ -146,11 +162,7 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
                     <div
                       className={cn(
                         "w-2 h-2 rounded-full shrink-0",
-                        store.market === "UK"
-                          ? "bg-accent-emerald"
-                          : store.market === "AU"
-                            ? "bg-accent-amber"
-                            : "bg-accent-indigo"
+                        marketDotColors[store.market] ?? "bg-accent-indigo"
                       )}
                     />
                     <div className="flex-1 min-w-0">
@@ -171,6 +183,26 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Meta token expiry warning */}
+      {metaDaysLeft !== null && metaDaysLeft <= 7 && metaDaysLeft > 0 && (
+        <a
+          href="/settings"
+          className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent-amber/10 border border-accent-amber/20 text-accent-amber text-[11px] font-medium hover:bg-accent-amber/15 transition-colors"
+        >
+          <span>⚠</span>
+          Meta token expires in {metaDaysLeft} day{metaDaysLeft !== 1 ? "s" : ""} — reconnect
+        </a>
+      )}
+      {metaDaysLeft !== null && metaDaysLeft <= 0 && (
+        <a
+          href="/settings"
+          className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent-red/10 border border-accent-red/20 text-accent-red text-[11px] font-medium hover:bg-accent-red/15 transition-colors"
+        >
+          <span>⚠</span>
+          Meta token expired — reconnect now
+        </a>
+      )}
 
       {/* Right section */}
       <div className="flex items-center gap-1.5">

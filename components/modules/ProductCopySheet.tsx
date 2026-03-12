@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X, Upload, Check, ChevronRight, ImageIcon, Table2 } from "lucide-react";
-import { useProductCopyStore } from "@/lib/store";
+import { useProductCopyStore, useStoreContext } from "@/lib/store";
 import { type ProductCopy, type AdStatus } from "@/data/mock";
 import { cn } from "@/lib/utils";
 
@@ -522,12 +522,19 @@ type StatusFilter = "All" | "Pending" | "Generating" | "Completed" | "Blank";
 // ── Main sheet component ───────────────────────────────────
 
 export function ProductCopySheet() {
-  const { copyProducts, updateCopyProduct, generateCopy, generateAll, pushToStore, pushAllToStore, generateSizeChart } =
+  const { copyProducts, loading, loadProducts, updateCopyProduct, generateCopy, generateAll, pushToStore, pushAllToStore, generateSizeChart } =
     useProductCopyStore();
+  const { selectedStore } = useStoreContext();
+  const storeId = selectedStore?.id;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Load products from Supabase when store changes
+  useEffect(() => {
+    if (storeId) loadProducts(storeId);
+  }, [storeId, loadProducts]);
 
   const filtered = useMemo(() => {
     let items = copyProducts;
@@ -555,6 +562,15 @@ export function ProductCopySheet() {
   const previewProduct = previewId
     ? copyProducts.find((p) => p.id === previewId)
     : null;
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <Loader2 size={24} className="animate-spin text-accent-indigo mb-3" />
+        <p className="text-sm text-text-secondary">Loading products…</p>
+      </div>
+    );
+  }
 
   if (copyProducts.length === 0) {
     return (

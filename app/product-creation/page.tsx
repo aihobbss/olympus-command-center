@@ -1,9 +1,33 @@
 "use client";
 
+import { useEffect } from "react";
 import { Wand2 } from "lucide-react";
 import { ProductCopySheet } from "@/components/modules/ProductCopySheet";
+import { ServiceConnectionOverlay } from "@/components/modules/ServiceConnectionCard";
+import { useConnectionsStore, useAuthStore } from "@/lib/store";
+import { SERVICE_REGISTRY } from "@/lib/services/connections";
 
 export default function ProductCreationPage() {
+  const user = useAuthStore((s) => s.user);
+  const { loadConnections, isConnected } = useConnectionsStore();
+
+  useEffect(() => {
+    if (user) loadConnections();
+  }, [user, loadConnections]);
+
+  const shopifyConnected = isConnected("shopify");
+  const anthropicConnected = isConnected("anthropic");
+  const allConnected = shopifyConnected && anthropicConnected;
+
+  const missingServices = [
+    ...(!shopifyConnected
+      ? [{ service: "shopify" as const, meta: SERVICE_REGISTRY.find((s) => s.id === "shopify")! }]
+      : []),
+    ...(!anthropicConnected
+      ? [{ service: "anthropic" as const, meta: SERVICE_REGISTRY.find((s) => s.id === "anthropic")! }]
+      : []),
+  ];
+
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
@@ -20,7 +44,18 @@ export default function ProductCreationPage() {
         </div>
       </div>
 
-      <ProductCopySheet />
+      {allConnected ? (
+        <ProductCopySheet />
+      ) : (
+        <ServiceConnectionOverlay
+          moduleName="Product Creation"
+          services={missingServices.map(({ service, meta }) => ({
+            service,
+            description: meta.description,
+            onConnect: () => { window.location.href = meta.connectUrl; },
+          }))}
+        />
+      )}
     </div>
   );
 }
