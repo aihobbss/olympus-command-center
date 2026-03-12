@@ -350,6 +350,45 @@ export default function AdManagerPage() {
           {/* ─── Live Campaigns Tab ─── */}
           {activeTab === "live" && (
             <>
+              {/* ─── Status Filter + Sync Status ─── */}
+              <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+                <div className="flex items-center gap-1.5">
+                  {(["Active", "Paused", "Killed", "all"] as const).map((s) => {
+                    const count = statusCounts[s] ?? 0;
+                    const label = s === "all" ? "All" : s;
+                    const isSelected = statusFilter === s;
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => setStatusFilter(s)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
+                          isSelected
+                            ? s === "Active" ? "bg-accent-emerald/15 text-accent-emerald border-accent-emerald/30"
+                            : s === "Killed" ? "bg-accent-red/15 text-accent-red border-accent-red/30"
+                            : s === "Paused" ? "bg-accent-amber/15 text-accent-amber border-accent-amber/30"
+                            : "bg-accent-indigo/15 text-accent-indigo border-accent-indigo/30"
+                            : "bg-white/[0.04] text-text-muted border-subtle hover:text-text-secondary hover:bg-white/[0.06]"
+                        )}
+                      >
+                        {label}
+                        {count > 0 && <span className="ml-1.5 opacity-60">{count}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  {lastSynced && (
+                    <span className="text-text-muted">
+                      Last synced: {new Date(lastSynced).toLocaleString()}
+                    </span>
+                  )}
+                  {syncError && (
+                    <span className="text-accent-red">{syncError}</span>
+                  )}
+                </div>
+              </div>
+
               {/* ─── Metric Cards ─── */}
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
                 <MetricCard
@@ -379,46 +418,6 @@ export default function AdManagerPage() {
                   format="number"
                   className="col-span-2 lg:col-span-1"
                 />
-              </div>
-
-              {/* ─── Status Filter + Sync Status ─── */}
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                <div className="flex items-center gap-1.5">
-                  {(["Active", "Paused", "Killed", "all"] as const).map((s) => {
-                    const count = statusCounts[s] ?? 0;
-                    if (s !== "all" && count === 0) return null;
-                    const label = s === "all" ? "All" : s;
-                    const active = statusFilter === s;
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => setStatusFilter(s)}
-                        className={cn(
-                          "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
-                          active
-                            ? s === "Active" ? "bg-accent-emerald/15 text-accent-emerald border border-accent-emerald/30"
-                            : s === "Killed" ? "bg-accent-red/15 text-accent-red border border-accent-red/30"
-                            : s === "Paused" ? "bg-accent-amber/15 text-accent-amber border border-accent-amber/30"
-                            : "bg-accent-indigo/15 text-accent-indigo border border-accent-indigo/30"
-                            : "bg-white/[0.04] text-text-muted border border-transparent hover:text-text-secondary"
-                        )}
-                      >
-                        {label}
-                        <span className="ml-1 opacity-60">{count}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex items-center gap-3 text-xs">
-                  {lastSynced && (
-                    <span className="text-text-muted">
-                      Last synced: {new Date(lastSynced).toLocaleString()}
-                    </span>
-                  )}
-                  {syncError && (
-                    <span className="text-accent-red">{syncError}</span>
-                  )}
-                </div>
               </div>
 
               {/* ─── Empty state ─── */}
