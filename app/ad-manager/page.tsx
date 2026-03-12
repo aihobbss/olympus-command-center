@@ -21,7 +21,7 @@ import {
   passCampaign,
   getLastSyncedAt,
 } from "@/lib/services/meta-campaigns";
-import { fetchProfitLogs } from "@/lib/services/profit-tracker";
+import { fetchProfitLogs, triggerProfitSync } from "@/lib/services/profit-tracker";
 
 type AdTab = "live" | "creator";
 
@@ -147,7 +147,11 @@ export default function AdManagerPage() {
 
   // ── Load campaigns from Supabase on mount + after sync ──
   const loadCampaigns = useCallback(async () => {
-    if (!storeId) return;
+    if (!storeId || !user) return;
+
+    // Sync Shopify profit data first so profit_logs table is populated
+    await triggerProfitSync(user.id, storeId).catch(() => {});
+
     const [data, profitLogs, synced] = await Promise.all([
       fetchLiveCampaigns(storeId),
       fetchProfitLogs(storeId),
@@ -169,7 +173,7 @@ export default function AdManagerPage() {
       prof += log.profit;
     }
     setShopifyTotals({ revenue: rev, orders: ord, profit: prof });
-  }, [storeId]);
+  }, [storeId, user]);
 
   useEffect(() => {
     if (metaConnected && storeId) loadCampaigns();
