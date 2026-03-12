@@ -13,8 +13,6 @@ import type { AdCampaign } from "@/data/mock";
 interface CampaignCardProps {
   campaign: AdCampaign;
   onClick: (campaign: AdCampaign) => void;
-  storeCurrency: string;
-  toUsd: (localAmount: number) => number;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -64,8 +62,6 @@ function roasColor(roas: number): string {
 export function CampaignCard({
   campaign,
   onClick,
-  storeCurrency,
-  toUsd,
 }: CampaignCardProps) {
   const {
     campaignName,
@@ -75,8 +71,6 @@ export function CampaignCard({
     cpc,
     atc,
     roas,
-    revenue,
-    profit,
     status,
     recommendation,
   } = campaign;
@@ -84,7 +78,6 @@ export function CampaignCard({
   const metrics: {
     label: string;
     value: string;
-    subtitle?: string;
     colorClass?: string;
   }[] = [
     {
@@ -107,21 +100,6 @@ export function CampaignCard({
       label: "ROAS",
       value: roas.toFixed(2),
       colorClass: roasColor(roas),
-    },
-    {
-      label: "Revenue",
-      value: formatCurrency(revenue, storeCurrency),
-      subtitle: `$${toUsd(revenue).toLocaleString("en-GB")} USD`,
-    },
-    {
-      label: "Profit",
-      value: formatCurrency(profit, storeCurrency),
-      subtitle: `$${toUsd(profit).toLocaleString("en-GB")} USD`,
-      colorClass: profit < 0 ? "text-accent-red" : undefined,
-    },
-    {
-      label: "Orders",
-      value: campaign.orders.toLocaleString("en-GB"),
     },
   ];
 
@@ -183,11 +161,6 @@ export function CampaignCard({
               >
                 {m.value}
               </span>
-              {m.subtitle && (
-                <span className="text-[10px] font-jetbrains text-text-secondary leading-none">
-                  {m.subtitle}
-                </span>
-              )}
             </div>
           ))}
         </div>

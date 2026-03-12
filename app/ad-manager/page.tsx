@@ -21,6 +21,7 @@ import {
   passCampaign,
   getLastSyncedAt,
 } from "@/lib/services/meta-campaigns";
+import { fetchProfitLogs } from "@/lib/services/profit-tracker";
 
 type AdTab = "live" | "creator";
 
@@ -124,6 +125,7 @@ export default function AdManagerPage() {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"live" | "paused" | "all">("live");
+  const [shopifyTotals, setShopifyTotals] = useState({ revenue: 0, orders: 0, profit: 0 });
 
   const storeCurrency = selectedStore?.currency ?? "";
   const rate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
@@ -146,15 +148,27 @@ export default function AdManagerPage() {
   // ── Load campaigns from Supabase on mount + after sync ──
   const loadCampaigns = useCallback(async () => {
     if (!storeId) return;
-    const data = await fetchLiveCampaigns(storeId);
+    const [data, profitLogs, synced] = await Promise.all([
+      fetchLiveCampaigns(storeId),
+      fetchProfitLogs(storeId),
+      getLastSyncedAt(storeId),
+    ]);
     // Re-compute SOP recommendations on the client
     const withRecs = data.map((c) => {
       const { status, recommendation } = computeRecommendation(c);
       return { ...c, status, recommendation };
     });
     setCampaigns(withRecs);
-    const synced = await getLastSyncedAt(storeId);
     setLastSynced(synced);
+
+    // Aggregate Shopify revenue/orders/profit from profit logs
+    let rev = 0, ord = 0, prof = 0;
+    for (const log of profitLogs) {
+      rev += log.revenue;
+      ord += log.orders ?? 0;
+      prof += log.profit;
+    }
+    setShopifyTotals({ revenue: rev, orders: ord, profit: prof });
   }, [storeId]);
 
   useEffect(() => {
@@ -207,20 +221,18 @@ export default function AdManagerPage() {
 
   // ── Aggregated metrics (from filtered view) ──
 
-  const totals = useMemo(() => {
-    let spend = 0,
-      revenue = 0,
-      profit = 0,
-      orders = 0;
-    for (const c of filteredCampaigns) {
-      spend += c.spend;
-      revenue += c.revenue;
-      profit += c.profit;
-      orders += c.orders;
-    }
-    const roas = spend > 0 ? parseFloat((revenue / spend).toFixed(2)) : 0;
-    return { spend, revenue, profit, orders, roas };
+  // Total ad spend from Meta campaigns (filtered view)
+  const totalSpend = useMemo(() => {
+    let spend = 0;
+    for (const c of filteredCampaigns) spend += c.spend;
+    return spend;
   }, [filteredCampaigns]);
+
+  // Revenue, Orders, Profit come from Shopify profit logs (store-wide, not per-campaign)
+  const totals = useMemo(() => {
+    const roas = totalSpend > 0 ? parseFloat((shopifyTotals.revenue / totalSpend).toFixed(2)) : 0;
+    return { spend: totalSpend, revenue: shopifyTotals.revenue, profit: shopifyTotals.profit, orders: shopifyTotals.orders, roas };
+  }, [totalSpend, shopifyTotals]);
 
   // ── Card click → open panel ──
 
@@ -393,15 +405,15 @@ export default function AdManagerPage() {
                   label="Revenue"
                   value={totals.revenue}
                   format="currency"
-                  currency={storeCurrency}
-                  subtitle={`$${toUsd(totals.revenue).toLocaleString("en-GB")} USD`}
+                  currency="$"
+                  subtitle="From Shopify"
                 />
                 <MetricCard
                   label="Profit"
                   value={totals.profit}
                   format="currency"
-                  currency={storeCurrency}
-                  subtitle={`$${toUsd(totals.profit).toLocaleString("en-GB")} USD`}
+                  currency="$"
+                  subtitle="From Shopify"
                 />
                 <MetricCard label="Orders" value={totals.orders} format="number" />
                 <MetricCard
@@ -433,8 +445,6 @@ export default function AdManagerPage() {
                     key={campaign.id}
                     campaign={campaign}
                     onClick={handleCardClick}
-                    storeCurrency={storeCurrency}
-                    toUsd={toUsd}
                   />
                 ))}
               </div>

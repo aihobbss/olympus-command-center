@@ -41,6 +41,7 @@ function rowToLog(row: ProfitLogRow): ProfitLog {
     profit: row.profit_usd,
     roas: row.roas,
     profitPercent: row.profit_percent,
+    orders: row.orders,
   };
 }
 

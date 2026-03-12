@@ -146,7 +146,7 @@ export function StoreSetup() {
             type="text"
             value={storeName}
             onChange={(e) => setStoreName(e.target.value)}
-            placeholder="e.g. Vantage London"
+            placeholder="e.g. Vantage Melbourne"
             className={cn(
               "w-full px-4 py-3 rounded-xl text-sm text-text-primary placeholder:text-text-muted",
               "bg-bg-primary border border-subtle",

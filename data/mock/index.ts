@@ -90,7 +90,7 @@ export const initialSheetProducts: SheetProduct[] = [
     id: "sp-001",
     productName: "Maven Bomber Jacket",
     adLink: "https://facebook.com/ads/library/?id=100003",
-    storeLink: "https://vantage-london.myshopify.com/products/maven-bomber-jacket",
+    storeLink: "https://vantagemelbourne.myshopify.com/products/maven-bomber-jacket",
     testingStatus: "Live",
     creativeSaved: true,
     cog: 18,
@@ -103,7 +103,7 @@ export const initialSheetProducts: SheetProduct[] = [
     id: "sp-002",
     productName: "Haldrin Layered Shirt",
     adLink: "https://facebook.com/ads/library/?id=100005",
-    storeLink: "https://vantage-london.myshopify.com/products/haldrin-layered-shirt",
+    storeLink: "https://vantagemelbourne.myshopify.com/products/haldrin-layered-shirt",
     testingStatus: "Scheduled",
     creativeSaved: true,
     cog: 12,
@@ -116,7 +116,7 @@ export const initialSheetProducts: SheetProduct[] = [
     id: "sp-003",
     productName: "Harrington Trainers",
     adLink: "https://facebook.com/ads/library/?id=100001",
-    storeLink: "https://vantage-london.myshopify.com/products/harrington-trainers",
+    storeLink: "https://vantagemelbourne.myshopify.com/products/harrington-trainers",
     testingStatus: "Imported",
     creativeSaved: false,
     cog: 22,
@@ -142,7 +142,7 @@ export const initialSheetProducts: SheetProduct[] = [
     id: "sp-005",
     productName: "Avalon Puffer Vest",
     adLink: "https://facebook.com/ads/library/?id=100007",
-    storeLink: "https://vantage-london.myshopify.com/products/avalon-puffer-vest",
+    storeLink: "https://vantagemelbourne.myshopify.com/products/avalon-puffer-vest",
     testingStatus: "Killed",
     creativeSaved: true,
     cog: 24,
@@ -251,10 +251,10 @@ export const initialCopyProducts: ProductCopy[] = [
     id: "pc-001",
     adStatus: "green",
     productName: "Aymbr Sweater",
-    productUrl: "https://vantage-london.myshopify.com/products/aymbr",
-    imageUrl: "http://vantage-london.myshopify.com/cdn/shop/files/britt_wit_1_1_720x.jpg",
+    productUrl: "https://vantagemelbourne.myshopify.com/products/aymbr",
+    imageUrl: "http://vantagemelbourne.myshopify.com/cdn/shop/files/britt_wit_1_1_720x.jpg",
     shopifyDescription: "Modern Edge Meets Everyday Comfort\n\nElevate your seasonal wardrobe with a statement knit designed to turn heads. The Aymbr Sweater features distinctive openwork detail and a relaxed silhouette that flatters while keeping things effortlessly stylish.\n\n\u2022 Knitted Design: Cozy construction combines warmth with everyday refinement\n\u2022 Openwork Details: Intricate patterns bring depth and modern flair\n\u2022 Relaxed Fit: Slightly oversized shape with dropped shoulders for easy layering\n\u2022 Round Neck: Classic crew neckline complements any outfit\n\nDesigned in London by Vantage for timeless versatility.",
-    facebookCopy: "Slide Into Textured Sophistication with the Aymbr Sweater\n\nPlayful structure meets confident style in this relaxed must-have. The Aymbr Sweater\u2019s openwork detail and patchwork texture bring effortless elegance to your rotation.\n\nRelaxed. Intricate. Versatile.\n\nhttps://vantage-london.myshopify.com/products/aymbr\nAymbr Sweater\nFree Shipping in the UK\nShop now",
+    facebookCopy: "Slide Into Textured Sophistication with the Aymbr Sweater\n\nPlayful structure meets confident style in this relaxed must-have. The Aymbr Sweater\u2019s openwork detail and patchwork texture bring effortless elegance to your rotation.\n\nRelaxed. Intricate. Versatile.\n\nhttps://vantagemelbourne.myshopify.com/products/aymbr\nAymbr Sweater\nFree Shipping in the UK\nShop now",
     status: "Completed",
     pushStatus: "",
     sizeChartImage: "",
@@ -265,10 +265,10 @@ export const initialCopyProducts: ProductCopy[] = [
     id: "pc-002",
     adStatus: "green",
     productName: "All-Terrain Canvas Sneaker",
-    productUrl: "https://vantage-london.myshopify.com/products/all-terrain-canvas-sneaker",
-    imageUrl: "http://vantage-london.myshopify.com/cdn/shop/files/S6dba56a87e254678.webp",
+    productUrl: "https://vantagemelbourne.myshopify.com/products/all-terrain-canvas-sneaker",
+    imageUrl: "http://vantagemelbourne.myshopify.com/cdn/shop/files/S6dba56a87e254678.webp",
     shopifyDescription: "Warm-Weather Function Meets Everyday Utility\n\nCrafted for comfort and ease, the All-Terrain Canvas Sneaker is ready for anything from daily errands to weekend adventures. The breathable upper and flexible sole support natural movement.\n\n\u2022 Low-Top Construction: Relaxed silhouette with casual styling appeal\n\u2022 Lace-Up Front: Metal eyelets provide secure fit and utility edge\n\u2022 Slip-Resistant Tread: Durable outsole provides reliable traction\n\u2022 Textured Details: Visible stitching and panel design add structure\n\nDesigned in London by Vantage for modern versatility.",
-    facebookCopy: "Slide Into Everyday Motion with the All-Terrain Canvas Sneaker\n\nBuilt to keep pace with your routine, the All-Terrain Canvas Sneaker delivers breathable comfort, structured support, and rugged traction in one easygoing package.\n\nPractical. Breathable. Grounded.\n\nhttps://vantage-london.myshopify.com/products/all-terrain-canvas-sneaker\nAll-Terrain Canvas Sneaker\nFree Shipping in the UK\nShop now",
+    facebookCopy: "Slide Into Everyday Motion with the All-Terrain Canvas Sneaker\n\nBuilt to keep pace with your routine, the All-Terrain Canvas Sneaker delivers breathable comfort, structured support, and rugged traction in one easygoing package.\n\nPractical. Breathable. Grounded.\n\nhttps://vantagemelbourne.myshopify.com/products/all-terrain-canvas-sneaker\nAll-Terrain Canvas Sneaker\nFree Shipping in the UK\nShop now",
     status: "Completed",
     pushStatus: "",
     sizeChartImage: "",
@@ -279,7 +279,7 @@ export const initialCopyProducts: ProductCopy[] = [
     id: "pc-003",
     adStatus: "yellow",
     productName: "Maven Bomber Jacket",
-    productUrl: "https://vantage-london.myshopify.com/products/maven-bomber-jacket",
+    productUrl: "https://vantagemelbourne.myshopify.com/products/maven-bomber-jacket",
     imageUrl: "",
     shopifyDescription: "",
     facebookCopy: "",
@@ -293,7 +293,7 @@ export const initialCopyProducts: ProductCopy[] = [
     id: "pc-004",
     adStatus: "red",
     productName: "Harrington Trainers",
-    productUrl: "https://vantage-london.myshopify.com/products/harrington-trainers",
+    productUrl: "https://vantagemelbourne.myshopify.com/products/harrington-trainers",
     imageUrl: "",
     shopifyDescription: "",
     facebookCopy: "",
@@ -307,7 +307,7 @@ export const initialCopyProducts: ProductCopy[] = [
     id: "pc-005",
     adStatus: "yellow",
     productName: "Haldrin Layered Shirt",
-    productUrl: "https://vantage-london.myshopify.com/products/haldrin-layered-shirt",
+    productUrl: "https://vantagemelbourne.myshopify.com/products/haldrin-layered-shirt",
     imageUrl: "",
     shopifyDescription: "",
     facebookCopy: "",
@@ -361,7 +361,7 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
   {
     id: "adc-001",
     productName: "Aymbr Sweater",
-    productUrl: "https://vantage-london.myshopify.com/products/aymbr",
+    productUrl: "https://vantagemelbourne.myshopify.com/products/aymbr",
     primaryText: "Slide Into Textured Sophistication with the Aymbr Sweater\n\nPlayful structure meets confident style in this relaxed must-have. The Aymbr Sweater\u2019s openwork detail and patchwork texture bring effortless elegance to your rotation.\n\nRelaxed. Intricate. Versatile.",
     headline: "Aymbr Sweater",
     description: "Free Shipping in the UK",
@@ -379,7 +379,7 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
   {
     id: "adc-002",
     productName: "All-Terrain Canvas Sneaker",
-    productUrl: "https://vantage-london.myshopify.com/products/all-terrain-canvas-sneaker",
+    productUrl: "https://vantagemelbourne.myshopify.com/products/all-terrain-canvas-sneaker",
     primaryText: "Slide Into Everyday Motion with the All-Terrain Canvas Sneaker\n\nBuilt to keep pace with your routine, the All-Terrain Canvas Sneaker delivers breathable comfort, structured support, and rugged traction in one easygoing package.\n\nPractical. Breathable. Grounded.",
     headline: "All-Terrain Canvas Sneaker",
     description: "Free Shipping in the UK",
@@ -396,7 +396,7 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
   {
     id: "adc-003",
     productName: "Maven Bomber Jacket",
-    productUrl: "https://vantage-london.myshopify.com/products/maven-bomber-jacket",
+    productUrl: "https://vantagemelbourne.myshopify.com/products/maven-bomber-jacket",
     primaryText: "",
     headline: "Maven Bomber Jacket",
     description: "Free Shipping in the UK",
@@ -410,7 +410,7 @@ export const initialAdCreatorCampaigns: AdCreatorCampaign[] = [
   {
     id: "adc-004",
     productName: "Harrington Trainers",
-    productUrl: "https://vantage-london.myshopify.com/products/harrington-trainers",
+    productUrl: "https://vantagemelbourne.myshopify.com/products/harrington-trainers",
     primaryText: "",
     headline: "Harrington Trainers",
     description: "Free Shipping in the UK",
@@ -627,6 +627,7 @@ export type ProfitLog = {
   profit: number;
   roas: number;
   profitPercent: number;
+  orders?: number;
 };
 
 export const profitLogs: ProfitLog[] = [
@@ -824,141 +825,6 @@ export const profitLogs: ProfitLog[] = [
 // 3b. Per-store data helpers
 // ============================================================
 
-// Vantage London is the main store (~£950K all-time revenue).
-// Vantage Melbourne is the student store (smaller numbers).
-// Scale factor: current Vantage Melbourne total ≈ £20K over 60 days → Vantage London target ≈ £950K → ~47x
-
-const VANTAGE_LDN_SCALE = 47;
-
-function scaleProfitLog(log: ProfitLog, scale: number): ProfitLog {
-  const revenue = Math.round(log.revenue * scale);
-  const cog = Math.round(log.cog * scale);
-  const adSpend = Math.round(log.adSpend * scale);
-  const transactionFee = +(log.transactionFee * scale).toFixed(2);
-  const profit = +(revenue - cog - adSpend - transactionFee).toFixed(2);
-  const roas = adSpend > 0 ? +(revenue / adSpend).toFixed(2) : 0;
-  const profitPercent = revenue > 0 ? +((profit / revenue) * 100).toFixed(1) : 0;
-  return { ...log, revenue, cog, adSpend, transactionFee, profit, roas, profitPercent };
-}
-
-const vantageLdnProfitLogs: ProfitLog[] = profitLogs.map((l) => scaleProfitLog(l, VANTAGE_LDN_SCALE));
-
-// Vantage London ad campaigns — hand-crafted with realistic $30→$60→$120→$240→$480 budget tiers
-const vantageLdnAdCampaigns: AdCampaign[] = [
-  {
-    id: "ol-001",
-    campaignName: "Harrington Trainers",
-    product: "Harrington Trainers",
-    spend: 218,
-    budget: 240,
-    cpc: 0.58,
-    atc: 38,
-    roas: 3.12,
-    revenue: 680,
-    orders: 19,
-    profit: 274,
-    status: "Scaling",
-    campaignStatus: "Active",
-    recommendation: "ROAS above 3.0 across all tiers — SOP: Scale to $480/day",
-    budgetHistory: [
-      { budgetPerDay: 30, status: "historical", spend: 145, revenue: 412, orders: 11, profit: 142, roas: 2.84, cpc: 0.68, atc: 12 },
-      { budgetPerDay: 60, status: "historical", spend: 287, revenue: 836, orders: 23, profit: 298, roas: 2.91, cpc: 0.62, atc: 22 },
-      { budgetPerDay: 120, status: "historical", spend: 564, revenue: 1740, orders: 48, profit: 634, roas: 3.09, cpc: 0.59, atc: 41 },
-      { budgetPerDay: 240, status: "current", spend: 218, revenue: 680, orders: 19, profit: 274, roas: 3.12, cpc: 0.58, atc: 38 },
-    ],
-  },
-  {
-    id: "ol-002",
-    campaignName: "Durango Road Sneakers",
-    product: "Durango Road Sneakers",
-    spend: 34,
-    budget: 30,
-    cpc: 1.12,
-    atc: 2,
-    roas: 0.91,
-    revenue: 31,
-    orders: 1,
-    profit: -18,
-    status: "Kill",
-    campaignStatus: "Killed",
-    recommendation: "$34 spent, CPC > $1, only 2 ATC — SOP: Kill",
-    budgetHistory: [
-      { budgetPerDay: 30, status: "current", spend: 34, revenue: 31, orders: 1, profit: -18, roas: 0.91, cpc: 1.12, atc: 2 },
-    ],
-  },
-  {
-    id: "ol-003",
-    campaignName: "Maven Bomber Jacket",
-    product: "Maven Bomber Jacket",
-    spend: 58,
-    budget: 60,
-    cpc: 0.82,
-    atc: 11,
-    roas: 2.14,
-    revenue: 124,
-    orders: 3,
-    profit: 22,
-    status: "Watch",
-    campaignStatus: "Active",
-    recommendation: "ROAS just above 2.0 at $60 — SOP: Watch before scaling",
-    budgetHistory: [
-      { budgetPerDay: 30, status: "historical", spend: 142, revenue: 348, orders: 9, profit: 98, roas: 2.45, cpc: 0.78, atc: 14 },
-      { budgetPerDay: 60, status: "current", spend: 58, revenue: 124, orders: 3, profit: 22, roas: 2.14, cpc: 0.82, atc: 11 },
-    ],
-  },
-  {
-    id: "ol-004",
-    campaignName: "Matteo Cotton Pants",
-    product: "Matteo Cotton Pants",
-    spend: 22,
-    budget: 30,
-    cpc: 1.34,
-    atc: 0,
-    roas: 0,
-    revenue: 0,
-    orders: 0,
-    profit: -22,
-    status: "Kill",
-    campaignStatus: "Killed",
-    recommendation: "$22 spent, CPC > $1, 0 ATC — SOP: Kill",
-    budgetHistory: [
-      { budgetPerDay: 30, status: "current", spend: 22, revenue: 0, orders: 0, profit: -22, roas: 0, cpc: 1.34, atc: 0 },
-    ],
-  },
-  {
-    id: "ol-005",
-    campaignName: "Haldrin Layered Shirt",
-    product: "Haldrin Layered Shirt",
-    spend: 436,
-    budget: 480,
-    cpc: 0.52,
-    atc: 56,
-    roas: 3.41,
-    revenue: 1487,
-    orders: 42,
-    profit: 612,
-    status: "Scaling",
-    campaignStatus: "Active",
-    recommendation: "Top performer — ROAS above 3.0 at $480/day, monitor for fatigue",
-    budgetHistory: [
-      { budgetPerDay: 30, status: "historical", spend: 138, revenue: 396, orders: 11, profit: 138, roas: 2.87, cpc: 0.71, atc: 10 },
-      { budgetPerDay: 60, status: "historical", spend: 284, revenue: 852, orders: 24, profit: 312, roas: 3.0, cpc: 0.64, atc: 20 },
-      { budgetPerDay: 120, status: "historical", spend: 556, revenue: 1784, orders: 50, profit: 672, roas: 3.21, cpc: 0.58, atc: 38 },
-      { budgetPerDay: 240, status: "historical", spend: 1124, revenue: 3708, orders: 104, profit: 1402, roas: 3.3, cpc: 0.55, atc: 74 },
-      { budgetPerDay: 480, status: "current", spend: 436, revenue: 1487, orders: 42, profit: 612, roas: 3.41, cpc: 0.52, atc: 56 },
-    ],
-  },
-];
-
-// Default COGs per store
-export const VANTAGE_LDN_DEFAULT_COGS: Record<string, number> = {
-  "ol-001": 16.0,
-  "ol-002": 15.0,
-  "ol-003": 20.0,
-  "ol-004": 12.0,
-  "ol-005": 12.0,
-};
-
 export const VANTAGE_DEFAULT_COGS: Record<string, number> = {
   "ac-001": 16.0,
   "ac-002": 15.0,
@@ -968,18 +834,18 @@ export const VANTAGE_DEFAULT_COGS: Record<string, number> = {
 };
 
 /** Get profit logs for a given store */
-export function getProfitLogs(storeId: string): ProfitLog[] {
-  return storeId === "vantage-london" ? vantageLdnProfitLogs : profitLogs;
+export function getProfitLogs(_storeId: string): ProfitLog[] {
+  return profitLogs;
 }
 
 /** Get ad campaigns for a given store */
-export function getAdCampaigns(storeId: string): AdCampaign[] {
-  return storeId === "vantage-london" ? vantageLdnAdCampaigns : adCampaigns;
+export function getAdCampaigns(_storeId: string): AdCampaign[] {
+  return adCampaigns;
 }
 
 /** Get default COGs for a given store */
-export function getDefaultCogs(storeId: string): Record<string, number> {
-  return storeId === "vantage-london" ? VANTAGE_LDN_DEFAULT_COGS : VANTAGE_DEFAULT_COGS;
+export function getDefaultCogs(_storeId: string): Record<string, number> {
+  return VANTAGE_DEFAULT_COGS;
 }
 
 // ============================================================

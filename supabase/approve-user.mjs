@@ -41,15 +41,7 @@ try {
   );
   console.log("✓ Approved and set role to admin");
 
-  // Create default stores
-  const [londonStore] = await sql.unsafe(
-    `INSERT INTO public.stores (name, market, currency, owner_id)
-     VALUES ('Vantage London', 'UK', 'GBP', $1)
-     ON CONFLICT DO NOTHING
-     RETURNING id`,
-    [userId]
-  );
-
+  // Create default store (Vantage Melbourne)
   const [melbourneStore] = await sql.unsafe(
     `INSERT INTO public.stores (name, market, currency, owner_id)
      VALUES ('Vantage Melbourne', 'AU', 'AUD', $1)
@@ -57,14 +49,6 @@ try {
      RETURNING id`,
     [userId]
   );
-
-  if (londonStore) {
-    await sql.unsafe(
-      `INSERT INTO public.user_stores (user_id, store_id, role) VALUES ($1, $2, 'owner') ON CONFLICT DO NOTHING`,
-      [userId, londonStore.id]
-    );
-    console.log(`✓ Created store: Vantage London (${londonStore.id})`);
-  }
 
   if (melbourneStore) {
     await sql.unsafe(
