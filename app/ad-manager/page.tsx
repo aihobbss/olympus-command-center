@@ -129,8 +129,14 @@ export default function AdManagerPage() {
 
   const storeCurrency = selectedStore?.currency ?? "";
   const rate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
+  const currencySymbol = storeCurrency === "AUD" ? "A$" : storeCurrency === "GBP" ? "£" : "$";
   const toUsd = useCallback(
     (localAmount: number) => Math.round(localAmount * rate),
+    [rate]
+  );
+  // Convert USD back to store currency for display
+  const usdToLocal = useCallback(
+    (usdAmount: number) => rate > 0 ? Math.round(usdAmount / rate) : usdAmount,
     [rate]
   );
 
@@ -149,7 +155,7 @@ export default function AdManagerPage() {
     "3d": 3,
     "7d": 7,
     "30d": 30,
-    all: 365,
+    all: 730,
   };
 
   // Helper: compute date range string for the selected period
@@ -425,17 +431,17 @@ export default function AdManagerPage() {
                 />
                 <MetricCard
                   label="Revenue"
-                  value={totals.revenue}
+                  value={usdToLocal(totals.revenue)}
                   format="currency"
-                  currency="$"
-                  subtitle="From Shopify"
+                  currency={currencySymbol}
+                  subtitle={`$${Math.round(totals.revenue).toLocaleString()} USD`}
                 />
                 <MetricCard
                   label="Profit"
                   value={totals.profit}
                   format="currency"
                   currency="$"
-                  subtitle="From Shopify"
+                  subtitle={`${currencySymbol}${Math.round(usdToLocal(totals.profit)).toLocaleString()} ${storeCurrency}`}
                 />
                 <MetricCard label="Orders" value={totals.orders} format="number" />
                 <MetricCard
