@@ -205,21 +205,23 @@ export default function AdManagerPage() {
     setSyncError(null);
     try {
       // Run Meta campaign sync and Shopify profit sync in parallel
-      // Cap sync to 90 days to avoid Vercel timeout — older data is already in DB
-      const syncDays = Math.min(DAYS_BACK[period], 90);
-      const [metaResult] = await Promise.all([
+      // Cap sync to 30 days to stay within Vercel 10s timeout
+      const syncDays = Math.min(DAYS_BACK[period], 30);
+      const results = await Promise.allSettled([
         triggerMetaSync(user.id, storeId, DATE_PRESET[period]),
         triggerProfitSync(user.id, storeId, syncDays),
       ]);
-      if (metaResult.error) {
-        setSyncError(metaResult.error);
+      // Check Meta result for errors
+      if (results[0].status === "fulfilled" && results[0].value.error) {
+        setSyncError(results[0].value.error);
       }
       // Reload data from Supabase
       await loadData(period);
     } catch {
       setSyncError("Sync failed — check your connections in Settings");
+    } finally {
+      setSyncing(false);
     }
-    setSyncing(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, storeId, period, loadData]);
 
