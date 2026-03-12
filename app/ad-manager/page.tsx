@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { BarChart3, RefreshCw } from "lucide-react";
-import type { CampaignStatus } from "@/data/mock";
 import { cn } from "@/lib/utils";
 import { MetricCard, TimePeriodSelector } from "@/components/ui";
 import type { TimePeriod } from "@/components/ui";
@@ -124,7 +123,7 @@ export default function AdManagerPage() {
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<CampaignStatus | "all">("Active");
+  const [statusFilter, setStatusFilter] = useState<"live" | "paused" | "all">("live");
 
   const storeCurrency = selectedStore?.currency ?? "";
   const rate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
@@ -194,20 +193,17 @@ export default function AdManagerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
-  // ── Filter campaigns by status ──
+  // ── Filter campaigns: "live" = Active/Scaling, "paused" = Paused/Killed ──
+  const isLive = (c: AdCampaign) => c.campaignStatus === "Active" || c.campaignStatus === "Scaling";
+
   const filteredCampaigns = useMemo(() => {
     if (statusFilter === "all") return campaigns;
-    return campaigns.filter((c) => c.campaignStatus === statusFilter);
+    if (statusFilter === "live") return campaigns.filter(isLive);
+    return campaigns.filter((c) => !isLive(c));
   }, [campaigns, statusFilter]);
 
-  // ── Status counts for filter pills ──
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: campaigns.length };
-    for (const c of campaigns) {
-      counts[c.campaignStatus] = (counts[c.campaignStatus] ?? 0) + 1;
-    }
-    return counts;
-  }, [campaigns]);
+  const liveCount = useMemo(() => campaigns.filter(isLive).length, [campaigns]);
+  const pausedCount = campaigns.length - liveCount;
 
   // ── Aggregated metrics (from filtered view) ──
 
@@ -353,29 +349,25 @@ export default function AdManagerPage() {
               {/* ─── Status Filter + Sync Status ─── */}
               <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
                 <div className="flex items-center gap-1.5">
-                  {(["Active", "Paused", "Killed", "all"] as const).map((s) => {
-                    const count = statusCounts[s] ?? 0;
-                    const label = s === "all" ? "All" : s;
-                    const isSelected = statusFilter === s;
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => setStatusFilter(s)}
-                        className={cn(
-                          "px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
-                          isSelected
-                            ? s === "Active" ? "bg-accent-emerald/15 text-accent-emerald border-accent-emerald/30"
-                            : s === "Killed" ? "bg-accent-red/15 text-accent-red border-accent-red/30"
-                            : s === "Paused" ? "bg-accent-amber/15 text-accent-amber border-accent-amber/30"
-                            : "bg-accent-indigo/15 text-accent-indigo border-accent-indigo/30"
-                            : "bg-white/[0.04] text-text-muted border-subtle hover:text-text-secondary hover:bg-white/[0.06]"
-                        )}
-                      >
-                        {label}
-                        {count > 0 && <span className="ml-1.5 opacity-60">{count}</span>}
-                      </button>
-                    );
-                  })}
+                  {([
+                    { key: "live" as const, label: "Live", count: liveCount, active: "bg-accent-emerald/15 text-accent-emerald border-accent-emerald/30" },
+                    { key: "paused" as const, label: "Paused", count: pausedCount, active: "bg-accent-amber/15 text-accent-amber border-accent-amber/30" },
+                    { key: "all" as const, label: "All", count: campaigns.length, active: "bg-accent-indigo/15 text-accent-indigo border-accent-indigo/30" },
+                  ]).map(({ key, label, count, active }) => (
+                    <button
+                      key={key}
+                      onClick={() => setStatusFilter(key)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
+                        statusFilter === key
+                          ? active
+                          : "bg-white/[0.04] text-text-muted border-subtle hover:text-text-secondary hover:bg-white/[0.06]"
+                      )}
+                    >
+                      {label}
+                      {count > 0 && <span className="ml-1.5 opacity-60">{count}</span>}
+                    </button>
+                  ))}
                 </div>
                 <div className="flex items-center gap-3 text-xs">
                   {lastSynced && (
@@ -424,7 +416,7 @@ export default function AdManagerPage() {
               {filteredCampaigns.length === 0 && !syncing && (
                 <div className="text-center py-16 text-text-muted">
                   <p className="text-lg font-medium mb-2">
-                    {campaigns.length === 0 ? "No campaigns found" : `No ${statusFilter === "all" ? "" : statusFilter.toLowerCase()} campaigns`}
+                    {campaigns.length === 0 ? "No campaigns found" : `No ${statusFilter} campaigns`}
                   </p>
                   <p className="text-sm">
                     {campaigns.length === 0
