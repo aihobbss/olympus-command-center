@@ -22,7 +22,7 @@ import {
   getLastSyncedAt,
 } from "@/lib/services/meta-campaigns";
 import { fetchProfitLogsByDateRange, triggerProfitSync } from "@/lib/services/profit-tracker";
-import { fetchAdAccounts, type UserAdAccount } from "@/lib/services/ad-accounts";
+import { fetchAdAccounts, discoverAdAccounts, type UserAdAccount } from "@/lib/services/ad-accounts";
 
 type AdTab = "live" | "creator";
 
@@ -148,12 +148,24 @@ export default function AdManagerPage() {
 
   const storeId = selectedStore?.id ?? "";
 
-  // ── Load ad accounts ──
+  // ── Load ad accounts (discover from Meta to get real names + all accounts) ──
+  const refreshAdAccounts = useCallback(async () => {
+    if (!user || !storeId) return;
+    const result = await discoverAdAccounts(user.id, storeId);
+    if (result.accounts.length > 0) {
+      setAdAccounts(result.accounts);
+    } else {
+      // Fallback to cached list if discover fails (e.g. token expired)
+      const cached = await fetchAdAccounts(user.id, storeId);
+      setAdAccounts(cached);
+    }
+  }, [user, storeId]);
+
   useEffect(() => {
     if (user && storeId && metaConnected) {
-      fetchAdAccounts(user.id, storeId).then(setAdAccounts);
+      refreshAdAccounts();
     }
-  }, [user, storeId, metaConnected]);
+  }, [user, storeId, metaConnected, refreshAdAccounts]);
 
   // ── Map period to Meta date_preset + days back for profit sync ──
   const DATE_PRESET: Record<TimePeriod, string> = {

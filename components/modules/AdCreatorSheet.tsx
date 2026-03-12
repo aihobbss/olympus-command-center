@@ -20,7 +20,7 @@ import {
 import { useAdCreatorStore, useCreativeGeneratorStore, useStoreContext, useAuthStore, useConnectionsStore } from "@/lib/store";
 import { type AdCreatorCampaign, type AdCreatorStatus, type AdGender } from "@/data/mock";
 import { cn } from "@/lib/utils";
-import { fetchAdAccounts, type UserAdAccount } from "@/lib/services/ad-accounts";
+import { fetchAdAccounts, discoverAdAccounts, type UserAdAccount } from "@/lib/services/ad-accounts";
 
 // ── Status badge ────────────────────────────────────────────
 
@@ -362,12 +362,15 @@ export function AdCreatorSheet() {
     if (storeId) loadCampaigns(storeId);
   }, [storeId, loadCampaigns]);
 
-  // Load ad accounts for the publish dropdown
+  // Load ad accounts for the publish dropdown (discover from Meta for real names)
   useEffect(() => {
     if (user && storeId && metaConnected) {
-      fetchAdAccounts(user.id, storeId).then((accts) => {
+      discoverAdAccounts(user.id, storeId).then(async (result) => {
+        let accts = result.accounts;
+        if (accts.length === 0) {
+          accts = await fetchAdAccounts(user.id, storeId);
+        }
         setAdAccounts(accts);
-        // Auto-select first account if none selected
         if (accts.length > 0 && !selectedAdAccountId) {
           setSelectedAdAccountId(accts[0].ad_account_id);
         }
