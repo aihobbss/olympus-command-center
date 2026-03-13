@@ -10,6 +10,7 @@ import {
   Plus,
   Loader2,
   Image,
+  Trash2,
 } from "lucide-react";
 import { useResearchStore, useStoreContext } from "@/lib/store";
 import {
@@ -343,7 +344,7 @@ type TestingStatusFilter =
 // ── Main sheet component ───────────────────────────────────
 
 export function ResearchSheet() {
-  const { sheetProducts, updateSheetProduct, importAllUnimported, addSheetProduct, loadProducts, loading } =
+  const { sheetProducts, updateSheetProduct, importAllUnimported, addSheetProduct, deleteSheetProduct, loadProducts, loading } =
     useResearchStore();
   const { selectedStore } = useStoreContext();
   const [search, setSearch] = useState("");
@@ -553,6 +554,7 @@ export function ResearchSheet() {
                 {h}
               </th>
             ))}
+            <th className="px-2 py-2.5 w-8" />
           </tr>
         </thead>
         <tbody>
@@ -560,7 +562,7 @@ export function ResearchSheet() {
             <tr
               key={product.id}
               className={cn(
-                "border-b border-subtle/50 hover:bg-white/[0.02] transition-colors duration-100",
+                "group border-b border-subtle/50 hover:bg-white/[0.02] transition-colors duration-100",
                 product.testingStatus === "Killed" && "opacity-40"
               )}
             >
@@ -747,6 +749,17 @@ export function ResearchSheet() {
                     updateSheetProduct(product.id, { notes: v })
                   }
                 />
+              </td>
+
+              {/* Delete row */}
+              <td className="px-2 py-2.5 w-8">
+                <button
+                  onClick={() => deleteSheetProduct(product.id)}
+                  className="p-1 rounded text-text-muted hover:text-accent-red hover:bg-accent-red/10 opacity-0 group-hover:opacity-100 transition-all duration-150"
+                  title="Delete product"
+                >
+                  <Trash2 size={13} />
+                </button>
               </td>
             </tr>
           ))}

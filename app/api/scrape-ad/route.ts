@@ -155,20 +155,21 @@ async function scrapeAfterlib(adId: string): Promise<ScrapeAdResponse> {
   );
 
   const data = await res.json();
-  // oRPC wraps the result in { result: { data: { json: ... } } }
-  const ad = data?.result?.data?.json ?? data;
+  // Response shape: { json: { items: [ ad, ... ] } }
+  const ad = data?.json?.items?.[0] ?? data?.result?.data?.json ?? data;
 
-  // Extract all media URLs (thumbnails, previews, videos)
+  // Extract all media URLs — urls are nested under m.urls.thumbnail / m.urls.preview
   const creatives: string[] = [];
   if (Array.isArray(ad.media)) {
     for (const m of ad.media) {
-      const url = m?.thumbnail ?? m?.preview ?? m?.url ?? m?.video_url;
+      const url =
+        m?.urls?.thumbnail ?? m?.urls?.preview ?? m?.thumbnail ?? m?.preview ?? m?.url;
       if (url && typeof url === "string") creatives.push(url);
     }
   }
 
   return {
-    productName: ad.headline ?? "",
+    productName: ad.headline ?? ad.productTitle ?? "",
     adCopy: ad.body ?? "",
     storeLink: ad.offerLink ?? ad.displayUrl ?? "",
     imageUrl: creatives[0] ?? "",
