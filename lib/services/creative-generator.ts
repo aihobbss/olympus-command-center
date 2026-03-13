@@ -61,7 +61,7 @@ export async function fetchCreatives(storeId: string): Promise<ProductCreative[]
     return [];
   }
 
-  return (data as CreativeRow[]).map(rowToCreative);
+  return (data as CreativeRow[]).map((row, idx) => rowToCreative(row, idx));
 }
 
 export async function fetchSavedCreatives(storeId: string): Promise<ProductCreative[]> {
@@ -77,7 +77,7 @@ export async function fetchSavedCreatives(storeId: string): Promise<ProductCreat
     return [];
   }
 
-  return (data as CreativeRow[]).map(rowToCreative);
+  return (data as CreativeRow[]).map((row, idx) => rowToCreative(row, idx));
 }
 
 export async function createCreative(
@@ -137,11 +137,17 @@ export async function updateCreativeStatus(
   return true;
 }
 
-export async function deleteCreative(id: string): Promise<boolean> {
-  const { error } = await supabase
+export async function deleteCreative(id: string, storeId?: string): Promise<boolean> {
+  let query = supabase
     .from("creatives")
     .delete()
     .eq("id", id);
+
+  if (storeId) {
+    query = query.eq("store_id", storeId);
+  }
+
+  const { error } = await query;
 
   if (error) {
     console.error("Failed to delete creative:", error.message);

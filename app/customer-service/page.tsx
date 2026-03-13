@@ -481,7 +481,7 @@ export default function CustomerServicePage() {
                   templates={templates}
                   value={currentResponse}
                   onChange={handleResponseChange}
-                  storePrefix={selectedStore.market === "AU" ? "VANTAGE" : "VANTAGE"}
+                  storePrefix={selectedStore.name?.split(" ")[0]?.toUpperCase() || "VANTAGE"}
                 />
 
                 {/* ── Action Bar ── */}

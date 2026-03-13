@@ -1,6 +1,6 @@
 # Vantage Command Center
 
-Centralized command center for fashion dropshipping operations — manage product research, ad campaigns, profit tracking, creative generation, customer service, and coaching from a single dashboard.
+Centralized multi-store command center for fashion dropshipping teams — manage product research, ad campaigns, profit tracking, creative generation, customer service, and coaching from a single dashboard. Multi-user with admin approval; all module data is store-scoped.
 
 ## Tech Stack
 
@@ -9,6 +9,7 @@ Centralized command center for fashion dropshipping operations — manage produc
 - **Animation:** Framer Motion
 - **State:** Zustand
 - **Icons:** Lucide React
+- **Backend:** Supabase (auth, RLS, per-store data)
 - **Charts:** Recharts
 - **Fonts:** Syne (display) · JetBrains Mono (metrics) · Inter (body)
 
@@ -37,7 +38,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 | **Product Creation** | `/product-creation` | AI-assisted product listings with descriptions, pricing, and variants |
 | **Ad Manager** | `/ad-manager` | Live Meta campaign dashboard with SOP-based Kill / Scale / Watch recommendations |
 | **Profit Tracker** | `/profit-tracker` | Real-time P&L tracking across every order with daily breakdown |
-| **Creative Generator** | `/creative-generator` | AI-powered ad creative generation via Higgsfield |
+| **Creative Generator** | `/creative-generator` | AI-powered ad creative generation via Nanobanana Pro |
 | **Customer Service** | `/customer-service` | AI-drafted email responses with refund SOPs and customer history |
 | **Coach View** | `/coach-view` | Multi-store monitoring dashboard for coaching students |
 

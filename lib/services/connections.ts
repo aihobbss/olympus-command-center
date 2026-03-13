@@ -57,11 +57,17 @@ export const SERVICE_REGISTRY: ServiceMeta[] = [
 
 // ── Queries ──────────────────────────────────────────────
 
-export async function fetchConnections(userId: string): Promise<ServiceConnection[]> {
-  const { data, error } = await supabase
+export async function fetchConnections(userId: string, storeId?: string): Promise<ServiceConnection[]> {
+  let query = supabase
     .from("oauth_tokens")
     .select("id, service, expires_at, access_token")
     .eq("user_id", userId);
+
+  if (storeId) {
+    query = query.eq("store_id", storeId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("Failed to fetch connections:", error.message);
@@ -79,12 +85,18 @@ export async function fetchConnections(userId: string): Promise<ServiceConnectio
     }));
 }
 
-export async function disconnectService(userId: string, service: ServiceId): Promise<boolean> {
-  const { error } = await supabase
+export async function disconnectService(userId: string, service: ServiceId, storeId?: string): Promise<boolean> {
+  let query = supabase
     .from("oauth_tokens")
     .delete()
     .eq("user_id", userId)
     .eq("service", service);
+
+  if (storeId) {
+    query = query.eq("store_id", storeId);
+  }
+
+  const { error } = await query;
 
   if (error) {
     console.error("Failed to disconnect service:", error.message);

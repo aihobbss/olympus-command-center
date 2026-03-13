@@ -9,6 +9,7 @@ type ResearchRow = {
   product_name: string | null;
   ad_link: string | null;
   store_link: string | null;
+  creative_urls: string[] | null;
   testing_status: string | null;
   creative_saved: boolean;
   cog: number | null;
@@ -26,6 +27,7 @@ function rowToSheet(row: ResearchRow): SheetProduct {
     productName: row.product_name ?? "",
     adLink: row.ad_link ?? "",
     storeLink: row.store_link ?? "",
+    creativeUrls: row.creative_urls ?? [],
     testingStatus: (row.testing_status ?? "") as SheetProduct["testingStatus"],
     creativeSaved: row.creative_saved,
     cog: row.cog,
@@ -45,6 +47,7 @@ function sheetToRow(
   if (product.productName !== undefined) row.product_name = product.productName || null;
   if (product.adLink !== undefined) row.ad_link = product.adLink || null;
   if (product.storeLink !== undefined) row.store_link = product.storeLink || null;
+  if (product.creativeUrls !== undefined) row.creative_urls = product.creativeUrls;
   if (product.testingStatus !== undefined) row.testing_status = product.testingStatus || null;
   if (product.creativeSaved !== undefined) row.creative_saved = product.creativeSaved;
   if (product.cog !== undefined) row.cog = product.cog;
@@ -58,10 +61,12 @@ function sheetToRow(
 
 // ── Service functions ──────────────────────────────────────
 
+const SELECT_COLS = "id, store_id, product_name, ad_link, store_link, creative_urls, testing_status, creative_saved, cog, product_type, pricing, discount_percent, notes";
+
 export async function fetchResearchProducts(storeId: string): Promise<SheetProduct[]> {
   const { data, error } = await supabase
     .from("research_products")
-    .select("id, store_id, product_name, ad_link, store_link, testing_status, creative_saved, cog, product_type, pricing, discount_percent, notes")
+    .select(SELECT_COLS)
     .eq("store_id", storeId)
     .order("created_at", { ascending: true });
 
@@ -81,6 +86,7 @@ export async function createResearchProduct(storeId: string): Promise<SheetProdu
       product_name: null,
       ad_link: null,
       store_link: null,
+      creative_urls: [],
       testing_status: null,
       creative_saved: false,
       cog: null,
@@ -89,7 +95,7 @@ export async function createResearchProduct(storeId: string): Promise<SheetProdu
       discount_percent: 42,
       notes: null,
     })
-    .select("id, store_id, product_name, ad_link, store_link, testing_status, creative_saved, cog, product_type, pricing, discount_percent, notes")
+    .select(SELECT_COLS)
     .single();
 
   if (error) {
@@ -122,11 +128,17 @@ export async function updateResearchProduct(
   return true;
 }
 
-export async function deleteResearchProduct(id: string): Promise<boolean> {
-  const { error } = await supabase
+export async function deleteResearchProduct(id: string, storeId?: string): Promise<boolean> {
+  let query = supabase
     .from("research_products")
     .delete()
     .eq("id", id);
+
+  if (storeId) {
+    query = query.eq("store_id", storeId);
+  }
+
+  const { error } = await query;
 
   if (error) {
     console.error("Failed to delete research product:", error.message);
@@ -138,12 +150,19 @@ export async function deleteResearchProduct(id: string): Promise<boolean> {
 
 export async function bulkUpdateStatus(
   ids: string[],
-  status: string
+  status: string,
+  storeId?: string
 ): Promise<boolean> {
-  const { error } = await supabase
+  let query = supabase
     .from("research_products")
     .update({ testing_status: status })
     .in("id", ids);
+
+  if (storeId) {
+    query = query.eq("store_id", storeId);
+  }
+
+  const { error } = await query;
 
   if (error) {
     console.error("Failed to bulk update status:", error.message);

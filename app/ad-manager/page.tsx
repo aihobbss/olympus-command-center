@@ -285,7 +285,7 @@ export default function AdManagerPage() {
       handleSync();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
+  }, [period, handleSync]);
 
   // ── Filter campaigns by account + status ──
   const isLive = (c: AdCampaign) => c.campaignStatus === "Active" || c.campaignStatus === "Scaling";

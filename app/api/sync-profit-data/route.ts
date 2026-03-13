@@ -39,17 +39,21 @@ export async function POST(request: Request) {
 
     // Initialize daily buckets
     const dailyData = new Map<string, DailyBucket>();
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-      dailyData.set(d.toISOString().split("T")[0], {
-        revenue: 0,
-        orders: 0,
-        adSpend: 0,
-      });
+    {
+      const d = new Date(startDate);
+      while (d <= endDate) {
+        dailyData.set(d.toISOString().split("T")[0], {
+          revenue: 0,
+          orders: 0,
+          adSpend: 0,
+        });
+        d.setTime(d.getTime() + 86_400_000); // advance exactly 1 day in ms
+      }
     }
 
     // ── 1. Pull Shopify orders ──────────────────────────────
 
-    const shopify = await getShopifyToken(userId);
+    const shopify = await getShopifyToken(userId, storeId);
 
     if (shopify) {
       {
@@ -141,10 +145,11 @@ export async function POST(request: Request) {
             `?fields=spend,actions,action_values` +
             `&time_range={"since":"${startStr}","until":"${endStr}"}` +
             `&time_increment=1` + // Daily breakdown
-            `&limit=500` +
-            `&access_token=${metaToken.access_token}`;
+            `&limit=500`;
 
-          const insightsRes = await fetch(insightsUrl);
+          const insightsRes = await fetch(insightsUrl, {
+            headers: { Authorization: `Bearer ${metaToken.access_token}` },
+          });
 
           if (insightsRes.ok) {
             const insightsData = await insightsRes.json();

@@ -121,7 +121,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
 
     // Listen for auth changes (login, logout, token refresh)
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" && session?.user) {
         const appUser = await buildAppUser(session.user.id, session.user.email!);
         set({ user: appUser, loading: false });
@@ -129,6 +129,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         set({ user: null, loading: false });
       }
     });
+
+    // Store subscription for potential cleanup
+    (useAuthStore as unknown as Record<string, unknown>)._authSubscription = subscription;
   },
 
   signInWithEmail: async (email, password) => {
@@ -246,8 +249,9 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
     }));
 
     // Persist to DB
+    const store = useStoreContext.getState().selectedStore;
     const ids = unimported.map((p) => p.id);
-    bulkUpdateStatus(ids, "Queued");
+    bulkUpdateStatus(ids, "Queued", store?.id);
   },
 
   addSheetProduct: async () => {
@@ -263,11 +267,12 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
   },
 
   deleteSheetProduct: (id) => {
+    const store = useStoreContext.getState().selectedStore;
     set((s) => ({
       sheetProducts: s.sheetProducts.filter((p) => p.id !== id),
     }));
     // Fire-and-forget DB delete
-    import("@/lib/services/research").then((m) => m.deleteResearchProduct(id));
+    import("@/lib/services/research").then((m) => m.deleteResearchProduct(id, store?.id));
   },
 }));
 
@@ -615,10 +620,11 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
   },
 
   removeCampaign: (id) => {
+    const store = useStoreContext.getState().selectedStore;
     set((s) => ({
       campaigns: s.campaigns.filter((c) => c.id !== id),
     }));
-    import("@/lib/services/ad-creator").then((m) => m.deleteAdCreatorCampaign(id));
+    import("@/lib/services/ad-creator").then((m) => m.deleteAdCreatorCampaign(id, store?.id));
   },
 
   pushCampaign: async (id, adAccountId) => {
@@ -790,12 +796,13 @@ export const useCreativeGeneratorStore = create<CreativeGeneratorStore>(
     },
 
     removeCreative: async (creativeId) => {
+      const store = useStoreContext.getState().selectedStore;
       set((s) => ({
         productCreatives: s.productCreatives.filter((c) => c.id !== creativeId),
       }));
       // Delete from DB if it's a real UUID (not a temp pcr- id)
       if (!creativeId.startsWith("pcr-")) {
-        await deleteCreativeFromDb(creativeId);
+        await deleteCreativeFromDb(creativeId, store?.id);
       }
     },
 
@@ -911,7 +918,22 @@ export const useStoreContext = create<StoreContext>((set) => ({
         : stores[0] ?? null,
     }));
   },
-  setSelectedStore: (store) => set({ selectedStore: store }),
+  setSelectedStore: (store) => {
+    // Clear all pending debounce timers to prevent cross-store writes
+    for (const key of Object.keys(updateTimers)) {
+      clearTimeout(updateTimers[key]);
+      delete updateTimers[key];
+    }
+    for (const key of Object.keys(copyUpdateTimers)) {
+      clearTimeout(copyUpdateTimers[key]);
+      delete copyUpdateTimers[key];
+    }
+    for (const key of Object.keys(adCreatorUpdateTimers)) {
+      clearTimeout(adCreatorUpdateTimers[key]);
+      delete adCreatorUpdateTimers[key];
+    }
+    set({ selectedStore: store });
+  },
 }));
 
 // ─── Connections Store ──────────────────────────────────
@@ -939,9 +961,10 @@ export const useConnectionsStore = create<ConnectionsStore>((set, get) => ({
 
   loadConnections: async () => {
     const user = useAuthStore.getState().user;
+    const store = useStoreContext.getState().selectedStore;
     if (!user) return;
     set({ loading: true });
-    const connections = await fetchConnections(user.id);
+    const connections = await fetchConnections(user.id, store?.id);
     set({ connections, loading: false });
   },
 

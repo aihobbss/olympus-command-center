@@ -51,6 +51,7 @@ export interface AdCampaign {
   id: string;
   campaignName: string;
   product: string;
+  adAccountId?: string;
   spend: number;
   budget: number;
   cpc: number;
@@ -60,6 +61,7 @@ export interface AdCampaign {
   orders: number;
   profit: number;
   status: "Scaling" | "Kill" | "Watch";
+  campaignStatus: "Active" | "Paused" | "Killed" | "Scaling";
   recommendation: string;
   budgetHistory?: BudgetTierSnapshot[];
 }

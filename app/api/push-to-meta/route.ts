@@ -111,7 +111,8 @@ export async function POST(request: Request) {
 
     // 3. Get a Facebook Page ID (needed for ads)
     const pagesRes = await fetch(
-      `${META_API}/me/accounts?fields=id,name&access_token=${accessToken}`
+      `${META_API}/me/accounts?fields=id,name`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const pagesData = await pagesRes.json();
     const pageId = pagesData.data?.[0]?.id;
@@ -129,13 +130,12 @@ export async function POST(request: Request) {
 
     const campaignRes = await fetch(`${META_API}/${adAccountId}/campaigns`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({
         name: campaign.product_name || "Vantage Campaign",
         objective: "OUTCOME_SALES",
         status: "PAUSED", // Start paused so user can review
         special_ad_categories: [],
-        access_token: accessToken,
       }),
     });
 
@@ -163,7 +163,7 @@ export async function POST(request: Request) {
 
     const adSetRes = await fetch(`${META_API}/${adAccountId}/adsets`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({
         name: `${campaign.product_name || "Campaign"} - Ad Set`,
         campaign_id: metaCampaignId,
@@ -172,7 +172,6 @@ export async function POST(request: Request) {
         optimization_goal: "OFFSITE_CONVERSIONS",
         targeting,
         status: "PAUSED",
-        access_token: accessToken,
       }),
     });
 
@@ -181,9 +180,8 @@ export async function POST(request: Request) {
       // Clean up: delete the campaign we just created
       await fetch(`${META_API}/${metaCampaignId}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: accessToken }),
-      });
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      }).catch((cleanupErr) => console.error("Failed to clean up Meta campaign:", cleanupErr));
       return NextResponse.json(
         { error: "Failed to create ad set on Meta", details: err },
         { status: 502 }
@@ -197,7 +195,7 @@ export async function POST(request: Request) {
 
     const creativeRes = await fetch(`${META_API}/${adAccountId}/adcreatives`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({
         name: `${campaign.product_name || "Creative"} - Creative`,
         object_story_spec: {
@@ -210,7 +208,6 @@ export async function POST(request: Request) {
             call_to_action: { type: ctaType },
           },
         },
-        access_token: accessToken,
       }),
     });
 
@@ -227,13 +224,12 @@ export async function POST(request: Request) {
     // 7. Create Ad (links ad set + creative)
     const adRes = await fetch(`${META_API}/${adAccountId}/ads`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({
         name: `${campaign.product_name || "Ad"} - Ad`,
         adset_id: adSetId,
         creative: { creative_id: creativeId },
         status: "PAUSED",
-        access_token: accessToken,
       }),
     });
 

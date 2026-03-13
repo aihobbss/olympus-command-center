@@ -134,6 +134,7 @@ export function CreativeBatchQueue() {
       if (delta > 0 && totalAllocated >= imagesPerProduct) {
         // At cap — steal 1 from the largest OTHER prompt
         const others = promptAllocations.filter((a) => a.templateId !== templateId);
+        if (others.length === 0) return; // no one to steal from
         const donor = others.reduce(
           (best, a) => (a.count > best.count ? a : best),
           others[0]

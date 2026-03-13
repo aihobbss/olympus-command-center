@@ -209,7 +209,7 @@ function CopyStatusCell({
           statusColors[status] ?? "text-text-primary"
         )}
         style={{
-          backgroundColor: "#1A1A24",
+          backgroundColor: "var(--bg-elevated)",
           backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
         }}
       >
@@ -533,7 +533,11 @@ export function ProductCopySheet() {
 
   // Load products from Supabase when store changes
   useEffect(() => {
-    if (storeId) loadProducts(storeId);
+    if (storeId) {
+      loadProducts(storeId).catch((err) =>
+        console.error("Failed to load product copies:", err)
+      );
+    }
   }, [storeId, loadProducts]);
 
   const filtered = useMemo(() => {
@@ -626,8 +630,8 @@ export function ProductCopySheet() {
               "appearance-none bg-[length:12px] bg-[right_8px_center] bg-no-repeat pr-7"
             )}
             style={{
-              color: "#F1F1F3",
-              backgroundColor: "#1A1A24",
+              color: "var(--text-primary)",
+              backgroundColor: "var(--bg-elevated)",
               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
             }}
           >

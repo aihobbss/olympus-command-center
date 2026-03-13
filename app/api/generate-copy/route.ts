@@ -25,7 +25,7 @@ RULES — follow these exactly:
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { productName, productType, market, currency, price, discount, userId } = body;
+    const { productName, productType, market, currency, price, discount, userId, storeId } = body;
 
     if (!productName || !userId) {
       return NextResponse.json(
@@ -34,13 +34,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch user's Claude API key from oauth_tokens
-    const { data: tokenRow, error: tokenError } = await supabaseAdmin
+    // Fetch user's Claude API key from oauth_tokens (prefer store-scoped)
+    let tokenQuery = supabaseAdmin
       .from("oauth_tokens")
       .select("access_token")
       .eq("user_id", userId)
-      .eq("service", "anthropic")
-      .single();
+      .eq("service", "anthropic");
+
+    if (storeId) {
+      tokenQuery = tokenQuery.eq("store_id", storeId);
+    }
+
+    const { data: tokenRow, error: tokenError } = await tokenQuery.single();
 
     if (tokenError || !tokenRow?.access_token) {
       return NextResponse.json(

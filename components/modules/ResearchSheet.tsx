@@ -9,6 +9,7 @@ import {
   PackageCheck,
   Plus,
   Loader2,
+  Image,
 } from "lucide-react";
 import { useResearchStore, useStoreContext } from "@/lib/store";
 import {
@@ -377,7 +378,11 @@ export function ResearchSheet() {
         const res = await fetch(
           `/api/scrape-ad?url=${encodeURIComponent(link)}`
         );
-        if (!res.ok) throw new Error("Scrape failed");
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          console.error("Scrape failed:", res.status, errBody);
+          return;
+        }
         const data = await res.json();
 
         // Only auto-fill empty fields — never overwrite existing data
@@ -389,14 +394,16 @@ export function ResearchSheet() {
           updates.productName = data.productName;
         if (!product.storeLink && data.storeLink)
           updates.storeLink = data.storeLink;
+        if (data.creatives?.length > 0 && product.creativeUrls.length === 0)
+          updates.creativeUrls = data.creatives;
         if (!product.notes && data.adCopy)
           updates.notes = data.adCopy.slice(0, 200);
 
         if (Object.keys(updates).length > 0) {
           updateSheetProduct(productId, updates);
         }
-      } catch {
-        // Silently skip — user can fill manually
+      } catch (err) {
+        console.error("Scrape error for", link, err);
       } finally {
         setScrapingIds((prev) => {
           const next = new Set(prev);
@@ -523,13 +530,14 @@ export function ResearchSheet() {
 
       {/* ── Table ── */}
     <div className="overflow-x-auto scrollbar-hide -mx-1">
-      <table className="w-full min-w-[1200px] text-left">
+      <table className="w-full min-w-[1320px] text-left">
         <thead>
           <tr className="border-b border-subtle">
             {[
               "Product Name",
               "Ad Link",
               "Store Link",
+              "Creatives",
               "Status",
               "COG",
               "Type",
@@ -592,6 +600,44 @@ export function ResearchSheet() {
                     updateSheetProduct(product.id, { storeLink: v })
                   }
                 />
+              </td>
+
+              {/* Creatives — thumbnail previews of scraped media */}
+              <td className="px-3 py-2.5 min-w-[100px]">
+                {product.creativeUrls.length > 0 ? (
+                  <div className="flex items-center gap-1">
+                    {product.creativeUrls.slice(0, 3).map((url, i) => (
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block w-8 h-8 rounded border border-subtle overflow-hidden hover:border-accent-indigo/40 transition-colors shrink-0"
+                        title={url}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={url}
+                          alt={`Creative ${i + 1}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      </a>
+                    ))}
+                    {product.creativeUrls.length > 3 && (
+                      <span className="text-[10px] text-text-muted">
+                        +{product.creativeUrls.length - 3}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-xs text-text-muted flex items-center gap-1">
+                    <Image size={12} />
+                    —
+                  </span>
+                )}
               </td>
 
               {/* Testing status — dropdown or Import button */}

@@ -6,6 +6,7 @@ export type ScrapeAdResponse = {
   adCopy: string;
   storeLink: string;
   imageUrl: string;
+  creatives: string[];
   countries: string[];
   gender: string;
   daysActive: number | null;
@@ -55,18 +56,21 @@ function isRateLimited(ip: string): boolean {
   return false;
 }
 
-// Periodically clean up stale IPs to prevent memory leaks
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, timestamps] of Array.from(rateLimitMap.entries())) {
-    const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
-    if (recent.length === 0) {
-      rateLimitMap.delete(ip);
-    } else {
-      rateLimitMap.set(ip, recent);
+// Periodically clean up stale IPs to prevent memory leaks (singleton interval)
+const _g = globalThis as unknown as Record<string, unknown>;
+if (!_g.__scrapeRateLimitCleanup) {
+  _g.__scrapeRateLimitCleanup = setInterval(() => {
+    const now = Date.now();
+    for (const [ip, timestamps] of Array.from(rateLimitMap.entries())) {
+      const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+      if (recent.length === 0) {
+        rateLimitMap.delete(ip);
+      } else {
+        rateLimitMap.set(ip, recent);
+      }
     }
-  }
-}, RATE_LIMIT_WINDOW_MS);
+  }, RATE_LIMIT_WINDOW_MS);
+}
 
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -154,11 +158,21 @@ async function scrapeAfterlib(adId: string): Promise<ScrapeAdResponse> {
   // oRPC wraps the result in { result: { data: { json: ... } } }
   const ad = data?.result?.data?.json ?? data;
 
+  // Extract all media URLs (thumbnails, previews, videos)
+  const creatives: string[] = [];
+  if (Array.isArray(ad.media)) {
+    for (const m of ad.media) {
+      const url = m?.thumbnail ?? m?.preview ?? m?.url ?? m?.video_url;
+      if (url && typeof url === "string") creatives.push(url);
+    }
+  }
+
   return {
     productName: ad.headline ?? "",
     adCopy: ad.body ?? "",
     storeLink: ad.offerLink ?? ad.displayUrl ?? "",
-    imageUrl: ad.media?.[0]?.thumbnail ?? ad.media?.[0]?.preview ?? "",
+    imageUrl: creatives[0] ?? "",
+    creatives,
     countries: ad.countries ?? [],
     gender: ad.audienceGender ?? "",
     daysActive: null,
@@ -185,11 +199,26 @@ async function scrapeWinningHunter(
   const data = await res.json();
   const ad = Array.isArray(data) ? data[0] : data;
 
+  // Collect all available creative URLs
+  const creatives: string[] = [];
+  for (const key of ["product_image", "image", "poster", "video_url", "thumbnail"]) {
+    const val = ad[key];
+    if (val && typeof val === "string") creatives.push(val);
+  }
+  // Also check media array if present
+  if (Array.isArray(ad.media)) {
+    for (const m of ad.media) {
+      const url = typeof m === "string" ? m : m?.url ?? m?.thumbnail ?? m?.preview;
+      if (url && typeof url === "string" && !creatives.includes(url)) creatives.push(url);
+    }
+  }
+
   return {
     productName: ad.product_title ?? ad.caption ?? "",
     adCopy: ad.copy ?? ad.description ?? "",
     storeLink: ad.urlStore ?? "",
-    imageUrl: ad.product_image ?? ad.image ?? ad.poster ?? "",
+    imageUrl: creatives[0] ?? "",
+    creatives,
     countries: ad.countries ?? [],
     gender: ad.gender_always ?? "",
     daysActive: ad.daysrunning ?? null,
@@ -199,10 +228,13 @@ async function scrapeWinningHunter(
 // ── Route handler ────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  // Extract client IP for rate limiting
+  // Extract client IP for rate limiting (use rightmost x-forwarded-for entry — least spoofable)
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  const forwardedParts = forwardedFor?.split(",").map((s) => s.trim()) ?? [];
   const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    (forwardedParts.length > 0 ? forwardedParts[forwardedParts.length - 1] : null) ??
     request.headers.get("x-real-ip") ??
+    request.ip ??
     "unknown";
 
   if (isRateLimited(ip)) {

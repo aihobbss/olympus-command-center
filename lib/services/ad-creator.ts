@@ -131,11 +131,17 @@ export async function updateAdCreatorCampaign(
   return true;
 }
 
-export async function deleteAdCreatorCampaign(id: string): Promise<boolean> {
-  const { error } = await supabase
+export async function deleteAdCreatorCampaign(id: string, storeId?: string): Promise<boolean> {
+  let query = supabase
     .from("ad_creator_campaigns")
     .delete()
     .eq("id", id);
+
+  if (storeId) {
+    query = query.eq("store_id", storeId);
+  }
+
+  const { error } = await query;
 
   if (error) {
     console.error("Failed to delete ad creator campaign:", error.message);

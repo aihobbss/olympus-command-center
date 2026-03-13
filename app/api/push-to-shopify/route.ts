@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     }
 
     // Fetch user's Shopify token (auto-refreshes if expired)
-    const shopify = await getShopifyToken(userId);
+    const shopify = await getShopifyToken(userId, storeId);
 
     if (!shopify) {
       return NextResponse.json(

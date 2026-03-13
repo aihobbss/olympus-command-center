@@ -137,11 +137,17 @@ export async function updateProductCopy(
   return true;
 }
 
-export async function deleteProductCopy(id: string): Promise<boolean> {
-  const { error } = await supabase
+export async function deleteProductCopy(id: string, storeId?: string): Promise<boolean> {
+  let query = supabase
     .from("product_copies")
     .delete()
     .eq("id", id);
+
+  if (storeId) {
+    query = query.eq("store_id", storeId);
+  }
+
+  const { error } = await query;
 
   if (error) {
     console.error("Failed to delete product copy:", error.message);

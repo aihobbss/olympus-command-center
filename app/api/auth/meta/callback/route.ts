@@ -117,7 +117,8 @@ export async function GET(request: Request) {
 
       if (profile?.active_store_id) {
         const meRes = await fetch(
-          `https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_status,currency,business_name&limit=100&access_token=${finalToken}`
+          `https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_status,currency,business_name&limit=100`,
+          { headers: { Authorization: `Bearer ${finalToken}` } }
         );
 
         if (meRes.ok) {

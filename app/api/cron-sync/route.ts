@@ -33,6 +33,8 @@ export async function GET(request: Request) {
 
       try {
         // 1. Sync Meta campaigns (last 7 days)
+        const metaController = new AbortController();
+        const metaTimeout = setTimeout(() => metaController.abort(), 60_000);
         const metaRes = await fetch(new URL("/api/sync-meta-campaigns", request.url), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -41,7 +43,9 @@ export async function GET(request: Request) {
             storeId: store.id,
             datePreset: "last_7d",
           }),
+          signal: metaController.signal,
         });
+        clearTimeout(metaTimeout);
 
         if (metaRes.ok) {
           const metaData = await metaRes.json();
@@ -55,6 +59,8 @@ export async function GET(request: Request) {
 
       try {
         // 2. Sync profit data (last 7 days)
+        const profitController = new AbortController();
+        const profitTimeout = setTimeout(() => profitController.abort(), 60_000);
         const profitRes = await fetch(new URL("/api/sync-profit-data", request.url), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -63,7 +69,9 @@ export async function GET(request: Request) {
             storeId: store.id,
             daysBack: 7,
           }),
+          signal: profitController.signal,
         });
+        clearTimeout(profitTimeout);
 
         if (profitRes.ok) {
           const profitData = await profitRes.json();

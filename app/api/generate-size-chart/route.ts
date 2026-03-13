@@ -16,7 +16,7 @@ RULES:
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { imageUrl, userId } = body;
+    const { imageUrl, userId, storeId } = body;
 
     if (!imageUrl || !userId) {
       return NextResponse.json(
@@ -53,13 +53,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch user's Claude API key
-    const { data: tokenRow, error: tokenError } = await supabaseAdmin
+    // Fetch user's Claude API key (prefer store-scoped)
+    let tokenQuery = supabaseAdmin
       .from("oauth_tokens")
       .select("access_token")
       .eq("user_id", userId)
-      .eq("service", "anthropic")
-      .single();
+      .eq("service", "anthropic");
+
+    if (storeId) {
+      tokenQuery = tokenQuery.eq("store_id", storeId);
+    }
+
+    const { data: tokenRow, error: tokenError } = await tokenQuery.single();
 
     if (tokenError || !tokenRow?.access_token) {
       return NextResponse.json(

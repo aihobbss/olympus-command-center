@@ -4,14 +4,20 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 // Dev Dashboard custom apps use client_credentials grant with 24h expiry.
 
 export async function getShopifyToken(
-  userId: string
+  userId: string,
+  storeId?: string
 ): Promise<{ accessToken: string; shopifyDomain: string } | null> {
-  const { data: row } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("oauth_tokens")
     .select("access_token, client_id, client_secret, expires_at, meta")
     .eq("user_id", userId)
-    .eq("service", "shopify")
-    .single();
+    .eq("service", "shopify");
+
+  if (storeId) {
+    query = query.eq("store_id", storeId);
+  }
+
+  const { data: row } = await query.single();
 
   if (!row?.access_token) return null;
 
@@ -62,7 +68,7 @@ export async function getShopifyToken(
       : null;
 
     // Update stored token
-    await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from("oauth_tokens")
       .update({
         access_token: tokenData.access_token,
@@ -70,6 +76,12 @@ export async function getShopifyToken(
       })
       .eq("user_id", userId)
       .eq("service", "shopify");
+
+    if (storeId) {
+      updateQuery = updateQuery.eq("store_id", storeId);
+    }
+
+    await updateQuery;
 
     return { accessToken: tokenData.access_token, shopifyDomain };
   } catch (err) {

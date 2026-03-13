@@ -84,10 +84,9 @@ export async function POST(request: Request) {
       // Pause the campaign
       const res = await fetch(`${META_API}/${metaCampaignId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
           status: "PAUSED",
-          access_token: accessToken,
         }),
       });
 
@@ -124,10 +123,9 @@ export async function POST(request: Request) {
 
       const res = await fetch(`${META_API}/${metaCampaignId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
           daily_budget: budgetCents,
-          access_token: accessToken,
         }),
       });
 

@@ -76,6 +76,7 @@ export type SheetProduct = {
   productName: string;
   adLink: string;
   storeLink: string;
+  creativeUrls: string[];
   testingStatus: "" | "Queued" | "Imported" | "Scheduled" | "Live" | "Killed";
   creativeSaved: boolean;
   cog: number | null;
@@ -91,6 +92,7 @@ export const initialSheetProducts: SheetProduct[] = [
     productName: "Maven Bomber Jacket",
     adLink: "https://facebook.com/ads/library/?id=100003",
     storeLink: "https://vantagemelbourne.myshopify.com/products/maven-bomber-jacket",
+    creativeUrls: [],
     testingStatus: "Live",
     creativeSaved: true,
     cog: 18,
@@ -104,6 +106,7 @@ export const initialSheetProducts: SheetProduct[] = [
     productName: "Haldrin Layered Shirt",
     adLink: "https://facebook.com/ads/library/?id=100005",
     storeLink: "https://vantagemelbourne.myshopify.com/products/haldrin-layered-shirt",
+    creativeUrls: [],
     testingStatus: "Scheduled",
     creativeSaved: true,
     cog: 12,
@@ -117,6 +120,7 @@ export const initialSheetProducts: SheetProduct[] = [
     productName: "Harrington Trainers",
     adLink: "https://facebook.com/ads/library/?id=100001",
     storeLink: "https://vantagemelbourne.myshopify.com/products/harrington-trainers",
+    creativeUrls: [],
     testingStatus: "Imported",
     creativeSaved: false,
     cog: 22,
@@ -130,6 +134,7 @@ export const initialSheetProducts: SheetProduct[] = [
     productName: "Enzo Suede Loafers",
     adLink: "https://facebook.com/ads/library/?id=100006",
     storeLink: "",
+    creativeUrls: [],
     testingStatus: "",
     creativeSaved: false,
     cog: null,
@@ -143,6 +148,7 @@ export const initialSheetProducts: SheetProduct[] = [
     productName: "Avalon Puffer Vest",
     adLink: "https://facebook.com/ads/library/?id=100007",
     storeLink: "https://vantagemelbourne.myshopify.com/products/avalon-puffer-vest",
+    creativeUrls: [],
     testingStatus: "Killed",
     creativeSaved: true,
     cog: 24,
@@ -156,6 +162,7 @@ export const initialSheetProducts: SheetProduct[] = [
     productName: "Kensington Wool Overcoat",
     adLink: "https://facebook.com/ads/library/?id=100008",
     storeLink: "https://cozycraft.com/products/kensington-wool-overcoat",
+    creativeUrls: [],
     testingStatus: "Queued",
     creativeSaved: false,
     cog: 16,
@@ -169,6 +176,7 @@ export const initialSheetProducts: SheetProduct[] = [
     productName: "Durango Road Sneakers",
     adLink: "https://facebook.com/ads/library/?id=100009",
     storeLink: "https://urbanstep.co/products/durango-road-sneakers",
+    creativeUrls: [],
     testingStatus: "Queued",
     creativeSaved: false,
     cog: 19,
@@ -182,6 +190,7 @@ export const initialSheetProducts: SheetProduct[] = [
     productName: "Matteo Cotton Pants",
     adLink: "https://facebook.com/ads/library/?id=100010",
     storeLink: "https://threadhaus.com/products/matteo-cotton-pants",
+    creativeUrls: [],
     testingStatus: "Queued",
     creativeSaved: true,
     cog: 11,
@@ -195,6 +204,7 @@ export const initialSheetProducts: SheetProduct[] = [
     productName: "Solara Linen Blazer",
     adLink: "https://facebook.com/ads/library/?id=100011",
     storeLink: "",
+    creativeUrls: [],
     testingStatus: "Queued",
     creativeSaved: false,
     cog: 14,

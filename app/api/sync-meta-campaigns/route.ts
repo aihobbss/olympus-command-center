@@ -142,7 +142,8 @@ export async function POST(request: Request) {
       try {
         // Fetch campaigns list for this account
         const campaignsRes = await fetch(
-          `${META_API}/${adAccountId}/campaigns?fields=${CAMPAIGN_FIELDS}&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=100&access_token=${accessToken}`
+          `${META_API}/${adAccountId}/campaigns?fields=${CAMPAIGN_FIELDS}&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=100`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
         );
 
         if (!campaignsRes.ok) {
@@ -160,7 +161,8 @@ export async function POST(request: Request) {
 
         // Fetch insights for all campaigns in this account
         const insightsRes = await fetch(
-          `${META_API}/${adAccountId}/insights?fields=${INSIGHT_FIELDS}&level=campaign&date_preset=${preset}&limit=500&access_token=${accessToken}`
+          `${META_API}/${adAccountId}/insights?fields=${INSIGHT_FIELDS}&level=campaign&date_preset=${preset}&limit=500`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
         );
 
         let insights: MetaInsight[] = [];
