@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Wand2 } from "lucide-react";
 import { ProductCopySheet } from "@/components/modules/ProductCopySheet";
 import { ServiceConnectionOverlay } from "@/components/modules/ServiceConnectionCard";
@@ -10,9 +10,12 @@ import { SERVICE_REGISTRY } from "@/lib/services/connections";
 export default function ProductCreationPage() {
   const user = useAuthStore((s) => s.user);
   const { loadConnections, isConnected } = useConnectionsStore();
+  const [connectionsChecked, setConnectionsChecked] = useState(false);
 
   useEffect(() => {
-    if (user) loadConnections();
+    if (user) {
+      loadConnections().then(() => setConnectionsChecked(true));
+    }
   }, [user, loadConnections]);
 
   const shopifyConnected = isConnected("shopify");
@@ -27,6 +30,10 @@ export default function ProductCreationPage() {
       ? [{ service: "anthropic" as const, meta: SERVICE_REGISTRY.find((s) => s.id === "anthropic")! }]
       : []),
   ];
+
+  // Don't render content until connections are checked to avoid flash
+  const showSheet = connectionsChecked && allConnected;
+  const showOverlay = connectionsChecked && !allConnected;
 
   return (
     <div>
@@ -44,9 +51,8 @@ export default function ProductCreationPage() {
         </div>
       </div>
 
-      {allConnected ? (
-        <ProductCopySheet />
-      ) : (
+      {showSheet && <ProductCopySheet />}
+      {showOverlay && (
         <ServiceConnectionOverlay
           moduleName="Product Creation"
           services={missingServices.map(({ service, meta }) => ({

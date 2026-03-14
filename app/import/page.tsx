@@ -58,14 +58,29 @@ export default function ImportPage() {
 
   async function clearQueueImported() {
     if (!storeId) return;
+    // Build store URL prefix from Shopify domain
+    const shopifyDomain = selectedStore?.shopifyDomain;
+
     // Mark research products as Imported + create product_copies entries
     for (const p of queuedProducts) {
       updateSheetProduct(p.id, { testingStatus: "Imported" });
+
+      // Convert competitor URL to our store URL (same product slug)
+      let storeUrl = p.storeLink;
+      if (shopifyDomain && p.storeLink) {
+        try {
+          const parsed = new URL(p.storeLink);
+          storeUrl = `https://${shopifyDomain}${parsed.pathname}`;
+        } catch {
+          // Keep original URL if parsing fails
+        }
+      }
+
       await createProductCopy(
         storeId,
         {
           productName: p.productName,
-          productUrl: p.storeLink,
+          productUrl: storeUrl,
           imageUrl: p.creativeUrls[0] ?? "",
         },
         p.id // Link back to research product for pricing lookup

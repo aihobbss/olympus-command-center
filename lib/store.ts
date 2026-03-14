@@ -303,6 +303,7 @@ interface ProductCopyStore {
   loading: boolean;
   loadProducts: (storeId: string) => Promise<void>;
   updateCopyProduct: (id: string, updates: Partial<ProductCopy>) => void;
+  deleteCopyProduct: (id: string) => void;
   generateCopy: (id: string) => Promise<void>;
   generateAll: () => void;
   pushToStore: (id: string) => Promise<void>;
@@ -323,10 +324,7 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
   loading: false,
 
   loadProducts: async (storeId: string) => {
-    const hasData = get().copyProducts.length > 0;
-    if (!hasData) {
-      set({ loading: true });
-    }
+    set({ loading: true });
     try {
       const { fetchProductCopies } = await import("@/lib/services/product-copy");
       const products = await fetchProductCopies(storeId);
@@ -352,6 +350,15 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
         updateProductCopyDB(id, updates, store.id);
       }, 300);
     }
+  },
+
+  deleteCopyProduct: (id) => {
+    const store = useStoreContext.getState().selectedStore;
+    set((s) => ({
+      copyProducts: s.copyProducts.filter((p) => p.id !== id),
+    }));
+    // Fire-and-forget DB delete
+    import("@/lib/services/product-copy").then((m) => m.deleteProductCopy(id, store?.id));
   },
 
   generateCopy: async (id) => {
@@ -920,6 +927,7 @@ export type AppStore = {
   name: string;
   market: string;
   currency: string;
+  shopifyDomain?: string;
 };
 
 interface StoreContext {
@@ -941,13 +949,14 @@ export const useStoreContext = create<StoreContext>((set) => ({
     try {
       const { data } = await supabase
         .from("stores")
-        .select("id, name, market, currency")
+        .select("id, name, market, currency, shopify_domain")
         .in("id", user.storeIds);
       const stores: AppStore[] = (data ?? []).map((s) => ({
         id: s.id,
         name: s.name,
         market: s.market,
         currency: s.currency,
+        shopifyDomain: s.shopify_domain || undefined,
       }));
       set((prev) => ({
         stores,

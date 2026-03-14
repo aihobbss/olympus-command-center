@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X, Upload, Check, ChevronRight, ImageIcon, Table2 } from "lucide-react";
+import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X, Upload, Check, ChevronRight, ImageIcon, Table2, Trash2 } from "lucide-react";
 import { useProductCopyStore, useStoreContext } from "@/lib/store";
 import { type ProductCopy, type AdStatus } from "@/data/mock";
 import { cn } from "@/lib/utils";
@@ -526,7 +526,7 @@ type StatusFilter = "All" | "Pending" | "Generating" | "Completed" | "Blank";
 // ── Main sheet component ───────────────────────────────────
 
 export function ProductCopySheet() {
-  const { copyProducts, loading, loadProducts, updateCopyProduct, generateCopy, generateAll, pushToStore, pushAllToStore, generateSizeChart } =
+  const { copyProducts, loading, loadProducts, updateCopyProduct, deleteCopyProduct, generateCopy, generateAll, pushToStore, pushAllToStore, generateSizeChart } =
     useProductCopyStore();
   const { selectedStore } = useStoreContext();
   const storeId = selectedStore?.id;
@@ -694,13 +694,13 @@ export function ProductCopySheet() {
             <col className="w-[3%]" />
             <col className="w-[3%]" />
             <col className="w-[12%]" />
-            <col className="w-[15%]" />
-            <col className="w-[15%]" />
+            <col className="w-[14%]" />
+            <col className="w-[14%]" />
             <col className="w-[14%]" />
             <col className="w-[14%]" />
             <col className="w-[6%]" />
             <col className="w-[12%]" />
-            <col className="w-[4%]" />
+            <col className="w-[6%]" />
           </colgroup>
           <thead>
             <tr className="border-b border-subtle">
@@ -708,7 +708,7 @@ export function ProductCopySheet() {
                 "",
                 "Ad",
                 "Product Name",
-                "Product URL",
+                "Store Link",
                 "Image URL",
                 "Shopify",
                 "Facebook",
@@ -853,21 +853,34 @@ export function ProductCopySheet() {
                   />
                 </td>
 
-                {/* Preview button (for completed) */}
+                {/* Preview + Delete */}
                 <td className="px-3 py-2.5">
-                  {(product.shopifyDescription || product.facebookCopy) && (
+                  <div className="flex items-center gap-1">
+                    {(product.shopifyDescription || product.facebookCopy) && (
+                      <button
+                        onClick={() => setPreviewId(product.id)}
+                        className={cn(
+                          "w-7 h-7 rounded-lg flex items-center justify-center",
+                          "text-text-muted hover:text-text-primary hover:bg-white/[0.06]",
+                          "transition-colors duration-150"
+                        )}
+                        title="Preview copy"
+                      >
+                        <Eye size={14} />
+                      </button>
+                    )}
                     <button
-                      onClick={() => setPreviewId(product.id)}
+                      onClick={() => deleteCopyProduct(product.id)}
                       className={cn(
                         "w-7 h-7 rounded-lg flex items-center justify-center",
-                        "text-text-muted hover:text-text-primary hover:bg-white/[0.06]",
+                        "text-text-muted hover:text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10",
                         "transition-colors duration-150"
                       )}
-                      title="Preview copy"
+                      title="Delete product"
                     >
-                      <Eye size={14} />
+                      <Trash2 size={14} />
                     </button>
-                  )}
+                  </div>
                 </td>
               </tr>
 
