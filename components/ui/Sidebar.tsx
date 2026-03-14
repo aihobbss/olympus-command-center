@@ -113,7 +113,7 @@ export function Sidebar({ collapsed, onToggle, bannerOffset = 0, highlightedNavI
                   {isActive && (
                     <motion.div
                       layoutId="sidebar-active"
-                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-accent-indigo"
+                      className="absolute -left-3 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-accent-indigo"
                       transition={{
                         type: "spring",
                         stiffness: 350,
