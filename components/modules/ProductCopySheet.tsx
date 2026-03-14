@@ -101,6 +101,91 @@ function EditableCell({
   );
 }
 
+// ── Link cell (clickable hyperlink + editable) ─────────────────
+
+type LinkCellProps = {
+  value: string;
+  placeholder?: string;
+  onSave: (value: string) => void;
+};
+
+function LinkCell({ value, placeholder = "—", onSave }: LinkCellProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  function commit() {
+    setEditing(false);
+    onSave(draft);
+  }
+
+  if (!editing) {
+    const display = value && value.trim() !== "" ? value : null;
+    return (
+      <div className="flex items-center gap-1 w-full min-w-0">
+        {display ? (
+          <>
+            <a
+              href={display}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-accent-indigo hover:underline truncate flex-1 min-w-0"
+              title={display}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {display.replace(/^https?:\/\//, "").split("/products/")[1] || display.replace(/^https?:\/\//, "")}
+            </a>
+            <button
+              onClick={() => {
+                setDraft(value ?? "");
+                setEditing(true);
+              }}
+              className="shrink-0 text-text-muted hover:text-text-primary transition-colors"
+              title="Edit link"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => {
+              setDraft(value ?? "");
+              setEditing(true);
+            }}
+            className="w-full text-left text-xs px-2 py-1 rounded hover:bg-white/[0.04] transition-colors duration-100 cursor-text text-text-muted"
+          >
+            {placeholder}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") setEditing(false);
+      }}
+      className={cn(
+        "w-full text-xs py-1 px-2 rounded",
+        "bg-bg-elevated border border-accent-indigo/40 outline-none",
+        "text-text-primary placeholder:text-text-muted"
+      )}
+      placeholder={placeholder}
+    />
+  );
+}
+
 // ── Ad status dot ──────────────────────────────────────────────
 
 const adStatusConfig: Record<AdStatus, { color: string; glow: string; label: string }> = {
@@ -770,11 +855,11 @@ export function ProductCopySheet() {
                   />
                 </td>
 
-                {/* Product URL */}
+                {/* Store Link */}
                 <td className="px-3 py-2.5 overflow-hidden">
-                  <EditableCell
+                  <LinkCell
                     value={product.productUrl}
-                    placeholder="Product URL"
+                    placeholder="Store link"
                     onSave={(v) =>
                       updateCopyProduct(product.id, { productUrl: v })
                     }

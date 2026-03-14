@@ -58,8 +58,8 @@ export default function ImportPage() {
 
   async function clearQueueImported() {
     if (!storeId) return;
-    // Build store URL prefix from Shopify domain
-    const shopifyDomain = selectedStore?.shopifyDomain;
+    // Use custom domain (public-facing) for store links, fall back to shopify domain
+    const storeDomain = selectedStore?.customDomain || selectedStore?.shopifyDomain;
 
     // Mark research products as Imported + create product_copies entries
     for (const p of queuedProducts) {
@@ -67,10 +67,10 @@ export default function ImportPage() {
 
       // Convert competitor URL to our store URL (same product slug)
       let storeUrl = p.storeLink;
-      if (shopifyDomain && p.storeLink) {
+      if (storeDomain && p.storeLink) {
         try {
           const parsed = new URL(p.storeLink);
-          storeUrl = `https://${shopifyDomain}${parsed.pathname}`;
+          storeUrl = `https://${storeDomain}${parsed.pathname}`;
         } catch {
           // Keep original URL if parsing fails
         }

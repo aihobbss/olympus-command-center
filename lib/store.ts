@@ -468,6 +468,7 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
           productName: product?.productName || "Product",
           shopifyDescription: product?.shopifyDescription || "",
           sizeChartTable: product?.sizeChartTable || "",
+          productUrl: product?.productUrl || "",
           imageUrl: product?.imageUrl || "",
           userId: user?.id,
           storeId: store?.id,
@@ -928,6 +929,7 @@ export type AppStore = {
   market: string;
   currency: string;
   shopifyDomain?: string;
+  customDomain?: string;
 };
 
 interface StoreContext {
@@ -949,7 +951,7 @@ export const useStoreContext = create<StoreContext>((set) => ({
     try {
       const { data } = await supabase
         .from("stores")
-        .select("id, name, market, currency, shopify_domain")
+        .select("id, name, market, currency, shopify_domain, custom_domain")
         .in("id", user.storeIds);
       const stores: AppStore[] = (data ?? []).map((s) => ({
         id: s.id,
@@ -957,6 +959,7 @@ export const useStoreContext = create<StoreContext>((set) => ({
         market: s.market,
         currency: s.currency,
         shopifyDomain: s.shopify_domain || undefined,
+        customDomain: s.custom_domain || undefined,
       }));
       set((prev) => ({
         stores,
