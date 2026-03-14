@@ -544,6 +544,7 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
         body: JSON.stringify({
           imageUrl: product?.sizeChartImage || "",
           userId: user?.id,
+          storeId: store?.id,
         }),
       });
 

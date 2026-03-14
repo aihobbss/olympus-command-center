@@ -25,34 +25,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // SSRF protection: only allow image URLs from trusted domains
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(imageUrl);
-    } catch {
-      return NextResponse.json(
-        { error: "INVALID_URL", message: "Invalid image URL." },
-        { status: 400 }
-      );
-    }
-
-    const ALLOWED_HOSTS = [
-      "jueajsofuknwzefcosow.supabase.co", // Our Supabase storage
-      "cdn.shopify.com",
-      "images.unsplash.com",
-      "i.imgur.com",
-    ];
-
-    if (
-      parsedUrl.protocol !== "https:" ||
-      !ALLOWED_HOSTS.some((h) => parsedUrl.hostname === h || parsedUrl.hostname.endsWith(`.${h}`))
-    ) {
-      return NextResponse.json(
-        { error: "BLOCKED_URL", message: "Image URL must be from a trusted source (Supabase storage, Shopify CDN)." },
-        { status: 400 }
-      );
-    }
-
     // Fetch user's Claude API key (prefer store-scoped)
     let tokenQuery = supabaseAdmin
       .from("oauth_tokens")
@@ -75,21 +47,65 @@ export async function POST(request: Request) {
 
     const apiKey = tokenRow.access_token;
 
-    // Fetch the image and convert to base64
-    const imageResponse = await fetch(imageUrl);
-    if (!imageResponse.ok) {
-      return NextResponse.json(
-        { error: "IMAGE_FETCH_FAILED", message: "Could not fetch the size chart image." },
-        { status: 400 }
-      );
-    }
+    // Convert image to base64 — handle both data URLs and remote URLs
+    let base64Image: string;
+    let mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" = "image/png";
 
-    const imageBuffer = await imageResponse.arrayBuffer();
-    const base64Image = Buffer.from(imageBuffer).toString("base64");
-    const contentType = imageResponse.headers.get("content-type") || "image/png";
-    const mediaType = contentType.startsWith("image/")
-      ? contentType as "image/jpeg" | "image/png" | "image/gif" | "image/webp"
-      : "image/png";
+    if (imageUrl.startsWith("data:")) {
+      // Data URL from paste/file upload — extract base64 directly
+      const match = imageUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+      if (!match) {
+        return NextResponse.json(
+          { error: "INVALID_DATA_URL", message: "Invalid image data." },
+          { status: 400 }
+        );
+      }
+      mediaType = match[1] as typeof mediaType;
+      base64Image = match[2];
+    } else {
+      // Remote URL — SSRF protection
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(imageUrl);
+      } catch {
+        return NextResponse.json(
+          { error: "INVALID_URL", message: "Invalid image URL." },
+          { status: 400 }
+        );
+      }
+
+      const ALLOWED_HOSTS = [
+        "jueajsofuknwzefcosow.supabase.co",
+        "cdn.shopify.com",
+        "images.unsplash.com",
+        "i.imgur.com",
+      ];
+
+      if (
+        parsedUrl.protocol !== "https:" ||
+        !ALLOWED_HOSTS.some((h) => parsedUrl.hostname === h || parsedUrl.hostname.endsWith(`.${h}`))
+      ) {
+        return NextResponse.json(
+          { error: "BLOCKED_URL", message: "Image URL must be from a trusted source." },
+          { status: 400 }
+        );
+      }
+
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        return NextResponse.json(
+          { error: "IMAGE_FETCH_FAILED", message: "Could not fetch the size chart image." },
+          { status: 400 }
+        );
+      }
+
+      const imageBuffer = await imageResponse.arrayBuffer();
+      base64Image = Buffer.from(imageBuffer).toString("base64");
+      const contentType = imageResponse.headers.get("content-type") || "image/png";
+      mediaType = contentType.startsWith("image/")
+        ? contentType as typeof mediaType
+        : "image/png";
+    }
 
     // Call Claude Vision API
     const response = await fetch("https://api.anthropic.com/v1/messages", {

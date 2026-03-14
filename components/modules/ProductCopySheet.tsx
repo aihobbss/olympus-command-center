@@ -913,6 +913,11 @@ export function ProductCopySheet() {
                         <Check size={14} />
                         <span className="text-[11px] font-medium">Done</span>
                       </div>
+                    ) : product.sizeChartImage ? (
+                      <div
+                        className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_6px_1px_rgba(245,158,11,0.4)]"
+                        title="Size chart image attached — expand row to generate"
+                      />
                     ) : (
                       <span className="text-[11px] text-text-muted">—</span>
                     )}

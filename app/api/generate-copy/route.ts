@@ -46,7 +46,10 @@ SHOPIFY DESCRIPTION STRUCTURE:
 PRODUCT NAME RULES:
 - 2-4 words maximum
 - Title Case
-- Clean and simple (e.g., "Joseph Owen Shirt", "Marina Linen Pants")
+- Use human first names as the brand/style name — NOT cities, countries, or places
+- Format: "[Human Name] [Garment Type]" or "[Human Name] [Adjective] [Garment Type]"
+- Good examples: "Joseph Owen Shirt", "Harrington Trainers", "Matteo Cotton Pants", "Haldrin Layered Shirt", "Enzo Suede Loafers", "Avalon Puffer Vest"
+- BAD examples (never use): "Melbourne Jacket", "London Coat", "Paris Dress", "Milan Sneakers", "Tokyo Bomber"
 - NO color references in product names
 
 FEATURE BULLETS (when materials unknown):
