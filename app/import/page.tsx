@@ -12,10 +12,11 @@ import {
   RotateCcw,
   CheckCheck,
 } from "lucide-react";
-import { useResearchStore, useStoreContext } from "@/lib/store";
+import { useResearchStore, useStoreContext, useProductCopyStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui";
 import { ImportQueueCard } from "@/components/modules/ImportQueueCard";
+import { createProductCopy } from "@/lib/services/product-copy";
 
 export default function ImportPage() {
   const router = useRouter();
@@ -55,10 +56,19 @@ export default function ImportPage() {
     setCsvGenerated(false);
   }
 
-  function clearQueueImported() {
-    queuedProducts.forEach((p) =>
-      updateSheetProduct(p.id, { testingStatus: "Imported" })
-    );
+  async function clearQueueImported() {
+    if (!storeId) return;
+    // Mark research products as Imported + create product_copies entries
+    for (const p of queuedProducts) {
+      updateSheetProduct(p.id, { testingStatus: "Imported" });
+      await createProductCopy(storeId, {
+        productName: p.productName,
+        productUrl: p.storeLink,
+        imageUrl: p.creativeUrls[0] ?? "",
+      });
+    }
+    // Reload product copies so Product Creation page picks them up
+    useProductCopyStore.getState().loadProducts(storeId);
     setCsvGenerated(false);
   }
 
