@@ -136,34 +136,44 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   signInWithEmail: async (email, password) => {
     set({ loading: true });
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        return { error: error.message };
+      }
+      // onAuthStateChange will handle setting the user and clearing loading
+      return {};
+    } catch {
+      return { error: "An unexpected error occurred" };
+    } finally {
       set({ loading: false });
-      return { error: error.message };
     }
-    // onAuthStateChange will handle setting the user
-    return {};
   },
 
   signUpWithEmail: async (email, password, fullName) => {
     set({ loading: true });
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName } },
-    });
-    if (error) {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: fullName } },
+      });
+      if (error) {
+        return { error: error.message };
+      }
+      // Update profile with full name if signup succeeded
+      if (data.user) {
+        await supabase
+          .from("profiles")
+          .update({ full_name: fullName })
+          .eq("id", data.user.id);
+      }
+      return {};
+    } catch {
+      return { error: "An unexpected error occurred" };
+    } finally {
       set({ loading: false });
-      return { error: error.message };
     }
-    // Update profile with full name if signup succeeded
-    if (data.user) {
-      await supabase
-        .from("profiles")
-        .update({ full_name: fullName })
-        .eq("id", data.user.id);
-    }
-    return {};
   },
 
   logout: async () => {
@@ -620,10 +630,14 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
     const store = useStoreContext.getState().selectedStore;
     if (!store) return;
 
-    const { createAdCreatorCampaign } = await import("@/lib/services/ad-creator");
-    const campaign = await createAdCreatorCampaign(store.id);
-    if (campaign) {
-      set((s) => ({ campaigns: [...s.campaigns, campaign] }));
+    try {
+      const { createAdCreatorCampaign } = await import("@/lib/services/ad-creator");
+      const campaign = await createAdCreatorCampaign(store.id);
+      if (campaign) {
+        set((s) => ({ campaigns: [...s.campaigns, campaign] }));
+      }
+    } catch (err) {
+      console.error("Failed to add campaign:", err);
     }
   },
 
@@ -739,13 +753,22 @@ export const useCreativeGeneratorStore = create<CreativeGeneratorStore>(
     loaded: false,
 
     loadBatchQueue: async (storeId: string) => {
-      const queue = await fetchBatchQueue(storeId);
-      set({ batchQueue: queue });
+      try {
+        const queue = await fetchBatchQueue(storeId);
+        set({ batchQueue: queue });
+      } catch (err) {
+        console.error("Failed to load batch queue:", err);
+      }
     },
 
     loadCreatives: async (storeId: string) => {
-      const creatives = await fetchCreativesFromDb(storeId);
-      set({ productCreatives: creatives, loaded: true });
+      try {
+        const creatives = await fetchCreativesFromDb(storeId);
+        set({ productCreatives: creatives, loaded: true });
+      } catch (err) {
+        console.error("Failed to load creatives:", err);
+        set({ loaded: true });
+      }
     },
 
     setImagesPerProduct: (n) => set({ imagesPerProduct: n }),
@@ -909,22 +932,26 @@ export const useStoreContext = create<StoreContext>((set) => ({
       set({ stores: [], selectedStore: null });
       return;
     }
-    const { data } = await supabase
-      .from("stores")
-      .select("id, name, market, currency")
-      .in("id", user.storeIds);
-    const stores: AppStore[] = (data ?? []).map((s) => ({
-      id: s.id,
-      name: s.name,
-      market: s.market,
-      currency: s.currency,
-    }));
-    set((prev) => ({
-      stores,
-      selectedStore: prev.selectedStore && stores.find((s) => s.id === prev.selectedStore!.id)
-        ? prev.selectedStore
-        : stores[0] ?? null,
-    }));
+    try {
+      const { data } = await supabase
+        .from("stores")
+        .select("id, name, market, currency")
+        .in("id", user.storeIds);
+      const stores: AppStore[] = (data ?? []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        market: s.market,
+        currency: s.currency,
+      }));
+      set((prev) => ({
+        stores,
+        selectedStore: prev.selectedStore && stores.find((s) => s.id === prev.selectedStore!.id)
+          ? prev.selectedStore
+          : stores[0] ?? null,
+      }));
+    } catch (err) {
+      console.error("Failed to load stores:", err);
+    }
   },
   setSelectedStore: (store) => {
     // Clear all pending debounce timers to prevent cross-store writes
@@ -972,8 +999,13 @@ export const useConnectionsStore = create<ConnectionsStore>((set, get) => ({
     const store = useStoreContext.getState().selectedStore;
     if (!user) return;
     set({ loading: true });
-    const connections = await fetchConnections(user.id, store?.id);
-    set({ connections, loading: false });
+    try {
+      const connections = await fetchConnections(user.id, store?.id);
+      set({ connections, loading: false });
+    } catch (err) {
+      console.error("Failed to load connections:", err);
+      set({ loading: false });
+    }
   },
 
   isConnected: (service) => isServiceConnected(get().connections, service),
