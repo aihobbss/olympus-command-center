@@ -85,7 +85,8 @@ export async function fetchProductCopies(storeId: string): Promise<ProductCopy[]
 
 export async function createProductCopy(
   storeId: string,
-  initial?: Partial<ProductCopy>
+  initial?: Partial<ProductCopy>,
+  researchProductId?: string
 ): Promise<ProductCopy | null> {
   const row: Record<string, unknown> = {
     store_id: storeId,
@@ -100,6 +101,7 @@ export async function createProductCopy(
     size_chart_image_url: "",
     size_chart_table: "",
     size_chart_status: "",
+    ...(researchProductId ? { research_product_id: researchProductId } : {}),
   };
 
   const { data, error } = await supabase

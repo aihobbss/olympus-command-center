@@ -377,12 +377,13 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           productName: product?.productName || "Product",
-          productType: "",
-          market: store?.market || "UK",
-          currency: store?.currency || "GBP",
-          price: null,
-          discount: null,
+          productUrl: product?.productUrl || "",
+          imageUrl: product?.imageUrl || "",
+          market: store?.market || "AU",
+          currency: store?.currency || "AUD",
           userId: user?.id,
+          storeId: store?.id,
+          productCopyId: id, // API uses this to look up research product pricing
         }),
       });
 
@@ -392,6 +393,10 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
           status: "Completed" as const,
           shopifyDescription: data.shopifyDescription || "",
           facebookCopy: data.facebookCopy || "",
+          // Update product name if Claude cleaned it
+          ...(data.cleanedTitle && data.cleanedTitle !== product?.productName
+            ? { productName: data.cleanedTitle }
+            : {}),
         };
         set((s) => ({
           copyProducts: s.copyProducts.map((p) =>
@@ -459,6 +464,7 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
           imageUrl: product?.imageUrl || "",
           userId: user?.id,
           storeId: store?.id,
+          productCopyId: id,
         }),
       });
 

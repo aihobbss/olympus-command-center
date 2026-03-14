@@ -387,24 +387,28 @@ function SizeChartPanel({
     [handleFile]
   );
 
-  const handlePaste = useCallback(
-    (e: React.ClipboardEvent) => {
-      const items = e.clipboardData.items;
+  // Listen for paste at the document level so Ctrl+V works anywhere when this panel is open
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.startsWith("image/")) {
+          e.preventDefault();
           const file = items[i].getAsFile();
           if (file) handleFile(file);
           break;
         }
       }
-    },
-    [handleFile]
-  );
+    }
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [handleFile]);
 
   const preview = localPreview || product.sizeChartImage;
 
   return (
-    <div className="flex gap-6 items-start" onPaste={handlePaste}>
+    <div className="flex gap-6 items-start">
       {/* Upload area */}
       <div className="flex-shrink-0">
         <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider mb-2">

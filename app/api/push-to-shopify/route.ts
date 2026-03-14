@@ -4,7 +4,7 @@ import { getShopifyToken } from "@/lib/shopify-token";
 
 // Push a product to Shopify via Admin API
 // Requires: user has a connected Shopify store (token in oauth_tokens)
-// Supports auto-pricing based on product type + store market
+// Pricing is looked up from the linked research product
 
 // Pricing table (matches data/mock/index.ts pricingTable)
 const PRICING: Record<string, { gbp: number; aud: number }> = {
@@ -31,18 +31,22 @@ function getPrice(productType: string | null, market: string): number | null {
   return market === "AU" ? entry.aud : entry.gbp;
 }
 
-function getCompareAtPrice(salePrice: number, market: string): number {
-  // Low-ticket threshold: AU $48, else £26
-  const lowTicketThreshold = market === "AU" ? 48 : 26;
-  const discountPercent = salePrice <= lowTicketThreshold ? 53 : 42;
-  // compare_at = sale_price / (1 - discount%)
+function getCompareAtPrice(salePrice: number, discountPercent: number): number {
   return Math.round(salePrice / (1 - discountPercent / 100));
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { productName, shopifyDescription, sizeChartTable, imageUrl, userId, productType, storeId } = body;
+    const {
+      productName,
+      shopifyDescription,
+      sizeChartTable,
+      imageUrl,
+      userId,
+      storeId,
+      productCopyId,
+    } = body;
 
     if (!productName || !userId) {
       return NextResponse.json(
@@ -65,15 +69,13 @@ export async function POST(request: Request) {
     const accessToken = shopify.accessToken;
 
     // Build the product description (Shopify-formatted HTML)
-    // Combine the AI-generated description with the size chart table if present
     let descriptionHtml = (shopifyDescription || "").replace(/\n/g, "<br>");
     if (sizeChartTable) {
       descriptionHtml += `<br><br><h3>Size Chart</h3>${sizeChartTable}`;
     }
 
-    // Look up store market for auto-pricing
-    let market = "UK";
-    let resolvedProductType = productType || null;
+    // Look up store market
+    let market = "AU";
     if (storeId) {
       const { data: storeInfo } = await supabaseAdmin
         .from("stores")
@@ -83,20 +85,53 @@ export async function POST(request: Request) {
       if (storeInfo?.market) market = storeInfo.market;
     }
 
-    // If no productType provided, try to look it up from research_products
+    // Look up pricing from linked research product
+    let resolvedProductType: string | null = null;
+    let researchPricing: number | null = null;
+    let researchDiscount: number = 42;
+
+    if (productCopyId) {
+      const { data: copyRow } = await supabaseAdmin
+        .from("product_copies")
+        .select("research_product_id")
+        .eq("id", productCopyId)
+        .single();
+
+      if (copyRow?.research_product_id) {
+        const { data: researchRow } = await supabaseAdmin
+          .from("research_products")
+          .select("product_type, pricing, discount_percent")
+          .eq("id", copyRow.research_product_id)
+          .single();
+
+        if (researchRow) {
+          resolvedProductType = researchRow.product_type || null;
+          researchPricing = researchRow.pricing;
+          researchDiscount = researchRow.discount_percent ?? 42;
+        }
+      }
+    }
+
+    // Fallback: look up by product name if no research link
     if (!resolvedProductType && productName) {
       const { data: researchRow } = await supabaseAdmin
         .from("research_products")
-        .select("product_type")
+        .select("product_type, pricing, discount_percent")
         .ilike("product_name", productName)
         .limit(1)
         .single();
-      if (researchRow?.product_type) resolvedProductType = researchRow.product_type;
+      if (researchRow) {
+        resolvedProductType = researchRow.product_type || null;
+        if (!researchPricing && researchRow.pricing) {
+          researchPricing = researchRow.pricing;
+          researchDiscount = researchRow.discount_percent ?? 42;
+        }
+      }
     }
 
-    // Auto-price based on product type + market
-    const salePrice = getPrice(resolvedProductType, market);
-    const compareAtPrice = salePrice ? getCompareAtPrice(salePrice, market) : null;
+    // Determine sale price: use research pricing directly, or fall back to type-based lookup
+    const salePrice = researchPricing || getPrice(resolvedProductType, market);
+    const compareAtPrice = salePrice ? getCompareAtPrice(salePrice, researchDiscount) : null;
 
     // Build variant with pricing
     const variant: Record<string, unknown> = {
@@ -115,7 +150,7 @@ export async function POST(request: Request) {
       product: {
         title: productName,
         body_html: descriptionHtml,
-        status: "draft", // Create as draft so user can review before publishing
+        status: "draft",
         product_type: resolvedProductType || undefined,
         variants: [variant],
         ...(imageUrl

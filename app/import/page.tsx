@@ -61,11 +61,15 @@ export default function ImportPage() {
     // Mark research products as Imported + create product_copies entries
     for (const p of queuedProducts) {
       updateSheetProduct(p.id, { testingStatus: "Imported" });
-      await createProductCopy(storeId, {
-        productName: p.productName,
-        productUrl: p.storeLink,
-        imageUrl: p.creativeUrls[0] ?? "",
-      });
+      await createProductCopy(
+        storeId,
+        {
+          productName: p.productName,
+          productUrl: p.storeLink,
+          imageUrl: p.creativeUrls[0] ?? "",
+        },
+        p.id // Link back to research product for pricing lookup
+      );
     }
     // Reload product copies so Product Creation page picks them up
     useProductCopyStore.getState().loadProducts(storeId);
