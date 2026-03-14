@@ -428,8 +428,6 @@ export function ResearchSheet() {
           updates.storeLink = data.storeLink;
         if (data.creatives && data.creatives.length > 0 && product.creativeUrls.length === 0)
           updates.creativeUrls = data.creatives;
-        if (!product.notes && data.adCopy)
-          updates.notes = data.adCopy.replace(/<br\s*\/?>/gi, "\n").slice(0, 200);
 
         if (Object.keys(updates).length > 0) {
           updateSheetProduct(productId, updates);
