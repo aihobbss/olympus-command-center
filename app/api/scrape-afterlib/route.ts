@@ -44,10 +44,11 @@ export async function POST(request: Request) {
       (raw as any)?.result?.data?.json ??
       raw;
 
-    // Extract media URLs
+    // Extract media URLs — skip profile pictures (type "PA_PP")
     const creatives: string[] = [];
     if (Array.isArray(ad.media)) {
       for (const m of ad.media) {
+        if (m?.type === "PA_PP") continue;
         const url =
           m?.urls?.thumbnail ?? m?.urls?.preview ?? m?.thumbnail ?? m?.preview ?? m?.url;
         if (url && typeof url === "string") creatives.push(url);
