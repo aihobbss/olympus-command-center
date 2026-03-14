@@ -193,6 +193,7 @@ interface ResearchStore {
   // Research Sheet
   sheetProducts: SheetProduct[];
   loading: boolean;
+  adding: boolean;
   loadProducts: (storeId: string) => Promise<void>;
   updateSheetProduct: (id: string, updates: Partial<SheetProduct>) => void;
   importAllUnimported: () => void;
@@ -203,6 +204,7 @@ interface ResearchStore {
 export const useResearchStore = create<ResearchStore>((set, get) => ({
   sheetProducts: [],
   loading: false,
+  adding: false,
 
   loadProducts: async (storeId) => {
     // Only show loading spinner if we have no cached data yet
@@ -255,14 +257,20 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
   },
 
   addSheetProduct: async () => {
+    if (get().adding) return;
     const store = useStoreContext.getState().selectedStore;
     if (!store) return;
 
-    const product = await createResearchProduct(store.id);
-    if (product) {
-      set((s) => ({
-        sheetProducts: [...s.sheetProducts, product],
-      }));
+    set({ adding: true });
+    try {
+      const product = await createResearchProduct(store.id);
+      if (product) {
+        set((s) => ({
+          sheetProducts: [...s.sheetProducts, product],
+        }));
+      }
+    } finally {
+      set({ adding: false });
     }
   },
 

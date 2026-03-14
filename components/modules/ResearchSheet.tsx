@@ -344,7 +344,7 @@ type TestingStatusFilter =
 // ── Main sheet component ───────────────────────────────────
 
 export function ResearchSheet() {
-  const { sheetProducts, updateSheetProduct, importAllUnimported, addSheetProduct, deleteSheetProduct, loadProducts, loading } =
+  const { sheetProducts, updateSheetProduct, importAllUnimported, addSheetProduct, deleteSheetProduct, loadProducts, loading, adding } =
     useResearchStore();
   const { selectedStore } = useStoreContext();
   const [search, setSearch] = useState("");
@@ -799,15 +799,17 @@ export function ResearchSheet() {
       {/* Add Row */}
       <button
         onClick={addSheetProduct}
+        disabled={adding}
         className={cn(
           "mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
           "text-text-muted hover:text-text-secondary",
           "border border-dashed border-subtle hover:border-text-muted",
-          "transition-all duration-150"
+          "transition-all duration-150",
+          adding && "opacity-50 pointer-events-none"
         )}
       >
-        <Plus size={14} />
-        Add Product
+        {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+        {adding ? "Adding…" : "Add Product"}
       </button>
 
       {/* No results */}
