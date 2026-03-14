@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { execFileSync } from "child_process";
 
 // ── Normalized response shape ────────────────────────────────
 export type ScrapeAdResponse = {
@@ -140,31 +139,25 @@ async function fetchWithTimeoutAndRetry(
 }
 
 // ── Afterlib handler ─────────────────────────────────────────
-// Cloudflare blocks Node.js fetch for api.afterlib.com, so we shell out to curl
-// which passes Cloudflare's TLS fingerprinting checks.
+// NOTE: Cloudflare blocks Node.js fetch on Vercel (TLS fingerprinting).
+// Afterlib scraping is handled client-side in ResearchSheet.tsx instead.
+// This server-side handler is kept as a fallback but will likely return 403.
 
 async function scrapeAfterlib(adId: string): Promise<ScrapeAdResponse> {
-  let raw: string;
-  try {
-    raw = execFileSync("curl", [
-      "-s",
-      "--max-time", "10",
-      "-X", "POST",
-      "https://api.afterlib.com/rpc/ads/getSharedAd",
-      "-H", "Content-Type: application/json",
-      "-H", `User-Agent: ${BROWSER_UA}`,
-      "-d", JSON.stringify({ json: { metaAdId: adId } }),
-    ], { encoding: "utf-8", timeout: SCRAPE_TIMEOUT_MS + 2000 });
-  } catch (err) {
-    throw new Error(`Afterlib curl failed: ${err instanceof Error ? err.message : "unknown"}`);
-  }
+  const res = await fetchWithTimeoutAndRetry(
+    "https://api.afterlib.com/rpc/ads/getSharedAd",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": BROWSER_UA,
+      },
+      body: JSON.stringify({ json: { metaAdId: adId } }),
+    },
+    "Afterlib"
+  );
 
-  let data: Record<string, unknown>;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    throw new Error("Afterlib returned non-JSON response (possible Cloudflare block)");
-  }
+  const data = await res.json();
 
   // Response shape: { json: { items: [ ad, ... ] } }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

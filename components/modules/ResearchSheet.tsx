@@ -365,26 +365,60 @@ export function ResearchSheet() {
       // Always save the link itself
       updateSheetProduct(productId, { adLink: link });
 
-      // Only attempt scrape for recognized URLs
-      if (
-        !link ||
-        (!link.includes("afterlib.com") && !link.includes("winninghunter.com"))
-      ) {
+      const isAfterlib = link.includes("afterlib.com");
+      const isWinningHunter = link.includes("winninghunter.com");
+
+      if (!link || (!isAfterlib && !isWinningHunter)) {
         return;
       }
 
       setScrapingIds((prev) => new Set(prev).add(productId));
 
       try {
-        const res = await fetch(
-          `/api/scrape-ad?url=${encodeURIComponent(link)}`
-        );
-        if (!res.ok) {
-          const errBody = await res.json().catch(() => ({}));
-          console.error("Scrape failed:", res.status, errBody);
-          return;
+        let data: { productName?: string; storeLink?: string; creatives?: string[]; adCopy?: string };
+
+        if (isAfterlib) {
+          // Call Afterlib API directly from browser — Cloudflare blocks
+          // Node.js fetch on Vercel (TLS fingerprinting), but browser fetch passes
+          const adIdMatch = link.match(/ad_id=([0-9a-f-]+)/i);
+          if (!adIdMatch) return;
+
+          const res = await fetch("https://api.afterlib.com/rpc/ads/getSharedAd", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ json: { metaAdId: adIdMatch[1] } }),
+          });
+          if (!res.ok) {
+            console.error("Afterlib scrape failed:", res.status);
+            return;
+          }
+          const raw = await res.json();
+          const ad = raw?.json?.items?.[0] ?? raw;
+
+          const creatives: string[] = [];
+          if (Array.isArray(ad.media)) {
+            for (const m of ad.media) {
+              const url = m?.urls?.thumbnail ?? m?.urls?.preview ?? m?.url;
+              if (url && typeof url === "string") creatives.push(url);
+            }
+          }
+
+          data = {
+            productName: ad.headline ?? ad.productTitle ?? "",
+            adCopy: ad.body ?? "",
+            storeLink: ad.offerLink ?? ad.displayUrl ?? "",
+            creatives,
+          };
+        } else {
+          // Winning Hunter — use server-side route (no Cloudflare issue)
+          const res = await fetch(`/api/scrape-ad?url=${encodeURIComponent(link)}`);
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({}));
+            console.error("Scrape failed:", res.status, errBody);
+            return;
+          }
+          data = await res.json();
         }
-        const data = await res.json();
 
         // Read latest state directly from Zustand to avoid stale closure
         const currentProducts = useResearchStore.getState().sheetProducts;
@@ -399,7 +433,7 @@ export function ResearchSheet() {
           updates.productName = data.productName;
         if (!product.storeLink && data.storeLink)
           updates.storeLink = data.storeLink;
-        if (data.creatives?.length > 0 && product.creativeUrls.length === 0)
+        if (data.creatives && data.creatives.length > 0 && product.creativeUrls.length === 0)
           updates.creativeUrls = data.creatives;
         if (!product.notes && data.adCopy)
           updates.notes = data.adCopy.replace(/<br\s*\/?>/gi, "\n").slice(0, 200);
