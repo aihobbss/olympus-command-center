@@ -121,8 +121,9 @@ export default function ProfitTrackerPage() {
   const storeCurrency = selectedStore?.currency ?? "";
   const ptRate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
   const currencyCode = selectedStore?.market === "UK" ? "GBP" : "AUD";
-  const convertToUsd = useCallback(
-    (localAmount: number) => Math.round(localAmount * ptRate),
+  // DB stores everything in USD — convert back to local for display
+  const usdToLocal = useCallback(
+    (usdAmount: number) => ptRate > 0 ? usdAmount / ptRate : usdAmount,
     [ptRate]
   );
 
@@ -463,24 +464,24 @@ export default function ProfitTrackerPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-2">
         <MetricCard
           label="Total Revenue"
-          value={totals.revenue}
+          value={Math.round(usdToLocal(totals.revenue))}
           format="currency"
           currency={storeCurrency}
-          subtitle={`$${convertToUsd(totals.revenue).toLocaleString("en-GB")} USD`}
+          subtitle={`$${Math.round(totals.revenue).toLocaleString("en-GB")} USD`}
         />
         <MetricCard
           label="Total Ad Spend"
-          value={convertToUsd(totals.adSpend)}
+          value={Math.round(totals.adSpend)}
           format="currency"
           currency="$"
-          subtitle={`${fmtCurrency(totals.adSpend, storeCurrency)} ${currencyCode}`}
+          subtitle={`${fmtCurrency(Math.round(usdToLocal(totals.adSpend)), storeCurrency)} ${currencyCode}`}
         />
         <MetricCard
           label="Net Profit"
-          value={convertToUsd(totals.profit)}
+          value={Math.round(totals.profit)}
           format="currency"
           currency="$"
-          subtitle={`${fmtCurrency(totals.profit, storeCurrency)} ${currencyCode}`}
+          subtitle={`${fmtCurrency(Math.round(usdToLocal(totals.profit)), storeCurrency)} ${currencyCode}`}
         />
         <MetricCard
           label="Blended ROAS"
@@ -540,7 +541,11 @@ export default function ProfitTrackerPage() {
           {/* Chart */}
           <div className="mb-6">
             <ProfitChart
-              logs={filteredLogs}
+              logs={filteredLogs.map((log) => ({
+                ...log,
+                revenue: usdToLocal(log.revenue),
+                profit: usdToLocal(log.profit),
+              }))}
               currency={storeCurrency}
               title={chartTitle}
             />
@@ -583,16 +588,16 @@ export default function ProfitTrackerPage() {
                       {fmtDate(log.date)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
-                      {fmtCurrency(log.revenue, storeCurrency)}
+                      {fmtCurrency(Math.round(usdToLocal(log.revenue)), storeCurrency)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
-                      {fmtCurrency(convertToUsd(log.cog), "$")}
+                      {fmtCurrency(Math.round(log.cog), "$")}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
-                      {fmtCurrency(convertToUsd(log.adSpend), "$")}
+                      {fmtCurrency(Math.round(log.adSpend), "$")}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
-                      {fmtCurrency(convertToUsd(log.transactionFee), "$", 2)}
+                      {fmtCurrency(log.transactionFee, "$", 2)}
                     </td>
                     <td
                       className={cn(
@@ -602,7 +607,7 @@ export default function ProfitTrackerPage() {
                           : "text-accent-red"
                       )}
                     >
-                      {fmtCurrency(convertToUsd(log.profit), "$", 2)}
+                      {fmtCurrency(log.profit, "$", 2)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
                       {log.roas.toFixed(2)}
@@ -628,16 +633,16 @@ export default function ProfitTrackerPage() {
                     {monthLabel} Total
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
-                    {fmtCurrency(monthTotals.revenue, storeCurrency)}
+                    {fmtCurrency(Math.round(usdToLocal(monthTotals.revenue)), storeCurrency)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
-                    {fmtCurrency(convertToUsd(monthTotals.cog), "$")}
+                    {fmtCurrency(Math.round(monthTotals.cog), "$")}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
-                    {fmtCurrency(convertToUsd(monthTotals.adSpend), "$")}
+                    {fmtCurrency(Math.round(monthTotals.adSpend), "$")}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
-                    {fmtCurrency(convertToUsd(monthTotals.transactionFee), "$", 2)}
+                    {fmtCurrency(monthTotals.transactionFee, "$", 2)}
                   </td>
                   <td
                     className={cn(
@@ -647,7 +652,7 @@ export default function ProfitTrackerPage() {
                         : "text-accent-red"
                     )}
                   >
-                    {fmtCurrency(convertToUsd(monthTotals.profit), "$", 2)}
+                    {fmtCurrency(monthTotals.profit, "$", 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
                     {monthTotals.roas.toFixed(2)}
@@ -725,7 +730,7 @@ export default function ProfitTrackerPage() {
                       onCogChange={handleCogChange}
                       storeCurrency={storeCurrency}
                       market={selectedStore.market}
-                      toUsd={convertToUsd}
+                      toLocal={usdToLocal}
                       tierIndicator={entry.tierIndicator}
                       scaledToBudget={entry.scaledToBudget}
                     />

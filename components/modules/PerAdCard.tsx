@@ -16,7 +16,7 @@ interface PerAdCardProps {
   onCogChange: (id: string, newCog: number) => void;
   storeCurrency: string;
   market: string;
-  toUsd: (localAmount: number) => number;
+  toLocal: (usdAmount: number) => number;
   tierIndicator?: "current" | "scaled";
   scaledToBudget?: number;
 }
@@ -54,7 +54,7 @@ export function PerAdCard({
   onCogChange,
   storeCurrency,
   market,
-  toUsd,
+  toLocal,
   tierIndicator,
   scaledToBudget,
 }: PerAdCardProps) {
@@ -77,8 +77,8 @@ export function PerAdCard({
   }[] = [
     {
       label: "Revenue",
-      value: formatCurrency(revenue, storeCurrency),
-      subtitle: `$${toUsd(revenue).toLocaleString("en-GB")} USD`,
+      value: formatCurrency(Math.round(toLocal(revenue)), storeCurrency),
+      subtitle: `$${Math.round(revenue).toLocaleString("en-GB")} USD`,
     },
     {
       label: "Ad Spend",
@@ -95,8 +95,8 @@ export function PerAdCard({
     },
     {
       label: "Profit",
-      value: formatCurrency(profit, storeCurrency),
-      subtitle: `$${toUsd(profit).toLocaleString("en-GB")} USD`,
+      value: formatCurrency(Math.round(toLocal(profit)), storeCurrency),
+      subtitle: `$${Math.round(profit).toLocaleString("en-GB")} USD`,
       colorClass: profit < 0 ? "text-accent-red" : profit > 0 ? "text-accent-emerald" : undefined,
     },
     {
@@ -106,7 +106,7 @@ export function PerAdCard({
     },
     {
       label: "Fees",
-      value: formatCurrency(fees, storeCurrency, 2),
+      value: formatCurrency(toLocal(fees), storeCurrency, 2),
     },
     {
       label: "CPC",
@@ -118,7 +118,7 @@ export function PerAdCard({
     },
     {
       label: "Min Price",
-      value: formatCurrency(minPrice, storeCurrency, 2),
+      value: formatCurrency(toLocal(minPrice), storeCurrency, 2),
     },
   ];
 
