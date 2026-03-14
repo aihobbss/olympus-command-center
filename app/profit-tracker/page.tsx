@@ -287,14 +287,20 @@ export default function ProfitTrackerPage() {
     setSyncing(true);
     setSyncError(null);
 
-    const result = await triggerProfitSync(user.id, storeId);
-    if (result.error) {
-      setSyncError(result.error);
-    } else {
-      await loadData();
-      setLastSynced(new Date());
+    try {
+      const result = await triggerProfitSync(user.id, storeId);
+      if (result.error) {
+        setSyncError(result.error);
+      } else {
+        await loadData();
+        setLastSynced(new Date());
+      }
+    } catch (err) {
+      setSyncError("Sync failed — check your connections and try again.");
+      console.error("Profit sync error:", err);
+    } finally {
+      setSyncing(false);
     }
-    setSyncing(false);
   }, [syncing, user, storeId, loadData]);
 
   // ── COG change (persisted to Supabase) ──
