@@ -386,9 +386,13 @@ export function ResearchSheet() {
         }
         const data = await res.json();
 
-        // Only auto-fill empty fields — never overwrite existing data
-        const product = sheetProducts.find((p) => p.id === productId);
-        if (!product) return;
+        // Read latest state directly from Zustand to avoid stale closure
+        const currentProducts = useResearchStore.getState().sheetProducts;
+        const product = currentProducts.find((p) => p.id === productId);
+        if (!product) {
+          console.error("Product not found after scrape:", productId);
+          return;
+        }
 
         const updates: Partial<typeof product> = {};
         if (!product.productName && data.productName)
@@ -398,7 +402,7 @@ export function ResearchSheet() {
         if (data.creatives?.length > 0 && product.creativeUrls.length === 0)
           updates.creativeUrls = data.creatives;
         if (!product.notes && data.adCopy)
-          updates.notes = data.adCopy.slice(0, 200);
+          updates.notes = data.adCopy.replace(/<br\s*\/?>/gi, "\n").slice(0, 200);
 
         if (Object.keys(updates).length > 0) {
           updateSheetProduct(productId, updates);
@@ -413,7 +417,7 @@ export function ResearchSheet() {
         });
       }
     },
-    [sheetProducts, updateSheetProduct]
+    [updateSheetProduct]
   );
 
   const filtered = useMemo(() => {
