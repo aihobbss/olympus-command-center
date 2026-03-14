@@ -384,45 +384,22 @@ export function ResearchSheet() {
         let data: { productName?: string; storeLink?: string; creatives?: string[]; adCopy?: string } | null = null;
 
         if (isAfterlib) {
-          // Call Afterlib API directly from browser — Cloudflare blocks
-          // Node.js fetch on Vercel (TLS fingerprinting), but browser fetch passes
+          // Afterlib via Edge Runtime proxy — Cloudflare blocks Node.js fetch
+          // (TLS fingerprinting) and browser fetch (CORS preflight 403).
+          // Edge Runtime uses V8/chromium TLS stack which passes.
           const adIdMatch = link.match(/ad_id=([0-9a-f-]+)/i)!;
 
-          const res = await fetch("https://api.afterlib.com/rpc/ads/getSharedAd", {
+          const res = await fetch("/api/scrape-afterlib", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ json: { metaAdId: adIdMatch[1] } }),
+            body: JSON.stringify({ adId: adIdMatch[1] }),
           });
           if (!res.ok) {
-            console.error("Afterlib scrape failed:", res.status, await res.text().catch(() => ""));
+            const errBody = await res.json().catch(() => ({}));
+            console.error("Afterlib scrape failed:", res.status, errBody);
             return;
           }
-          const raw = await res.json();
-          console.log("Afterlib raw response:", JSON.stringify(raw).slice(0, 500));
-
-          // oRPC wraps response — try multiple paths
-          const ad =
-            raw?.result?.data?.json ??
-            raw?.json?.items?.[0] ??
-            raw?.json ??
-            raw;
-
-          console.log("Afterlib parsed ad keys:", Object.keys(ad ?? {}));
-
-          const creatives: string[] = [];
-          if (Array.isArray(ad.media)) {
-            for (const m of ad.media) {
-              const url = m?.urls?.thumbnail ?? m?.urls?.preview ?? m?.thumbnail ?? m?.preview ?? m?.url;
-              if (url && typeof url === "string") creatives.push(url);
-            }
-          }
-
-          data = {
-            productName: ad.headline ?? ad.productTitle ?? "",
-            adCopy: (ad.body ?? "").replace(/<br\s*\/?>/gi, "\n"),
-            storeLink: ad.offerLink ?? ad.displayUrl ?? "",
-            creatives,
-          };
+          data = await res.json();
         } else {
           // Winning Hunter — use server-side route (no Cloudflare issue)
           const res = await fetch(`/api/scrape-ad?url=${encodeURIComponent(link)}`);
@@ -435,8 +412,6 @@ export function ResearchSheet() {
         }
 
         if (!data) return;
-
-        console.log("Scraped data:", { productName: data.productName, storeLink: data.storeLink, creatives: data.creatives?.length, adCopy: data.adCopy?.slice(0, 50) });
 
         // Read latest state directly from Zustand to avoid stale closure
         const currentProducts = useResearchStore.getState().sheetProducts;
@@ -456,7 +431,6 @@ export function ResearchSheet() {
         if (!product.notes && data.adCopy)
           updates.notes = data.adCopy.replace(/<br\s*\/?>/gi, "\n").slice(0, 200);
 
-        console.log("Applying updates:", Object.keys(updates));
         if (Object.keys(updates).length > 0) {
           updateSheetProduct(productId, updates);
         }
