@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { execFileSync } from "child_process";
 
 // ── Normalized response shape ────────────────────────────────
 export type ScrapeAdResponse = {
@@ -139,24 +140,35 @@ async function fetchWithTimeoutAndRetry(
 }
 
 // ── Afterlib handler ─────────────────────────────────────────
+// Cloudflare blocks Node.js fetch for api.afterlib.com, so we shell out to curl
+// which passes Cloudflare's TLS fingerprinting checks.
 
 async function scrapeAfterlib(adId: string): Promise<ScrapeAdResponse> {
-  const res = await fetchWithTimeoutAndRetry(
-    "https://api.afterlib.com/rpc/ads/getSharedAd",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": BROWSER_UA,
-      },
-      body: JSON.stringify({ json: { metaAdId: adId } }),
-    },
-    "Afterlib"
-  );
+  let raw: string;
+  try {
+    raw = execFileSync("curl", [
+      "-s",
+      "--max-time", "10",
+      "-X", "POST",
+      "https://api.afterlib.com/rpc/ads/getSharedAd",
+      "-H", "Content-Type: application/json",
+      "-H", `User-Agent: ${BROWSER_UA}`,
+      "-d", JSON.stringify({ json: { metaAdId: adId } }),
+    ], { encoding: "utf-8", timeout: SCRAPE_TIMEOUT_MS + 2000 });
+  } catch (err) {
+    throw new Error(`Afterlib curl failed: ${err instanceof Error ? err.message : "unknown"}`);
+  }
 
-  const data = await res.json();
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error("Afterlib returned non-JSON response (possible Cloudflare block)");
+  }
+
   // Response shape: { json: { items: [ ad, ... ] } }
-  const ad = data?.json?.items?.[0] ?? data?.result?.data?.json ?? data;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ad = (data as any)?.json?.items?.[0] ?? (data as any)?.result?.data?.json ?? data;
 
   // Extract all media URLs — urls are nested under m.urls.thumbnail / m.urls.preview
   const creatives: string[] = [];
