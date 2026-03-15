@@ -240,8 +240,7 @@ export default function AdManagerPage() {
       prof += log.profit;
     }
     setShopifyTotals({ revenue: rev, orders: ord, profit: prof });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId]);
+  }, [storeId]); // getDateRange uses DAYS_BACK which is a static const
 
   // ── Sync: pull fresh data from Meta + Shopify, then reload ──
   const handleSync = useCallback(async () => {
@@ -270,11 +269,11 @@ export default function AdManagerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, storeId, period, loadData]);
 
-  // ── Auto-sync on first load if connected ──
-  const [hasAutoSynced, setHasAutoSynced] = useState(false);
+  // ── Auto-sync on first load if connected (resets when storeId changes) ──
+  const [hasAutoSynced, setHasAutoSynced] = useState<string | null>(null);
   useEffect(() => {
-    if (metaConnected && user && storeId && !hasAutoSynced) {
-      setHasAutoSynced(true);
+    if (metaConnected && user && storeId && hasAutoSynced !== storeId) {
+      setHasAutoSynced(storeId);
       handleSync();
     }
   }, [metaConnected, user, storeId, hasAutoSynced, handleSync]);
@@ -285,7 +284,7 @@ export default function AdManagerPage() {
       handleSync();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, handleSync]);
+  }, [period]);
 
   // ── Filter campaigns by account + status ──
   const isLive = (c: AdCampaign) => c.campaignStatus === "Active" || c.campaignStatus === "Scaling";

@@ -27,10 +27,10 @@ export default function ImportPage() {
   // Ensure research products are loaded (user may navigate here directly)
   const storeId = selectedStore?.id;
   useEffect(() => {
-    if (storeId && sheetProducts.length === 0) {
+    if (storeId) {
       loadProducts(storeId);
     }
-  }, [storeId, loadProducts, sheetProducts.length]);
+  }, [storeId, loadProducts]);
 
   const queuedProducts = useMemo(
     () => sheetProducts.filter((p) => p.testingStatus === "Queued"),

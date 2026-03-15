@@ -104,10 +104,10 @@ export default function CreativeGeneratorPage() {
 
   // Load saved creatives from Supabase as library items
   const [library, setLibrary] = useState<LibraryItem[]>([]);
-  const [libraryLoaded, setLibraryLoaded] = useState(false);
+  const [libraryLoadedForStore, setLibraryLoadedForStore] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!selectedStore || libraryLoaded) return;
+    if (!selectedStore || libraryLoadedForStore === selectedStore.id) return;
     (async () => {
       const saved = await fetchSavedCreatives(selectedStore.id);
       setLibrary(
@@ -118,9 +118,9 @@ export default function CreativeGeneratorPage() {
           savedAt: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
         }))
       );
-      setLibraryLoaded(true);
+      setLibraryLoadedForStore(selectedStore.id);
     })();
-  }, [selectedStore, libraryLoaded]);
+  }, [selectedStore, libraryLoadedForStore]);
 
   const nanobananaConnected = isConnected("nanobanana");
   const nanobananaMeta = SERVICE_REGISTRY.find((s) => s.id === "nanobanana")!;

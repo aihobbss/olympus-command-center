@@ -4,19 +4,23 @@ import { useEffect, useState } from "react";
 import { Wand2 } from "lucide-react";
 import { ProductCopySheet } from "@/components/modules/ProductCopySheet";
 import { ServiceConnectionOverlay } from "@/components/modules/ServiceConnectionCard";
-import { useConnectionsStore, useAuthStore } from "@/lib/store";
+import { useConnectionsStore, useAuthStore, useStoreContext } from "@/lib/store";
 import { SERVICE_REGISTRY } from "@/lib/services/connections";
 
 export default function ProductCreationPage() {
   const user = useAuthStore((s) => s.user);
   const { loadConnections, isConnected } = useConnectionsStore();
+  const { selectedStore } = useStoreContext();
   const [connectionsChecked, setConnectionsChecked] = useState(false);
 
+  // Reset check when store changes so we re-gate until fresh connections load
+  const storeId = selectedStore?.id;
   useEffect(() => {
+    setConnectionsChecked(false);
     if (user) {
       loadConnections().then(() => setConnectionsChecked(true));
     }
-  }, [user, loadConnections]);
+  }, [user, storeId, loadConnections]);
 
   const shopifyConnected = isConnected("shopify");
   const anthropicConnected = isConnected("anthropic");

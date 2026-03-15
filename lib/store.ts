@@ -1004,6 +1004,15 @@ export const useStoreContext = create<StoreContext>((set) => ({
       delete adCreatorUpdateTimers[key];
     }
     set({ selectedStore: store });
+
+    // Clear all module data so pages reload fresh for the new store
+    useResearchStore.setState({ sheetProducts: [], loading: false });
+    useProductCopyStore.setState({ copyProducts: [], loading: false });
+    useAdCreatorStore.setState({ campaigns: [], loading: false });
+    useCreativeGeneratorStore.setState({ batchQueue: [], productCreatives: [], loaded: false });
+    useConnectionsStore.setState({ connections: [], loading: false, loaded: false });
+    // Reset dedup flag so connections reload for the new store
+    _connectionsPromise = null;
   },
 }));
 
@@ -1020,28 +1029,42 @@ import {
 interface ConnectionsStore {
   connections: ServiceConnection[];
   loading: boolean;
+  loaded: boolean;
   loadConnections: () => Promise<void>;
   isConnected: (service: ServiceId) => boolean;
   removeConnection: (service: ServiceId) => void;
   getExpiryDaysLeft: (service: ServiceId) => number | null;
 }
 
+// Dedup: track in-flight loadConnections promise to prevent concurrent calls
+let _connectionsPromise: Promise<void> | null = null;
+
 export const useConnectionsStore = create<ConnectionsStore>((set, get) => ({
   connections: [],
   loading: false,
+  loaded: false,
 
   loadConnections: async () => {
     const user = useAuthStore.getState().user;
     const store = useStoreContext.getState().selectedStore;
     if (!user) return;
+
+    // If a load is already in flight, wait for it instead of starting another
+    if (_connectionsPromise) return _connectionsPromise;
+
     set({ loading: true });
-    try {
-      const connections = await fetchConnections(user.id, store?.id);
-      set({ connections, loading: false });
-    } catch (err) {
-      console.error("Failed to load connections:", err);
-      set({ loading: false });
-    }
+    _connectionsPromise = (async () => {
+      try {
+        const connections = await fetchConnections(user.id, store?.id);
+        set({ connections, loading: false, loaded: true });
+      } catch (err) {
+        console.error("Failed to load connections:", err);
+        set({ loading: false, loaded: true });
+      } finally {
+        _connectionsPromise = null;
+      }
+    })();
+    return _connectionsPromise;
   },
 
   isConnected: (service) => isServiceConnected(get().connections, service),
