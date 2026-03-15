@@ -86,9 +86,13 @@ function formatDescriptionHtml(description: string, sizeChartTable?: string): st
     html += "</ul>\n";
   }
 
-  // Append size chart table if present
+  // Append size chart table if present — add inline styles for Shopify storefront
   if (sizeChartTable) {
-    html += `\n<h3>Size Chart</h3>\n${sizeChartTable}`;
+    const styledTable = sizeChartTable
+      .replace(/<table/g, '<table style="width:100%;border-collapse:collapse;font-size:14px"')
+      .replace(/<th(?=[\s>])/g, '<th style="background:#f3f4f6;text-align:left;padding:8px 12px;border:1px solid #e5e7eb"')
+      .replace(/<td(?=[\s>])/g, '<td style="padding:8px 12px;border:1px solid #e5e7eb"');
+    html += `\n<h3 style="text-align:center;">Size Chart</h3>\n${styledTable}`;
   }
 
   return html.trim();

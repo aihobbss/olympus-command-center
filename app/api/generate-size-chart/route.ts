@@ -4,14 +4,12 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 const SYSTEM_PROMPT = `You are a precise data extraction assistant. Given an image of a size chart, extract all measurements and return them as a clean HTML table.
 
 RULES:
-1. Return ONLY an HTML <table> element — no surrounding text, no markdown
-2. Use inline styles for the table (border-collapse, width, text-align, font-size)
-3. Include proper <thead> and <tbody>
-4. Style headers with a light gray background (#f3f4f6)
-5. All cells should have: border: 1px solid #e5e7eb, padding: 8px 12px
-6. Keep original units (cm, inches, etc.)
-7. If you cannot read certain values, use "—" as placeholder
-8. Preserve the exact column headers from the image`;
+1. Return ONLY an HTML <table> element — no surrounding text, no markdown, no code fences
+2. Include proper <thead> and <tbody>
+3. Do NOT add inline styles — the app styles the table via CSS
+4. Keep original units (cm, inches, etc.)
+5. If you cannot read certain values, use "—" as placeholder
+6. Preserve the exact column headers from the image`;
 
 export async function POST(request: Request) {
   try {
@@ -117,7 +115,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 2048,
+        max_tokens: 4096,
         system: SYSTEM_PROMPT,
         messages: [
           {
@@ -170,11 +168,14 @@ export async function POST(request: Request) {
     let tableHtml = textContent.trim();
     // Strip markdown code fences if present
     tableHtml = tableHtml.replace(/```html\n?/g, "").replace(/```\n?/g, "").trim();
-    // Ensure it starts with <table
+    // Extract the <table>...</table> block
     const tableStart = tableHtml.indexOf("<table");
-    const tableEnd = tableHtml.lastIndexOf("</table>") + "</table>".length;
-    if (tableStart >= 0 && tableEnd > tableStart) {
-      tableHtml = tableHtml.slice(tableStart, tableEnd);
+    const tableEndIndex = tableHtml.lastIndexOf("</table>");
+    if (tableStart >= 0 && tableEndIndex >= 0) {
+      tableHtml = tableHtml.slice(tableStart, tableEndIndex + "</table>".length);
+    } else if (tableStart >= 0) {
+      // </table> missing (response was truncated) — take from <table and append closing tag
+      tableHtml = tableHtml.slice(tableStart) + "</table>";
     }
 
     return NextResponse.json({ sizeChartTable: tableHtml });
