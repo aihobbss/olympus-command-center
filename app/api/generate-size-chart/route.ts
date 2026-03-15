@@ -4,12 +4,13 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 const SYSTEM_PROMPT = `You are a precise data extraction assistant. Given an image of a size chart, extract all measurements and return them as a clean HTML table.
 
 RULES:
-1. Return ONLY an HTML <table> element — no surrounding text, no markdown, no code fences
+1. Return ONLY an HTML <table> element followed by a <p> note — no surrounding text, no markdown, no code fences
 2. Include proper <thead> and <tbody>
 3. Do NOT add inline styles — the app styles the table via CSS
-4. Keep original units (cm, inches, etc.)
-5. If you cannot read certain values, use "—" as placeholder
-6. Preserve the exact column headers from the image`;
+4. Use CM measurements ONLY — ignore/omit any inch columns. If the image only has inches, convert them to cm (multiply by 2.54, round to 1 decimal)
+5. Use clean header names — e.g. "Length" not "Length cm", "Bust" not "Bust (cm)". The first column should be "Size"
+6. If you cannot read certain values, use "—" as placeholder
+7. After the closing </table> tag, add: <p class="size-chart-note">All measurements in centimetres</p>`;
 
 export async function POST(request: Request) {
   try {
@@ -168,14 +169,22 @@ export async function POST(request: Request) {
     let tableHtml = textContent.trim();
     // Strip markdown code fences if present
     tableHtml = tableHtml.replace(/```html\n?/g, "").replace(/```\n?/g, "").trim();
-    // Extract the <table>...</table> block
+    // Extract from <table to end of </p> (table + note)
     const tableStart = tableHtml.indexOf("<table");
+    const noteEnd = tableHtml.lastIndexOf("</p>");
     const tableEndIndex = tableHtml.lastIndexOf("</table>");
-    if (tableStart >= 0 && tableEndIndex >= 0) {
-      tableHtml = tableHtml.slice(tableStart, tableEndIndex + "</table>".length);
+
+    if (tableStart >= 0 && noteEnd >= 0 && noteEnd > tableEndIndex) {
+      // Got both table and note
+      tableHtml = tableHtml.slice(tableStart, noteEnd + "</p>".length);
+    } else if (tableStart >= 0 && tableEndIndex >= 0) {
+      // Got table but no note — append it
+      tableHtml = tableHtml.slice(tableStart, tableEndIndex + "</table>".length)
+        + '\n<p class="size-chart-note">All measurements in centimetres</p>';
     } else if (tableStart >= 0) {
-      // </table> missing (response was truncated) — take from <table and append closing tag
-      tableHtml = tableHtml.slice(tableStart) + "</table>";
+      // </table> missing (truncated) — close it and add note
+      tableHtml = tableHtml.slice(tableStart) + "</table>"
+        + '\n<p class="size-chart-note">All measurements in centimetres</p>';
     }
 
     return NextResponse.json({ sizeChartTable: tableHtml });

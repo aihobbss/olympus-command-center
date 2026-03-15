@@ -123,6 +123,13 @@ h1, h2, h3, h4, h5, h6 {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
+.size-chart-preview .size-chart-note {
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+  margin-top: 8px !important;
+  font-style: italic;
+}
+
 /* ============================================================
    Keyframe animations
    ============================================================ */

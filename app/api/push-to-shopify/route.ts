@@ -91,7 +91,8 @@ function formatDescriptionHtml(description: string, sizeChartTable?: string): st
     const styledTable = sizeChartTable
       .replace(/<table/g, '<table style="width:100%;border-collapse:collapse;font-size:14px"')
       .replace(/<th(?=[\s>])/g, '<th style="background:#f3f4f6;text-align:left;padding:8px 12px;border:1px solid #e5e7eb"')
-      .replace(/<td(?=[\s>])/g, '<td style="padding:8px 12px;border:1px solid #e5e7eb"');
+      .replace(/<td(?=[\s>])/g, '<td style="padding:8px 12px;border:1px solid #e5e7eb"')
+      .replace(/<p class="size-chart-note">/g, '<p style="font-size:12px;color:#6b7280;font-style:italic;margin-top:8px">');
     html += `\n<h3 style="text-align:center;">Size Chart</h3>\n${styledTable}`;
   }
 
