@@ -335,6 +335,13 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
   },
 
   updateCopyProduct: (id, updates) => {
+    // If any content field changes on a pushed product, reset pushStatus so it can be re-pushed
+    const contentFields = ["productName", "shopifyDescription", "facebookCopy", "productUrl", "sizeChartTable"];
+    const current = get().copyProducts.find((p) => p.id === id);
+    if (current?.pushStatus === "pushed" && contentFields.some((f) => f in updates)) {
+      updates = { ...updates, pushStatus: "" as const };
+    }
+
     // Optimistic update
     set((s) => ({
       copyProducts: s.copyProducts.map((p) =>
@@ -412,6 +419,12 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
           ),
         }));
         if (store) updateProductCopyDB(id, updates, store.id);
+
+        // Auto-generate size chart if image is attached and not yet generated
+        const latest = get().copyProducts.find((p) => p.id === id);
+        if (latest?.sizeChartImage && latest.sizeChartStatus !== "done" && latest.sizeChartStatus !== "generating") {
+          get().generateSizeChart(id);
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         console.error("Copy generation failed:", err.message || res.statusText);
