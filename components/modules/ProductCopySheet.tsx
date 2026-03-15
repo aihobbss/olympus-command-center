@@ -652,13 +652,7 @@ function SizeChartPanel({
             </div>
           ) : (
             <div
-              className={cn(
-                "rounded-lg border border-subtle bg-bg-elevated p-3 overflow-x-auto max-h-[200px] overflow-y-auto text-xs",
-                "[&_table]:w-full [&_table]:border-collapse",
-                "[&_th]:!bg-white/[0.06] [&_th]:!color-[var(--text-muted)] [&_th]:text-text-muted [&_th]:text-left [&_th]:px-3 [&_th]:py-2 [&_th]:border [&_th]:!border-white/10",
-                "[&_td]:text-text-secondary [&_td]:px-3 [&_td]:py-2 [&_td]:border [&_td]:!border-white/10",
-                "[&_thead]:border-b [&_thead]:border-white/10"
-              )}
+              className="rounded-lg border border-subtle bg-bg-elevated p-3 overflow-x-auto max-h-[200px] overflow-y-auto text-xs size-chart-preview"
               dangerouslySetInnerHTML={{ __html: product.sizeChartTable }}
             />
           )}

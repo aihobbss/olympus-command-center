@@ -564,9 +564,12 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
 
       if (res.ok) {
         const data = await res.json();
+        // Reset pushStatus so product can be re-pushed with the new size chart
+        const wasPushed = get().copyProducts.find((p) => p.id === id)?.pushStatus === "pushed";
         const updates: Partial<ProductCopy> = {
           sizeChartStatus: "done" as const,
           sizeChartTable: data.sizeChartTable || "",
+          ...(wasPushed ? { pushStatus: "" as const } : {}),
         };
         set((s) => ({
           copyProducts: s.copyProducts.map((p) =>

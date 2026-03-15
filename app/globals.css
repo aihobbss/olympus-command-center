@@ -94,6 +94,36 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ============================================================
+   Size chart preview — override inline styles from AI-generated HTML
+   ============================================================ */
+.size-chart-preview table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  background: transparent !important;
+}
+
+.size-chart-preview th {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--text-muted) !important;
+  text-align: left !important;
+  padding: 6px 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  font-size: 11px !important;
+}
+
+.size-chart-preview td {
+  color: var(--text-secondary) !important;
+  padding: 6px 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: transparent !important;
+  font-size: 11px !important;
+}
+
+.size-chart-preview thead {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ============================================================
    Keyframe animations
    ============================================================ */
 
