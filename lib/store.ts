@@ -388,6 +388,7 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
           imageUrl: product?.imageUrl || "",
           market: store?.market || "AU",
           currency: store?.currency || "AUD",
+          storeName: store?.name || "",
           userId: user?.id,
           storeId: store?.id,
           productCopyId: id, // API uses this to look up research product pricing

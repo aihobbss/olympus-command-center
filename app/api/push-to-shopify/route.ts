@@ -178,9 +178,12 @@ export async function POST(request: Request) {
       if (handleMatch) productHandle = handleMatch[1];
     }
 
+    // Product title is always ALL CAPS on Shopify
+    const shopifyTitle = productName.toUpperCase();
+
     // ── Step 2: Look up existing product by handle ──
     let shopifyProductId: string | null = null;
-    let existingVariantId: string | null = null;
+    let existingVariants: Array<{ id: string }> = [];
 
     if (productHandle) {
       const lookupRes = await fetch(
@@ -198,7 +201,9 @@ export async function POST(request: Request) {
         const existingProduct = lookupData.products?.[0];
         if (existingProduct) {
           shopifyProductId = existingProduct.id?.toString();
-          existingVariantId = existingProduct.variants?.[0]?.id?.toString();
+          existingVariants = (existingProduct.variants || []).map((v: { id: number | string }) => ({
+            id: v.id?.toString(),
+          }));
         }
       }
     }
@@ -209,7 +214,7 @@ export async function POST(request: Request) {
       const updatePayload: Record<string, unknown> = {
         product: {
           id: shopifyProductId,
-          title: productName,
+          title: shopifyTitle,
           body_html: descriptionHtml,
         },
       };
@@ -235,33 +240,35 @@ export async function POST(request: Request) {
         );
       }
 
-      // Update variant pricing if we have a price and variant ID
-      if (existingVariantId && salePrice) {
-        const variantPayload = {
-          variant: {
-            id: existingVariantId,
-            price: salePrice.toFixed(2),
-            ...(compareAtPrice ? { compare_at_price: compareAtPrice.toFixed(2) } : {}),
-          },
-        };
-
-        await fetch(
-          `https://${shopDomain}/admin/api/2024-01/variants/${existingVariantId}.json`,
-          {
-            method: "PUT",
-            headers: {
-              "X-Shopify-Access-Token": accessToken,
-              "Content-Type": "application/json",
+      // Update pricing on ALL variants (not just the first)
+      if (salePrice && existingVariants.length > 0) {
+        for (const variant of existingVariants) {
+          const variantPayload = {
+            variant: {
+              id: variant.id,
+              price: salePrice.toFixed(2),
+              ...(compareAtPrice ? { compare_at_price: compareAtPrice.toFixed(2) } : {}),
             },
-            body: JSON.stringify(variantPayload),
-          }
-        );
+          };
+
+          await fetch(
+            `https://${shopDomain}/admin/api/2024-01/variants/${variant.id}.json`,
+            {
+              method: "PUT",
+              headers: {
+                "X-Shopify-Access-Token": accessToken,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(variantPayload),
+            }
+          );
+        }
       }
 
       return NextResponse.json({
         success: true,
         shopifyProductId,
-        message: `Product "${productName}" updated in Shopify.`,
+        message: `Product "${shopifyTitle}" updated in Shopify.`,
       });
     } else {
       // No existing product found — create as draft (fallback)
@@ -278,7 +285,7 @@ export async function POST(request: Request) {
 
       const createPayload = {
         product: {
-          title: productName,
+          title: shopifyTitle,
           body_html: descriptionHtml,
           status: "draft",
           product_type: resolvedProductType || undefined,

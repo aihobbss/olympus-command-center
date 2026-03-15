@@ -439,13 +439,17 @@ function SizeChartPanel({
   product,
   onImageChange,
   onGenerate,
+  onTableChange,
 }: {
   product: ProductCopy;
   onImageChange: (url: string) => void;
   onGenerate: () => void;
+  onTableChange: (html: string) => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const [editingTable, setEditingTable] = useState(false);
+  const [tableDraft, setTableDraft] = useState(product.sizeChartTable || "");
 
   const handleFile = useCallback(
     (file: File) => {
@@ -600,6 +604,60 @@ function SizeChartPanel({
           Converts your size chart screenshot into an HTML table that gets included with the Shopify description when pushed to store.
         </p>
       </div>
+
+      {/* Size chart table preview (editable) */}
+      {product.sizeChartStatus === "done" && product.sizeChartTable && (
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2">
+            <p className="text-[11px] font-medium text-text-muted uppercase tracking-wider">
+              Generated Table Preview
+            </p>
+            <button
+              onClick={() => {
+                setTableDraft(product.sizeChartTable || "");
+                setEditingTable(!editingTable);
+              }}
+              className="text-[11px] text-accent-indigo hover:underline underline-offset-2"
+            >
+              {editingTable ? "Preview" : "Edit HTML"}
+            </button>
+          </div>
+          {editingTable ? (
+            <div className="flex flex-col gap-2">
+              <textarea
+                value={tableDraft}
+                onChange={(e) => setTableDraft(e.target.value)}
+                rows={8}
+                className={cn(
+                  "w-full rounded-lg bg-bg-elevated p-3 text-xs text-text-secondary leading-relaxed font-mono",
+                  "border border-accent-indigo/40 outline-none resize-y"
+                )}
+              />
+              {tableDraft !== product.sizeChartTable && (
+                <button
+                  onClick={() => {
+                    onTableChange(tableDraft);
+                    setEditingTable(false);
+                  }}
+                  className={cn(
+                    "self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium",
+                    "bg-accent-indigo hover:bg-accent-indigo-hover text-white",
+                    "transition-colors duration-150"
+                  )}
+                >
+                  <Check size={12} />
+                  Save Changes
+                </button>
+              )}
+            </div>
+          ) : (
+            <div
+              className="rounded-lg border border-subtle bg-bg-elevated p-3 overflow-x-auto max-h-[200px] overflow-y-auto text-xs [&_table]:w-full [&_th]:text-left [&_th]:text-text-muted [&_td]:text-text-secondary"
+              dangerouslySetInnerHTML={{ __html: product.sizeChartTable }}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -984,6 +1042,9 @@ export function ProductCopySheet() {
                         updateCopyProduct(product.id, { sizeChartImage: url })
                       }
                       onGenerate={() => generateSizeChart(product.id)}
+                      onTableChange={(html) =>
+                        updateCopyProduct(product.id, { sizeChartTable: html })
+                      }
                     />
                   </td>
                 </tr>

@@ -41,7 +41,7 @@ SHOPIFY DESCRIPTION STRUCTURE:
 - Line 5: Empty line
 - Lines 6-9: EXACTLY 4 bullets in format "• **Label**: Description"
 - Line 10: Empty line
-- Line 11: One sentence about brand/origin
+- Line 11: One sentence about the brand/store (use the exact store name provided, e.g., "Vantage Melbourne infuses [style approach] — a [garment] essential you'll rely on every day.")
 
 PRODUCT NAME RULES:
 - 2-4 words maximum
@@ -90,6 +90,7 @@ export async function POST(request: Request) {
       imageUrl,
       market,
       currency,
+      storeName,
       userId,
       storeId,
       productCopyId,
@@ -219,6 +220,8 @@ Format your response as a structured list with these exact labels. Do NOT descri
     const urlPart = productUrl ? `URL: ${productUrl}` : "";
     const visionPart = visionAnalysis ? `Image Analysis: ${visionAnalysis}` : "";
 
+    const storeNamePart = storeName ? `Store Name: ${storeName}` : "";
+
     const userPrompt = `Generate ad copy for:
 
 Title: ${productName}
@@ -226,11 +229,12 @@ ${urlPart}
 ${typePart}
 ${pricePart}
 ${comparePart}
+${storeNamePart}
 Shipping: Free Shipping in ${country}
 CTA: Shop now
 ${visionPart}
 
-Create a clean product name (2-4 words, no colors), a Shopify Product Description with 4 bullets, and Facebook Ad Copy. Follow the exact format specified. Use "${country}" for the shipping line in the Facebook ad.
+Create a clean product name (2-4 words, using human names not cities, no colors), a Shopify Product Description with 4 bullets, and Facebook Ad Copy. Follow the exact format specified. Use "${country}" for the shipping line in the Facebook ad.${storeName ? ` Use "${storeName}" as the brand name in the closing sentence of the Shopify description.` : ""}
 
 Return ONLY the JSON object, no markdown, no code fences.`;
 
