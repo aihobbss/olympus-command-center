@@ -589,7 +589,8 @@ export default function ProfitTrackerPage() {
                 <tr className="border-b border-subtle">
                   {[
                     "Date",
-                    "Revenue",
+                    `Revenue (${currencyCode})`,
+                    "Revenue (USD)",
                     "COG",
                     "Ad Spend",
                     "Transaction",
@@ -619,13 +620,16 @@ export default function ProfitTrackerPage() {
                       {fmtDate(log.date)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
-                      {fmtCurrency(Math.round(usdToLocal(log.revenue)), storeCurrency)}
+                      {fmtCurrency(usdToLocal(log.revenue), storeCurrency, 2)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
-                      {fmtCurrency(Math.round(log.cog), "$")}
+                      {fmtCurrency(log.revenue, "$", 2)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
+                      {fmtCurrency(log.cog, "$", 2)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
-                      {fmtCurrency(Math.round(log.adSpend), "$")}
+                      {fmtCurrency(log.adSpend, "$", 2)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
                       {fmtCurrency(log.transactionFee, "$", 2)}
@@ -664,13 +668,16 @@ export default function ProfitTrackerPage() {
                     {monthLabel} Total
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
-                    {fmtCurrency(Math.round(usdToLocal(monthTotals.revenue)), storeCurrency)}
+                    {fmtCurrency(usdToLocal(monthTotals.revenue), storeCurrency, 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
-                    {fmtCurrency(Math.round(monthTotals.cog), "$")}
+                    {fmtCurrency(monthTotals.revenue, "$", 2)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
+                    {fmtCurrency(monthTotals.cog, "$", 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
-                    {fmtCurrency(Math.round(monthTotals.adSpend), "$")}
+                    {fmtCurrency(monthTotals.adSpend, "$", 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
                     {fmtCurrency(monthTotals.transactionFee, "$", 2)}
