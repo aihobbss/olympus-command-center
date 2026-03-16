@@ -342,13 +342,17 @@ export default function ProfitTrackerPage() {
 
   const syncLabel = useMemo(() => {
     if (!lastSynced) return "Never";
-    return `Today ${lastSynced
+    const now = new Date();
+    const isToday = lastSynced.getFullYear() === now.getFullYear() && lastSynced.getMonth() === now.getMonth() && lastSynced.getDate() === now.getDate();
+    const time = lastSynced
       .toLocaleTimeString("en-GB", {
         hour: "2-digit",
         minute: "2-digit",
         hour12: true,
       })
-      .toUpperCase()}`;
+      .toUpperCase();
+    if (isToday) return `Today ${time}`;
+    return `${lastSynced.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${time}`;
   }, [lastSynced]);
 
   // ── Chart title ──

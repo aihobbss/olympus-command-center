@@ -128,30 +128,59 @@ export default function AdManagerPage() {
   const [statusFilter, setStatusFilter] = useState<"live" | "paused" | "all">("live");
   const [shopifyTotals, setShopifyTotals] = useState({ revenue: 0, orders: 0, profit: 0 });
 
-  // ── Ad account switcher state (multi-select) ──
+  const storeId = selectedStore?.id ?? "";
+
+  // ── Ad account switcher state (multi-select, persisted per store) ──
   const [adAccounts, setAdAccounts] = useState<UserAdAccount[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set()); // empty = all
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
 
+  // Restore saved selection from localStorage when storeId changes
+  useEffect(() => {
+    if (!storeId) return;
+    try {
+      const saved = localStorage.getItem(`ad-accounts-selection:${storeId}`);
+      if (saved) {
+        const ids: string[] = JSON.parse(saved);
+        if (Array.isArray(ids) && ids.length > 0) {
+          setSelectedAccountIds(new Set(ids));
+        } else {
+          setSelectedAccountIds(new Set());
+        }
+      } else {
+        setSelectedAccountIds(new Set());
+      }
+    } catch {
+      setSelectedAccountIds(new Set());
+    }
+  }, [storeId]);
+
+  // Persist selection to localStorage whenever it changes
+  const updateSelection = useCallback((next: Set<string>) => {
+    setSelectedAccountIds(next);
+    if (storeId) {
+      try {
+        localStorage.setItem(`ad-accounts-selection:${storeId}`, JSON.stringify(Array.from(next)));
+      } catch { /* quota exceeded — non-critical */ }
+    }
+  }, [storeId]);
+
   const allSelected = selectedAccountIds.size === 0 || selectedAccountIds.size === adAccounts.length;
 
   const toggleAccount = useCallback((accountId: string) => {
-    setSelectedAccountIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(accountId)) {
-        next.delete(accountId);
-      } else {
-        next.add(accountId);
-      }
-      // If all are now selected, reset to empty (= "all")
-      if (next.size === adAccounts.length) return new Set();
-      return next;
-    });
-  }, [adAccounts.length]);
+    const next = new Set(selectedAccountIds);
+    if (next.has(accountId)) {
+      next.delete(accountId);
+    } else {
+      next.add(accountId);
+    }
+    // If all are now selected, reset to empty (= "all")
+    updateSelection(next.size === adAccounts.length ? new Set() : next);
+  }, [selectedAccountIds, adAccounts.length, updateSelection]);
 
   const toggleAll = useCallback(() => {
-    setSelectedAccountIds(new Set()); // empty = all
-  }, []);
+    updateSelection(new Set()); // empty = all
+  }, [updateSelection]);
 
   const storeCurrency = selectedStore?.currency ?? "";
   const rate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
@@ -165,8 +194,6 @@ export default function AdManagerPage() {
     (usdAmount: number) => rate > 0 ? Math.round(usdAmount / rate) : usdAmount,
     [rate]
   );
-
-  const storeId = selectedStore?.id ?? "";
 
   // ── Load ad accounts (discover from Meta to get real names + all accounts) ──
   const refreshAdAccounts = useCallback(async () => {
@@ -555,7 +582,13 @@ export default function AdManagerPage() {
                 <div className="flex items-center gap-3 text-xs">
                   {lastSynced && (
                     <span className="text-text-muted">
-                      Last synced: {new Date(lastSynced).toLocaleString()}
+                      Last synced: {(() => {
+                        const d = new Date(lastSynced);
+                        const now = new Date();
+                        const isToday = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+                        const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true }).toUpperCase();
+                        return isToday ? `Today ${time}` : `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${time}`;
+                      })()}
                     </span>
                   )}
                   {syncError && (
