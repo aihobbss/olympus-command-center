@@ -16,11 +16,14 @@ type DailyBucket = {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { userId, storeId, daysBack } = body as {
+    const { userId, storeId, daysBack, adAccountIds } = body as {
       userId: string;
       storeId: string;
       daysBack?: number;
+      adAccountIds?: string[];
     };
+
+    console.log("[profit-sync API] adAccountIds received:", adAccountIds);
 
     if (!userId || !storeId) {
       return NextResponse.json(
@@ -110,7 +113,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── 2. Pull Meta ad spend (from ALL active ad accounts) ──
+    // ── 2. Pull Meta ad spend (from selected ad accounts) ─────
 
     const { data: metaToken } = await supabaseAdmin
       .from("oauth_tokens")
@@ -120,22 +123,31 @@ export async function POST(request: Request) {
       .single();
 
     if (metaToken?.access_token) {
-      // Get all active ad accounts for this user+store
-      const { data: adAccounts } = await supabaseAdmin
-        .from("user_ad_accounts")
-        .select("ad_account_id")
-        .eq("user_id", userId)
-        .eq("store_id", storeId)
-        .eq("active", true);
+      // Use explicitly passed account IDs (from user's UI selection), or fall back to all active
+      let accountIds: string[] = adAccountIds && adAccountIds.length > 0
+        ? adAccountIds
+        : [];
 
-      // Fallback to legacy oauth_tokens.meta if no accounts in new table
-      let accountIds: string[] = (adAccounts || []).map((a) => a.ad_account_id);
+      if (accountIds.length === 0) {
+        const { data: adAccounts } = await supabaseAdmin
+          .from("user_ad_accounts")
+          .select("ad_account_id")
+          .eq("user_id", userId)
+          .eq("store_id", storeId)
+          .eq("active", true);
+
+        accountIds = (adAccounts || []).map((a) => a.ad_account_id);
+      }
+
+      // Fallback to legacy oauth_tokens.meta if still empty
       if (accountIds.length === 0) {
         const metaData = (metaToken.meta as Record<string, string>) || {};
         if (metaData.ad_account_id) {
           accountIds = [metaData.ad_account_id];
         }
       }
+
+      console.log("[profit-sync API] final accountIds:", accountIds);
 
       // Fetch spend from each active ad account
       for (const adAccountId of accountIds) {

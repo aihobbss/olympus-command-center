@@ -133,21 +133,37 @@ export async function upsertCog(
 export async function triggerProfitSync(
   userId: string,
   storeId: string,
-  daysBack?: number
+  daysBack?: number,
+  adAccountIds?: string[]
 ): Promise<{ synced: number; error?: string }> {
-  const res = await fetch("/api/sync-profit-data", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, storeId, daysBack }),
-  });
+  // 60s timeout — large syncs (365 days) can take a while
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60_000);
 
-  const data = await res.json();
+  try {
+    const res = await fetch("/api/sync-profit-data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, storeId, daysBack, adAccountIds }),
+      signal: controller.signal,
+    });
 
-  if (!res.ok) {
-    return { synced: 0, error: data.error || "Sync failed" };
+    clearTimeout(timeout);
+    const data = await res.json();
+
+    if (!res.ok) {
+      return { synced: 0, error: data.error || "Sync failed" };
+    }
+
+    return { synced: data.synced };
+  } catch (err) {
+    clearTimeout(timeout);
+    // If the request timed out, the server may still have written data
+    if (err instanceof DOMException && err.name === "AbortError") {
+      return { synced: -1 }; // signal to caller: data may exist, reload
+    }
+    throw err;
   }
-
-  return { synced: data.synced };
 }
 
 export async function getLastProfitSync(storeId: string): Promise<string | null> {

@@ -291,10 +291,27 @@ export default function ProfitTrackerPage() {
     try {
       // First sync: pull full history. After that: just pull today (cron handles daily).
       const daysToSync = profitLogs.length === 0 ? 365 : 1;
-      const result = await triggerProfitSync(user.id, storeId, daysToSync);
+
+      // Use the same ad account selection saved by Ad Manager
+      let selectedAccounts: string[] | undefined;
+      try {
+        const key = `ad-accounts-selection:${storeId}`;
+        const saved = localStorage.getItem(key);
+        console.log("[profit-sync] localStorage key:", key, "value:", saved);
+        if (saved) {
+          const ids: string[] = JSON.parse(saved);
+          if (Array.isArray(ids) && ids.length > 0) {
+            selectedAccounts = ids;
+          }
+        }
+        console.log("[profit-sync] selectedAccounts:", selectedAccounts);
+      } catch { /* ignore parse errors */ }
+
+      const result = await triggerProfitSync(user.id, storeId, daysToSync, selectedAccounts);
       if (result.error) {
         setSyncError(result.error);
       } else {
+        // synced === -1 means the request timed out but server may have written data
         await loadData();
         setLastSynced(new Date());
       }
