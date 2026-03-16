@@ -13,6 +13,24 @@ type DailyBucket = {
   adSpend: number;
 };
 
+// Helper: get "today" in a given IANA timezone as YYYY-MM-DD
+function todayInTz(tz: string): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: tz });
+}
+
+// Helper: generate an array of YYYY-MM-DD date strings in a timezone
+function dateRange(daysBack: number, tz: string): string[] {
+  const today = todayInTz(tz);
+  const dates: string[] = [];
+  // Parse today as midnight UTC to do simple day math
+  const end = new Date(today + "T12:00:00Z"); // noon to avoid DST edge cases
+  for (let i = daysBack; i >= 0; i--) {
+    const d = new Date(end.getTime() - i * 86_400_000);
+    dates.push(d.toISOString().split("T")[0]);
+  }
+  return dates;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -30,33 +48,13 @@ export async function POST(request: Request) {
     }
 
     const days = daysBack || 30;
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    const startStr = startDate.toISOString().split("T")[0];
-    const endStr = endDate.toISOString().split("T")[0];
-
-    // Initialize daily buckets
-    const dailyData = new Map<string, DailyBucket>();
-    {
-      const d = new Date(startDate);
-      while (d <= endDate) {
-        dailyData.set(d.toISOString().split("T")[0], {
-          revenue: 0,
-          orders: 0,
-          adSpend: 0,
-        });
-        d.setTime(d.getTime() + 86_400_000); // advance exactly 1 day in ms
-      }
-    }
 
     // ── 1. Pull Shopify orders ──────────────────────────────
 
     const shopify = await getShopifyToken(userId, storeId);
 
     // Fetch store timezone from Shopify so we bucket orders by the store's
-    // local date, not UTC (fixes off-by-one for non-UTC stores like AU/UK).
+    // local date (fixes off-by-one for non-UTC stores like AU/UK).
     let storeTimezone = "UTC";
     if (shopify) {
       try {
@@ -73,63 +71,78 @@ export async function POST(request: Request) {
       }
     }
 
+    // Build date range in the STORE'S timezone (not UTC) — this ensures
+    // bucket keys match the local dates used for order bucketing below.
+    const localDates = dateRange(days, storeTimezone);
+    const startStr = localDates[0];
+    const endStr = localDates[localDates.length - 1];
+
+    // Initialize daily buckets keyed by store-local dates
+    const dailyData = new Map<string, DailyBucket>();
+    for (const d of localDates) {
+      dailyData.set(d, { revenue: 0, orders: 0, adSpend: 0 });
+    }
+
     if (shopify) {
-      {
-        try {
-          // Paginate through all Shopify orders in the date range
-          let pageUrl: string | null =
-            `https://${shopify.shopifyDomain}/admin/api/2024-01/orders.json` +
-            `?status=any&created_at_min=${startStr}T00:00:00Z&created_at_max=${endStr}T23:59:59Z&limit=250`;
+      try {
+        // Query an extra day on each side to account for UTC ↔ local offset
+        // (orders near midnight could fall on adjacent UTC day)
+        const queryStart = localDates[0]; // already covers the earliest local date
+        const queryEnd = endStr;
 
-          while (pageUrl) {
-            const ordersRes: Response = await fetch(pageUrl, {
-              headers: {
-                "X-Shopify-Access-Token": shopify.accessToken,
-                "Content-Type": "application/json",
-              },
-            });
+        // Paginate through all Shopify orders in the date range
+        let pageUrl: string | null =
+          `https://${shopify.shopifyDomain}/admin/api/2024-01/orders.json` +
+          `?status=any&created_at_min=${queryStart}T00:00:00Z&created_at_max=${queryEnd}T23:59:59Z&limit=250`;
 
-            if (!ordersRes.ok) break;
+        while (pageUrl) {
+          const ordersRes: Response = await fetch(pageUrl, {
+            headers: {
+              "X-Shopify-Access-Token": shopify.accessToken,
+              "Content-Type": "application/json",
+            },
+          });
 
-            const ordersData = await ordersRes.json();
-            const orders = ordersData.orders || [];
+          if (!ordersRes.ok) break;
 
-            for (const order of orders) {
-              // Convert order timestamp to the store's local date (not UTC)
-              // e.g. an order at 2024-11-26T22:00:00Z is Nov 27 in Melbourne
-              const orderDt = new Date(order.created_at);
-              if (isNaN(orderDt.getTime())) continue;
-              // en-CA locale gives YYYY-MM-DD format
-              const date = orderDt.toLocaleDateString("en-CA", { timeZone: storeTimezone });
-              if (!dailyData.has(date)) continue;
+          const ordersData = await ordersRes.json();
+          const orders = ordersData.orders || [];
 
-              const bucket = dailyData.get(date)!;
-              const totalPrice = parseFloat(order.total_price || "0");
+          for (const order of orders) {
+            // Convert order timestamp to the store's LOCAL date (not UTC)
+            // e.g. an order at 2024-11-26T22:00:00Z → Nov 27 in Melbourne (UTC+11)
+            const orderDt = new Date(order.created_at);
+            if (isNaN(orderDt.getTime())) continue;
+            // en-CA locale gives YYYY-MM-DD format
+            const date = orderDt.toLocaleDateString("en-CA", { timeZone: storeTimezone });
+            if (!dailyData.has(date)) continue;
 
-              // Subtract refunds for accurate net revenue
-              let refundTotal = 0;
-              if (order.refunds && Array.isArray(order.refunds)) {
-                for (const refund of order.refunds) {
-                  if (refund.transactions && Array.isArray(refund.transactions)) {
-                    for (const txn of refund.transactions) {
-                      refundTotal += parseFloat(txn.amount || "0");
-                    }
+            const bucket = dailyData.get(date)!;
+            const totalPrice = parseFloat(order.total_price || "0");
+
+            // Subtract refunds for accurate net revenue
+            let refundTotal = 0;
+            if (order.refunds && Array.isArray(order.refunds)) {
+              for (const refund of order.refunds) {
+                if (refund.transactions && Array.isArray(refund.transactions)) {
+                  for (const txn of refund.transactions) {
+                    refundTotal += parseFloat(txn.amount || "0");
                   }
                 }
               }
-
-              bucket.revenue += totalPrice - refundTotal;
-              bucket.orders += 1;
             }
 
-            // Check for next page via Link header
-            const linkHeader = ordersRes.headers.get("link") || "";
-            const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
-            pageUrl = nextMatch ? nextMatch[1] : null;
+            bucket.revenue += totalPrice - refundTotal;
+            bucket.orders += 1;
           }
-        } catch (err) {
-          console.error("Shopify orders fetch error:", err);
+
+          // Check for next page via Link header
+          const linkHeader = ordersRes.headers.get("link") || "";
+          const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+          pageUrl = nextMatch ? nextMatch[1] : null;
         }
+      } catch (err) {
+        console.error("Shopify orders fetch error:", err);
       }
     }
 
@@ -252,6 +265,7 @@ export async function POST(request: Request) {
         profit_percent: profitPercent,
         orders: bucket.orders,
         synced_from: "manual",
+        created_at: new Date().toISOString(), // Update on every sync so "last synced" stays fresh
       });
     }
 
@@ -278,7 +292,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       synced: rows.length,
       dateRange: { start: startStr, end: endStr },
-      message: `Synced ${rows.length} days of profit data`,
+      timezone: storeTimezone,
+      message: `Synced ${rows.length} days of profit data (tz: ${storeTimezone})`,
     });
   } catch (err) {
     console.error("Profit sync error:", err);
