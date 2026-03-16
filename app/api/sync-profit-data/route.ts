@@ -7,6 +7,13 @@ import { getShopifyToken } from "@/lib/shopify-token";
 
 const META_API = "https://graph.facebook.com/v19.0";
 
+// Map store market to IANA timezone for correct local-date extraction
+const MARKET_TIMEZONE: Record<string, string> = {
+  AU: "Australia/Melbourne",
+  UK: "Europe/London",
+  US: "America/New_York",
+};
+
 type DailyBucket = {
   revenue: number;
   orders: number;
@@ -33,24 +40,43 @@ export async function POST(request: Request) {
     }
 
     const days = daysBack || 30;
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
 
-    const startStr = startDate.toISOString().split("T")[0];
-    const endStr = endDate.toISOString().split("T")[0];
+    // ── 0. Get store info (need timezone before processing orders) ──
 
-    // Initialize daily buckets
+    const { data: store } = await supabaseAdmin
+      .from("stores")
+      .select("exchange_rate_to_usd, currency, market")
+      .eq("id", storeId)
+      .single();
+
+    const exchangeRate = store?.exchange_rate_to_usd || 1.0;
+    const storeTimezone = MARKET_TIMEZONE[store?.market ?? ""] || "UTC";
+
+    // Helper: extract YYYY-MM-DD in the store's local timezone from any ISO timestamp
+    const toLocalDate = (isoTimestamp: string): string => {
+      const d = new Date(isoTimestamp);
+      // en-CA locale returns YYYY-MM-DD format
+      return d.toLocaleDateString("en-CA", { timeZone: storeTimezone });
+    };
+
+    // Compute date range in the store's local timezone
+    const now = new Date();
+    const endStr = toLocalDate(now.toISOString());
+    const startMs = now.getTime() - days * 86_400_000;
+    const startStr = toLocalDate(new Date(startMs).toISOString());
+
+    // Initialize daily buckets using store-local dates
     const dailyData = new Map<string, DailyBucket>();
     {
-      const d = new Date(startDate);
-      while (d <= endDate) {
-        dailyData.set(d.toISOString().split("T")[0], {
-          revenue: 0,
-          orders: 0,
-          adSpend: 0,
-        });
-        d.setTime(d.getTime() + 86_400_000); // advance exactly 1 day in ms
+      const d = new Date(startMs);
+      // Iterate with some padding to cover timezone edges
+      const endMs = now.getTime() + 86_400_000;
+      while (d.getTime() <= endMs) {
+        const localDate = toLocalDate(d.toISOString());
+        if (!dailyData.has(localDate)) {
+          dailyData.set(localDate, { revenue: 0, orders: 0, adSpend: 0 });
+        }
+        d.setTime(d.getTime() + 86_400_000);
       }
     }
 
@@ -80,8 +106,9 @@ export async function POST(request: Request) {
             const orders = ordersData.orders || [];
 
             for (const order of orders) {
-              const date = order.created_at?.split("T")[0];
-              if (!date || !dailyData.has(date)) continue;
+              if (!order.created_at) continue;
+              const date = toLocalDate(order.created_at);
+              if (!dailyData.has(date)) continue;
 
               const bucket = dailyData.get(date)!;
               const totalPrice = parseFloat(order.total_price || "0");
@@ -181,17 +208,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── 3. Get store exchange rate ──────────────────────────
-
-    const { data: store } = await supabaseAdmin
-      .from("stores")
-      .select("exchange_rate_to_usd, currency")
-      .eq("id", storeId)
-      .single();
-
-    const exchangeRate = store?.exchange_rate_to_usd || 1.0;
-
-    // ── 4. Get COGs for this store ──────────────────────────
+    // ── 3. Get COGs for this store ──────────────────────────
 
     const { data: cogRows } = await supabaseAdmin
       .from("product_cogs")
@@ -205,7 +222,7 @@ export async function POST(request: Request) {
       avgCogPerOrder = totalCog / cogRows.length;
     }
 
-    // ── 5. Compute daily P&L and upsert ─────────────────────
+    // ── 4. Compute daily P&L and upsert ─────────────────────
 
     const rows = [];
     for (const [date, bucket] of Array.from(dailyData.entries())) {

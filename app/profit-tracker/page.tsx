@@ -64,10 +64,18 @@ function fmtCurrency(value: number, currency: string, decimals = 0): string {
 }
 
 function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
+  // Parse YYYY-MM-DD as local date (not UTC) to avoid off-by-one timezone shift
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
   });
+}
+
+/** Parse a YYYY-MM-DD string as local midnight (avoids UTC interpretation) */
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
 // ─── Budget tier grouping types ─────────────────────────────
@@ -167,7 +175,7 @@ export default function ProfitTrackerPage() {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     cutoff.setHours(0, 0, 0, 0);
-    return storeProfitLogs.filter((log) => new Date(log.date) >= cutoff);
+    return storeProfitLogs.filter((log) => parseLocalDate(log.date) >= cutoff);
   }, [period, storeProfitLogs]);
 
   // ── Aggregated totals (from filtered logs) ──
@@ -192,7 +200,7 @@ export default function ProfitTrackerPage() {
     const year = tableMonth.getFullYear();
     const month = tableMonth.getMonth();
     return storeProfitLogs.filter((log) => {
-      const d = new Date(log.date);
+      const d = parseLocalDate(log.date);
       return d.getFullYear() === year && d.getMonth() === month;
     });
   }, [tableMonth, storeProfitLogs]);
