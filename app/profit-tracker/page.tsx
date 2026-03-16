@@ -289,7 +289,9 @@ export default function ProfitTrackerPage() {
     setSyncError(null);
 
     try {
-      const result = await triggerProfitSync(user.id, storeId);
+      // First sync: pull full history. After that: just pull today (cron handles daily).
+      const daysToSync = profitLogs.length === 0 ? 365 : 1;
+      const result = await triggerProfitSync(user.id, storeId, daysToSync);
       if (result.error) {
         setSyncError(result.error);
       } else {
