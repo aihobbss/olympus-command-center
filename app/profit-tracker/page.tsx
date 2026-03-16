@@ -468,10 +468,10 @@ export default function ProfitTrackerPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-2">
         <MetricCard
           label="Total Revenue"
-          value={Math.round(usdToLocal(totals.revenue))}
+          value={parseFloat(usdToLocal(totals.revenue).toFixed(2))}
           format="currency"
           currency={storeCurrency}
-          subtitle={`$${Math.round(totals.revenue).toLocaleString("en-GB")} USD`}
+          subtitle={`$${totals.revenue.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`}
         />
         <MetricCard
           label="Total Ad Spend"
@@ -562,7 +562,8 @@ export default function ProfitTrackerPage() {
                 <tr className="border-b border-subtle">
                   {[
                     "Date",
-                    "Revenue",
+                    `Revenue (${currencyCode})`,
+                    "Revenue (USD)",
                     "COG",
                     "Ad Spend",
                     "Transaction",
@@ -592,7 +593,10 @@ export default function ProfitTrackerPage() {
                       {fmtDate(log.date)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
-                      {fmtCurrency(Math.round(usdToLocal(log.revenue)), storeCurrency)}
+                      {fmtCurrency(usdToLocal(log.revenue), storeCurrency, 2)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
+                      {fmtCurrency(log.revenue, "$", 2)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
                       {fmtCurrency(Math.round(log.cog), "$")}
@@ -637,7 +641,10 @@ export default function ProfitTrackerPage() {
                     {monthLabel} Total
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
-                    {fmtCurrency(Math.round(usdToLocal(monthTotals.revenue)), storeCurrency)}
+                    {fmtCurrency(usdToLocal(monthTotals.revenue), storeCurrency, 2)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
+                    {fmtCurrency(monthTotals.revenue, "$", 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
                     {fmtCurrency(Math.round(monthTotals.cog), "$")}

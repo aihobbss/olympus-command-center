@@ -55,6 +55,24 @@ export async function POST(request: Request) {
 
     const shopify = await getShopifyToken(userId, storeId);
 
+    // Fetch store timezone from Shopify so we bucket orders by the store's
+    // local date, not UTC (fixes off-by-one for non-UTC stores like AU/UK).
+    let storeTimezone = "UTC";
+    if (shopify) {
+      try {
+        const shopRes = await fetch(
+          `https://${shopify.shopifyDomain}/admin/api/2024-01/shop.json`,
+          { headers: { "X-Shopify-Access-Token": shopify.accessToken } }
+        );
+        if (shopRes.ok) {
+          const shopData = await shopRes.json();
+          storeTimezone = shopData.shop?.iana_timezone || "UTC";
+        }
+      } catch {
+        // Fall back to UTC if we can't fetch timezone
+      }
+    }
+
     if (shopify) {
       {
         try {
@@ -77,8 +95,13 @@ export async function POST(request: Request) {
             const orders = ordersData.orders || [];
 
             for (const order of orders) {
-              const date = order.created_at?.split("T")[0];
-              if (!date || !dailyData.has(date)) continue;
+              // Convert order timestamp to the store's local date (not UTC)
+              // e.g. an order at 2024-11-26T22:00:00Z is Nov 27 in Melbourne
+              const orderDt = new Date(order.created_at);
+              if (isNaN(orderDt.getTime())) continue;
+              // en-CA locale gives YYYY-MM-DD format
+              const date = orderDt.toLocaleDateString("en-CA", { timeZone: storeTimezone });
+              if (!dailyData.has(date)) continue;
 
               const bucket = dailyData.get(date)!;
               const totalPrice = parseFloat(order.total_price || "0");
