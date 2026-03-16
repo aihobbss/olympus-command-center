@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, authFetch } from "@/lib/supabase";
 import type { ProfitLog } from "@/data/mock";
 
 // ── DB row shape (snake_case) ──────────────────────────────
@@ -141,7 +141,7 @@ export async function triggerProfitSync(
   const timeout = setTimeout(() => controller.abort(), 60_000);
 
   try {
-    const res = await fetch("/api/sync-profit-data", {
+    const res = await authFetch("/api/sync-profit-data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId, storeId, daysBack, adAccountIds }),

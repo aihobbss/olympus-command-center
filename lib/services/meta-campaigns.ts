@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, authFetch } from "@/lib/supabase";
 import type { AdCampaign } from "@/data/mock";
 
 // ── DB row shape (snake_case) ──────────────────────────────
@@ -89,7 +89,7 @@ export async function triggerMetaSync(
   storeId: string,
   datePreset?: string
 ): Promise<{ synced: number; error?: string }> {
-  const res = await fetch("/api/sync-meta-campaigns", {
+  const res = await authFetch("/api/sync-meta-campaigns", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, storeId, datePreset }),
@@ -110,7 +110,7 @@ export async function killCampaign(
   userId: string,
   campaignId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const res = await fetch("/api/meta-campaign-action", {
+  const res = await authFetch("/api/meta-campaign-action", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, campaignId, action: "kill" }),
@@ -125,7 +125,7 @@ export async function scaleCampaign(
   campaignId: string,
   newBudget: number
 ): Promise<{ success: boolean; error?: string }> {
-  const res = await fetch("/api/meta-campaign-action", {
+  const res = await authFetch("/api/meta-campaign-action", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, campaignId, action: "scale", newBudget }),
@@ -139,7 +139,7 @@ export async function passCampaign(
   userId: string,
   campaignId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const res = await fetch("/api/meta-campaign-action", {
+  const res = await authFetch("/api/meta-campaign-action", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, campaignId, action: "pass" }),

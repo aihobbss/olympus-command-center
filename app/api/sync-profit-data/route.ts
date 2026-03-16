@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
 import { getShopifyToken } from "@/lib/shopify-token";
 
 // Profit Data Sync — pulls Shopify orders + Meta ad spend, computes daily P&L
@@ -38,6 +38,12 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    const authResult = await verifyApiUser(request, storeId);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const verifiedUserId = authResult.userId;
 
     const days = daysBack || 30;
 
@@ -82,7 +88,7 @@ export async function POST(request: Request) {
 
     // ── 1. Pull Shopify orders ──────────────────────────────
 
-    const shopify = await getShopifyToken(userId, storeId);
+    const shopify = await getShopifyToken(verifiedUserId, storeId);
 
     if (shopify) {
       {
@@ -145,7 +151,7 @@ export async function POST(request: Request) {
     const { data: metaToken } = await supabaseAdmin
       .from("oauth_tokens")
       .select("access_token, meta")
-      .eq("user_id", userId)
+      .eq("user_id", verifiedUserId)
       .eq("service", "facebook")
       .single();
 
@@ -159,7 +165,7 @@ export async function POST(request: Request) {
         const { data: adAccounts } = await supabaseAdmin
           .from("user_ad_accounts")
           .select("ad_account_id")
-          .eq("user_id", userId)
+          .eq("user_id", verifiedUserId)
           .eq("store_id", storeId)
           .eq("active", true);
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
 
 // Meta Ad Accounts — discover and manage multiple ad accounts per user
 // GET: list user's saved ad accounts
@@ -11,20 +11,19 @@ const META_API = "https://graph.facebook.com/v19.0";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
   const storeId = searchParams.get("storeId");
 
-  if (!userId) {
-    return NextResponse.json(
-      { error: "userId is required" },
-      { status: 400 }
-    );
+  const authResult = await verifyApiUser(request);
+  if ("error" in authResult) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
+  // Use verified userId instead of query param
+  const verifiedUserId = authResult.userId;
 
   const query = supabaseAdmin
     .from("user_ad_accounts")
     .select("id, user_id, store_id, ad_account_id, account_name, account_status, active, created_at")
-    .eq("user_id", userId)
+    .eq("user_id", verifiedUserId)
     .order("created_at", { ascending: true });
 
   if (storeId) {
@@ -48,20 +47,26 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { userId, storeId } = body as { userId: string; storeId: string };
+    const { storeId } = body as { userId: string; storeId: string };
 
-    if (!userId || !storeId) {
+    if (!storeId) {
       return NextResponse.json(
-        { error: "userId and storeId are required" },
+        { error: "storeId is required" },
         { status: 400 }
       );
     }
+
+    const authResult = await verifyApiUser(request, storeId);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const verifiedUserId = authResult.userId;
 
     // 1. Get user's Meta access token
     const { data: tokenRow } = await supabaseAdmin
       .from("oauth_tokens")
       .select("access_token, expires_at")
-      .eq("user_id", userId)
+      .eq("user_id", verifiedUserId)
       .eq("service", "facebook")
       .single();
 
@@ -111,7 +116,7 @@ export async function POST(request: Request) {
 
     // 3. Upsert all discovered accounts
     const rows = accounts.map((acct) => ({
-      user_id: userId,
+      user_id: verifiedUserId,
       store_id: storeId,
       ad_account_id: acct.id,
       account_name: acct.name || acct.business_name || acct.id,
@@ -135,7 +140,7 @@ export async function POST(request: Request) {
     const { data: saved } = await supabaseAdmin
       .from("user_ad_accounts")
       .select("id, user_id, store_id, ad_account_id, account_name, account_status, active, created_at")
-      .eq("user_id", userId)
+      .eq("user_id", verifiedUserId)
       .eq("store_id", storeId)
       .order("created_at", { ascending: true });
 
@@ -167,10 +172,16 @@ export async function PATCH(request: Request) {
       );
     }
 
+    const authResult = await verifyApiUser(request);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
     const { error } = await supabaseAdmin
       .from("user_ad_accounts")
       .update({ active })
-      .eq("id", accountId);
+      .eq("id", accountId)
+      .eq("user_id", authResult.userId);
 
     if (error) {
       return NextResponse.json(

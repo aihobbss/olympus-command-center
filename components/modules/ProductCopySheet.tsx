@@ -6,6 +6,27 @@ import { useProductCopyStore, useStoreContext } from "@/lib/store";
 import { type ProductCopy, type AdStatus } from "@/data/mock";
 import { cn } from "@/lib/utils";
 
+// Sanitize HTML to prevent XSS — only allows safe table/formatting tags
+function sanitizeHtml(html: string): string {
+  const ALLOWED_TAGS = new Set([
+    "table", "thead", "tbody", "tfoot", "tr", "th", "td",
+    "b", "strong", "i", "em", "br", "p", "span", "div", "ul", "ol", "li",
+  ]);
+  // Strip <script>, <iframe>, <object>, <embed>, <form>, <input>, <link>, <style> tags entirely
+  let clean = html.replace(/<(script|iframe|object|embed|form|input|link|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
+  // Strip self-closing dangerous tags
+  clean = clean.replace(/<(script|iframe|object|embed|form|input|link|style)\b[^>]*\/?>/gi, "");
+  // Strip event handler attributes (on*)
+  clean = clean.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  // Strip javascript: URLs
+  clean = clean.replace(/href\s*=\s*(?:"javascript:[^"]*"|'javascript:[^']*')/gi, "");
+  // Strip any remaining tags not in allowlist
+  clean = clean.replace(/<\/?([a-z][a-z0-9]*)\b[^>]*>/gi, (match, tag) => {
+    return ALLOWED_TAGS.has(tag.toLowerCase()) ? match : "";
+  });
+  return clean;
+}
+
 // ── Inline editable text cell ───────────────────────────────
 
 type EditableCellProps = {
@@ -653,7 +674,7 @@ function SizeChartPanel({
           ) : (
             <div
               className="rounded-lg border border-subtle bg-bg-elevated p-3 overflow-x-auto max-h-[200px] overflow-y-auto text-xs size-chart-preview"
-              dangerouslySetInnerHTML={{ __html: product.sizeChartTable }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.sizeChartTable) }}
             />
           )}
         </div>

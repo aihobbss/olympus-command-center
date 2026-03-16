@@ -8,7 +8,7 @@ import {
   type ProductCreative,
   type PromptAllocation,
 } from "@/data/mock";
-import { supabase } from "@/lib/supabase";
+import { supabase, authFetch } from "@/lib/supabase";
 
 // ─── Auth Store ──────────────────────────────────────────
 // Supabase-backed auth with approval gate.
@@ -106,6 +106,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   initialize: async () => {
     if (get().initialized) return;
 
+    // Unsubscribe any previous auth listener to prevent memory leaks
+    const prev = (useAuthStore as unknown as Record<string, unknown>)._authSubscription as
+      | { unsubscribe: () => void }
+      | undefined;
+    prev?.unsubscribe();
+
     try {
       // Check existing session
       const { data: { session } } = await supabase.auth.getSession();
@@ -130,7 +136,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       }
     });
 
-    // Store subscription for potential cleanup
+    // Store subscription for cleanup on re-initialization
     (useAuthStore as unknown as Record<string, unknown>)._authSubscription = subscription;
   },
 
@@ -410,7 +416,7 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
     const product = get().copyProducts.find((p) => p.id === id);
 
     try {
-      const res = await fetch("/api/generate-copy", {
+      const res = await authFetch("/api/generate-copy", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -499,7 +505,7 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
     const product = get().copyProducts.find((p) => p.id === id);
 
     try {
-      const res = await fetch("/api/push-to-shopify", {
+      const res = await authFetch("/api/push-to-shopify", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -576,7 +582,7 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
     const product = get().copyProducts.find((p) => p.id === id);
 
     try {
-      const res = await fetch("/api/generate-size-chart", {
+      const res = await authFetch("/api/generate-size-chart", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -732,7 +738,7 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
     if (store) updateAdCreatorDB(id, { status: "Pushing" }, store.id);
 
     try {
-      const res = await fetch("/api/push-to-meta", {
+      const res = await authFetch("/api/push-to-meta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user?.id, campaignId: id, adAccountId }),
@@ -777,6 +783,9 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
 
 // ─── Creative Generator Store ────────────────────────────
 // Manages batch queue and global product creatives pool.
+
+// Track active creative generation timers so they can be cancelled on store switch
+const _creativeTimers: ReturnType<typeof setTimeout>[] = [];
 
 const creativeGradients = [
   "from-indigo-600 to-purple-500",
@@ -873,26 +882,31 @@ export const useCreativeGeneratorStore = create<CreativeGeneratorStore>(
         productCreatives: [...s.productCreatives, ...newCreatives],
       }));
 
+      // Cancel any in-flight creative timers from a previous batch
+      while (_creativeTimers.length) clearTimeout(_creativeTimers.pop());
+
       // Stagger-reveal creatives (placeholder until Nanobanana API is wired)
       newCreatives.forEach((c, i) => {
-        setTimeout(() => {
+        const t = setTimeout(() => {
           set((s) => ({
             productCreatives: s.productCreatives.map((pc) =>
               pc.id === c.id ? { ...pc, status: "completed" as const } : pc
             ),
           }));
         }, (i + 1) * 200);
+        _creativeTimers.push(t);
       });
 
       // Mark products completed after all creatives done
       const totalTime = (newCreatives.length + 1) * 200;
-      setTimeout(() => {
+      const finalTimer = setTimeout(() => {
         set((s) => ({
           batchQueue: s.batchQueue.map((p) =>
             productIds.includes(p.id) ? { ...p, status: "completed" as const } : p
           ),
         }));
       }, totalTime);
+      _creativeTimers.push(finalTimer);
     },
 
     removeCreative: async (creativeId) => {
@@ -1040,6 +1054,9 @@ export const useStoreContext = create<StoreContext>((set) => ({
       clearTimeout(adCreatorUpdateTimers[key]);
       delete adCreatorUpdateTimers[key];
     }
+    // Cancel any in-flight creative generation timers
+    while (_creativeTimers.length) clearTimeout(_creativeTimers.pop());
+
     set({ selectedStore: store });
 
     // Abort all in-flight loads to free browser connections

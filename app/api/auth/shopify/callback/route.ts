@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     // Exchange code for access token
     const tokenUrl = `https://${shop}/admin/oauth/access_token`;
     const tokenBody = { client_id: clientId, client_secret: clientSecret, code };
-    console.log("Shopify token exchange:", { url: tokenUrl, shop, codeLength: code.length, clientId: clientId.slice(0, 8) + "..." });
+    console.log("Shopify token exchange:", { url: tokenUrl, shop, codeLength: code.length });
 
     const tokenResponse = await fetch(tokenUrl, {
       method: "POST",

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
 
 // Meta Graph API v19.0 — Campaign Actions (Kill / Scale / Pass)
 // Kill: pauses campaign | Scale: updates daily budget | Pass: logs decision only
@@ -25,6 +25,13 @@ export async function POST(request: Request) {
       );
     }
 
+    // Verify caller identity
+    const authResult = await verifyApiUser(request);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const verifiedUserId = authResult.userId;
+
     if (action === "scale" && (!newBudget || newBudget <= 0)) {
       return NextResponse.json(
         { error: "newBudget is required for scale action and must be positive" },
@@ -46,6 +53,17 @@ export async function POST(request: Request) {
       );
     }
 
+    // Verify the user has access to this campaign's store
+    const { data: storeMembership } = await supabaseAdmin
+      .from("user_stores")
+      .select("store_id")
+      .eq("user_id", verifiedUserId)
+      .eq("store_id", campaign.store_id)
+      .single();
+    if (!storeMembership) {
+      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+    }
+
     if (!campaign.meta_campaign_id) {
       return NextResponse.json(
         { error: "Campaign has no Meta campaign ID — cannot perform action" },
@@ -57,7 +75,7 @@ export async function POST(request: Request) {
     const { data: tokenRow, error: tokenError } = await supabaseAdmin
       .from("oauth_tokens")
       .select("access_token, expires_at")
-      .eq("user_id", userId)
+      .eq("user_id", verifiedUserId)
       .eq("service", "facebook")
       .single();
 
@@ -91,9 +109,9 @@ export async function POST(request: Request) {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
+        await res.json().catch(() => ({}));
         return NextResponse.json(
-          { error: "Failed to pause campaign on Meta", details: err },
+          { error: "Failed to pause campaign on Meta" },
           { status: 502 }
         );
       }
@@ -130,9 +148,9 @@ export async function POST(request: Request) {
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
+        await res.json().catch(() => ({}));
         return NextResponse.json(
-          { error: "Failed to update budget on Meta", details: err },
+          { error: "Failed to update budget on Meta" },
           { status: 502 }
         );
       }

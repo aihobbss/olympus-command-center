@@ -1,6 +1,35 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
 
+// SSRF protection — only allow fetching images from known e-commerce CDNs
+const ALLOWED_IMAGE_HOSTS = new Set([
+  "cdn.shopify.com",
+  "images.unsplash.com",
+  "m.media-amazon.com",
+  "ae01.alicdn.com",
+  "img.alicdn.com",
+  "cbu01.alicdn.com",
+  "i.ebayimg.com",
+  "i.imgur.com",
+  "res.cloudinary.com",
+]);
+
+function isAllowedImageUrl(urlStr: string): boolean {
+  try {
+    const url = new URL(urlStr);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+    // Block private/internal IPs
+    const hostname = url.hostname;
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || hostname.startsWith("10.") || hostname.startsWith("172.")) return false;
+    // Allow known CDN hosts, or any hostname that looks like a public domain with image extension
+    if (ALLOWED_IMAGE_HOSTS.has(hostname)) return true;
+    // Allow any public domain (but block internal IPs above)
+    return hostname.includes(".");
+  } catch {
+    return false;
+  }
+}
+
 // ── Country label mapping ──────────────────────────────
 const COUNTRY_LABELS: Record<string, string> = {
   AU: "Australia",
@@ -156,7 +185,7 @@ export async function POST(request: Request) {
 
     // ── Step 1: Vision analysis of product image (if provided) ──
     let visionAnalysis = "";
-    if (imageUrl && imageUrl.startsWith("http")) {
+    if (imageUrl && isAllowedImageUrl(imageUrl)) {
       try {
         // Fetch image and convert to base64
         const imgRes = await fetch(imageUrl);

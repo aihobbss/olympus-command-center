@@ -16,3 +16,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     },
   },
 });
+
+// ── Authenticated API fetch helper ──────────────────────────
+// Attaches the current Supabase session JWT as a Bearer token so API routes
+// can verify the caller's identity via verifyApiUser().
+export async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers = new Headers(init?.headers);
+  if (session?.access_token) {
+    headers.set("Authorization", `Bearer ${session.access_token}`);
+  }
+  return fetch(url, { ...init, headers });
+}

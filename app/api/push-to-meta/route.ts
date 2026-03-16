@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
 
 // Push an Ad Creator campaign to Meta as a real Facebook campaign
 // Creates: Campaign → Ad Set → Ad (with creative)
@@ -57,11 +57,17 @@ export async function POST(request: Request) {
       );
     }
 
+    const authResult = await verifyApiUser(request, campaign.store_id);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const verifiedUserId = authResult.userId;
+
     // 2. Get Meta token + ad account ID
     const { data: tokenRow, error: tokenError } = await supabaseAdmin
       .from("oauth_tokens")
       .select("access_token, expires_at, meta")
-      .eq("user_id", userId)
+      .eq("user_id", verifiedUserId)
       .eq("service", "facebook")
       .single();
 
@@ -89,7 +95,7 @@ export async function POST(request: Request) {
       const { data: adAccounts } = await supabaseAdmin
         .from("user_ad_accounts")
         .select("ad_account_id")
-        .eq("user_id", userId)
+        .eq("user_id", verifiedUserId)
         .eq("active", true)
         .limit(1);
 

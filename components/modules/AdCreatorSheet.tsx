@@ -364,18 +364,24 @@ export function AdCreatorSheet() {
 
   // Load ad accounts for the publish dropdown (discover from Meta for real names)
   useEffect(() => {
-    if (user && storeId && metaConnected) {
-      discoverAdAccounts(user.id, storeId).then(async (result) => {
-        let accts = result.accounts;
-        if (accts.length === 0) {
-          accts = await fetchAdAccounts(user.id, storeId);
-        }
-        setAdAccounts(accts);
-        if (accts.length > 0 && !selectedAdAccountId) {
-          setSelectedAdAccountId(accts[0].ad_account_id);
-        }
-      });
-    }
+    if (!user || !storeId || !metaConnected) return;
+    let cancelled = false;
+
+    (async () => {
+      const result = await discoverAdAccounts(user.id, storeId);
+      if (cancelled) return;
+      let accts = result.accounts;
+      if (accts.length === 0) {
+        accts = await fetchAdAccounts(user.id, storeId);
+      }
+      if (cancelled) return;
+      setAdAccounts(accts);
+      if (accts.length > 0) {
+        setSelectedAdAccountId((prev) => prev || accts[0].ad_account_id);
+      }
+    })();
+
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, storeId, metaConnected]);
 

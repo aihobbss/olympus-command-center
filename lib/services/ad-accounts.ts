@@ -1,5 +1,7 @@
 // Client-side service for managing multiple Meta ad accounts
 
+import { authFetch } from "@/lib/supabase";
+
 export type UserAdAccount = {
   id: string;
   user_id: string;
@@ -17,7 +19,7 @@ export async function fetchAdAccounts(
   userId: string,
   storeId: string
 ): Promise<UserAdAccount[]> {
-  const res = await fetch(
+  const res = await authFetch(
     `/api/meta/ad-accounts?userId=${userId}&storeId=${storeId}`
   );
   const data = await res.json();
@@ -30,7 +32,7 @@ export async function discoverAdAccounts(
   userId: string,
   storeId: string
 ): Promise<{ accounts: UserAdAccount[]; error?: string }> {
-  const res = await fetch("/api/meta/ad-accounts", {
+  const res = await authFetch("/api/meta/ad-accounts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId, storeId }),
@@ -51,7 +53,7 @@ export async function toggleAdAccount(
   accountId: string,
   active: boolean
 ): Promise<boolean> {
-  const res = await fetch("/api/meta/ad-accounts", {
+  const res = await authFetch("/api/meta/ad-accounts", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ accountId, active }),

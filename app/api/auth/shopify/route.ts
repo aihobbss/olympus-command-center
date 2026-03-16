@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   }
 
   // Client credentials grant — form-encoded, NOT JSON
-  console.log("Shopify connect attempt:", { storeDomain, hasClientId: !!clientId, hasClientSecret: !!clientSecret, clientIdPrefix: clientId?.slice(0, 8) });
+  console.log("Shopify connect attempt:", { storeDomain, hasClientId: !!clientId, hasClientSecret: !!clientSecret });
   try {
     const tokenRes = await fetch(
       `https://${storeDomain}/admin/oauth/access_token`,
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
     if (!tokenRes.ok) {
       const errBody = await tokenRes.text().catch(() => "");
-      console.error("Shopify client_credentials failed:", tokenRes.status, errBody, "clientId:", clientId?.slice(0, 8));
+      console.error("Shopify client_credentials failed:", tokenRes.status, errBody);
       return NextResponse.json(
         { error: "TOKEN_FAILED", message: `Shopify returned ${tokenRes.status}: ${errBody.slice(0, 200)}` },
         { status: 400 }

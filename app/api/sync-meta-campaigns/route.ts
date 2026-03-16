@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
 
 // Meta Graph API v19.0 — Campaign Insights sync
 // Pulls campaign-level performance data from ALL active ad accounts
@@ -66,11 +66,17 @@ export async function POST(request: Request) {
       );
     }
 
+    const authResult = await verifyApiUser(request, storeId);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const verifiedUserId = authResult.userId;
+
     // 1. Get user's Meta access token
     const { data: tokenRow, error: tokenError } = await supabaseAdmin
       .from("oauth_tokens")
       .select("access_token, expires_at, meta")
-      .eq("user_id", userId)
+      .eq("user_id", verifiedUserId)
       .eq("service", "facebook")
       .single();
 
@@ -95,7 +101,7 @@ export async function POST(request: Request) {
     const { data: adAccounts } = await supabaseAdmin
       .from("user_ad_accounts")
       .select("ad_account_id, account_name")
-      .eq("user_id", userId)
+      .eq("user_id", verifiedUserId)
       .eq("store_id", storeId)
       .eq("active", true);
 
@@ -109,7 +115,7 @@ export async function POST(request: Request) {
         // Migrate legacy account to new table
         await supabaseAdmin.from("user_ad_accounts").upsert(
           {
-            user_id: userId,
+            user_id: verifiedUserId,
             store_id: storeId,
             ad_account_id: metaData.ad_account_id,
             account_name: "Ad Account",
