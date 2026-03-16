@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Wand2 } from "lucide-react";
 import { ProductCopySheet } from "@/components/modules/ProductCopySheet";
 import { ServiceConnectionOverlay } from "@/components/modules/ServiceConnectionCard";
@@ -9,18 +9,13 @@ import { SERVICE_REGISTRY } from "@/lib/services/connections";
 
 export default function ProductCreationPage() {
   const user = useAuthStore((s) => s.user);
-  const { loadConnections, isConnected } = useConnectionsStore();
+  const { loadConnections, isConnected, loaded: connectionsLoaded } = useConnectionsStore();
   const { selectedStore } = useStoreContext();
-  const [connectionsChecked, setConnectionsChecked] = useState(false);
 
-  // Reset check when store changes so we re-gate until fresh connections load
-  const storeId = selectedStore?.id;
+  // Ensure connections are loaded (skips fetch if already loaded)
   useEffect(() => {
-    setConnectionsChecked(false);
-    if (user) {
-      loadConnections().then(() => setConnectionsChecked(true));
-    }
-  }, [user, storeId, loadConnections]);
+    if (user) loadConnections();
+  }, [user, loadConnections]);
 
   const shopifyConnected = isConnected("shopify");
   const anthropicConnected = isConnected("anthropic");
@@ -36,8 +31,8 @@ export default function ProductCreationPage() {
   ];
 
   // Don't render content until connections are checked to avoid flash
-  const showSheet = connectionsChecked && allConnected;
-  const showOverlay = connectionsChecked && !allConnected;
+  const showSheet = connectionsLoaded && allConnected;
+  const showOverlay = connectionsLoaded && !allConnected;
 
   return (
     <div>

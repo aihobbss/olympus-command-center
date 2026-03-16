@@ -199,6 +199,9 @@ import {
 // Debounce map for batching rapid edits before writing to DB
 const updateTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
+// AbortController for in-flight research product loads — cancels stale fetches on rapid navigation
+let _researchLoadController: AbortController | null = null;
+
 interface ResearchStore {
   // Research Sheet
   sheetProducts: SheetProduct[];
@@ -217,17 +220,24 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
   adding: false,
 
   loadProducts: async (storeId) => {
+    // Abort any in-flight load to free the browser connection
+    _researchLoadController?.abort();
+    const controller = new AbortController();
+    _researchLoadController = controller;
+
     // Only show loading spinner if we have no cached data yet
     const hasData = get().sheetProducts.length > 0;
     if (!hasData) {
       set({ loading: true });
     }
     try {
-      const products = await fetchResearchProducts(storeId);
+      const products = await fetchResearchProducts(storeId, controller.signal);
+      if (controller.signal.aborted) return; // stale — newer load in progress
       set({ sheetProducts: products, loading: false });
-    } catch {
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return; // cancelled, not an error
       // Ensure loading is always cleared even on unexpected errors
-      set({ loading: false });
+      if (!controller.signal.aborted) set({ loading: false });
     }
   },
 
@@ -314,6 +324,9 @@ interface ProductCopyStore {
 // Debounce timers for product copy updates
 const copyUpdateTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
+// AbortController for in-flight product copy loads
+let _copyLoadController: AbortController | null = null;
+
 async function updateProductCopyDB(id: string, updates: Partial<ProductCopy>, storeId: string) {
   const { updateProductCopy } = await import("@/lib/services/product-copy");
   await updateProductCopy(id, updates, storeId);
@@ -324,13 +337,24 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
   loading: false,
 
   loadProducts: async (storeId: string) => {
-    set({ loading: true });
+    // Abort any in-flight load to free the browser connection
+    _copyLoadController?.abort();
+    const controller = new AbortController();
+    _copyLoadController = controller;
+
+    // Only show loading spinner if we have no cached data yet
+    const hasData = get().copyProducts.length > 0;
+    if (!hasData) {
+      set({ loading: true });
+    }
     try {
       const { fetchProductCopies } = await import("@/lib/services/product-copy");
-      const products = await fetchProductCopies(storeId);
+      const products = await fetchProductCopies(storeId, controller.signal);
+      if (controller.signal.aborted) return;
       set({ copyProducts: products, loading: false });
-    } catch {
-      set({ loading: false });
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      if (!controller.signal.aborted) set({ loading: false });
     }
   },
 
@@ -619,6 +643,9 @@ interface AdCreatorStore {
 // Debounce timers for ad creator updates
 const adCreatorUpdateTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
+// AbortController for in-flight ad creator campaign loads
+let _adCreatorLoadController: AbortController | null = null;
+
 async function updateAdCreatorDB(id: string, updates: Partial<AdCreatorCampaign>, storeId: string) {
   const { updateAdCreatorCampaign } = await import("@/lib/services/ad-creator");
   await updateAdCreatorCampaign(id, updates, storeId);
@@ -629,14 +656,24 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
   loading: false,
 
   loadCampaigns: async (storeId: string) => {
-    set({ loading: true });
+    // Abort any in-flight load to free the browser connection
+    _adCreatorLoadController?.abort();
+    const controller = new AbortController();
+    _adCreatorLoadController = controller;
+
+    const hasData = get().campaigns.length > 0;
+    if (!hasData) {
+      set({ loading: true });
+    }
     try {
       const { fetchAdCreatorCampaigns } = await import("@/lib/services/ad-creator");
-      const campaigns = await fetchAdCreatorCampaigns(storeId);
+      const campaigns = await fetchAdCreatorCampaigns(storeId, controller.signal);
+      if (controller.signal.aborted) return;
       set({ campaigns, loading: false });
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       console.error("Failed to load ad creator campaigns:", err);
-      set({ campaigns: [], loading: false });
+      if (!controller.signal.aborted) set({ campaigns: [], loading: false });
     }
   },
 
@@ -1005,14 +1042,22 @@ export const useStoreContext = create<StoreContext>((set) => ({
     }
     set({ selectedStore: store });
 
+    // Abort all in-flight loads to free browser connections
+    _researchLoadController?.abort();
+    _researchLoadController = null;
+    _copyLoadController?.abort();
+    _copyLoadController = null;
+    _connectionsLoadController?.abort();
+    _connectionsLoadController = null;
+    _adCreatorLoadController?.abort();
+    _adCreatorLoadController = null;
+
     // Clear all module data so pages reload fresh for the new store
     useResearchStore.setState({ sheetProducts: [], loading: false });
     useProductCopyStore.setState({ copyProducts: [], loading: false });
     useAdCreatorStore.setState({ campaigns: [], loading: false });
     useCreativeGeneratorStore.setState({ batchQueue: [], productCreatives: [], loaded: false });
     useConnectionsStore.setState({ connections: [], loading: false, loaded: false });
-    // Reset dedup flag so connections reload for the new store
-    _connectionsPromise = null;
   },
 }));
 
@@ -1036,8 +1081,8 @@ interface ConnectionsStore {
   getExpiryDaysLeft: (service: ServiceId) => number | null;
 }
 
-// Dedup: track in-flight loadConnections promise to prevent concurrent calls
-let _connectionsPromise: Promise<void> | null = null;
+// AbortController for in-flight connections load
+let _connectionsLoadController: AbortController | null = null;
 
 export const useConnectionsStore = create<ConnectionsStore>((set, get) => ({
   connections: [],
@@ -1049,22 +1094,24 @@ export const useConnectionsStore = create<ConnectionsStore>((set, get) => ({
     const store = useStoreContext.getState().selectedStore;
     if (!user) return;
 
-    // If a load is already in flight, wait for it instead of starting another
-    if (_connectionsPromise) return _connectionsPromise;
+    // If already loaded, skip the fetch — connections rarely change outside Settings
+    if (get().loaded) return;
+
+    // Abort any in-flight load to free the browser connection
+    _connectionsLoadController?.abort();
+    const controller = new AbortController();
+    _connectionsLoadController = controller;
 
     set({ loading: true });
-    _connectionsPromise = (async () => {
-      try {
-        const connections = await fetchConnections(user.id, store?.id);
-        set({ connections, loading: false, loaded: true });
-      } catch (err) {
-        console.error("Failed to load connections:", err);
-        set({ loading: false, loaded: true });
-      } finally {
-        _connectionsPromise = null;
-      }
-    })();
-    return _connectionsPromise;
+    try {
+      const connections = await fetchConnections(user.id, store?.id, controller.signal);
+      if (controller.signal.aborted) return;
+      set({ connections, loading: false, loaded: true });
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      console.error("Failed to load connections:", err);
+      if (!controller.signal.aborted) set({ loading: false, loaded: true });
+    }
   },
 
   isConnected: (service) => isServiceConnected(get().connections, service),

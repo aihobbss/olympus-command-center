@@ -57,7 +57,7 @@ export const SERVICE_REGISTRY: ServiceMeta[] = [
 
 // ── Queries ──────────────────────────────────────────────
 
-export async function fetchConnections(userId: string, storeId?: string): Promise<ServiceConnection[]> {
+export async function fetchConnections(userId: string, storeId?: string, signal?: AbortSignal): Promise<ServiceConnection[]> {
   let query = supabase
     .from("oauth_tokens")
     .select("id, service, expires_at, access_token")
@@ -65,6 +65,9 @@ export async function fetchConnections(userId: string, storeId?: string): Promis
 
   if (storeId) {
     query = query.eq("store_id", storeId);
+  }
+  if (signal) {
+    query = query.abortSignal(signal);
   }
 
   const { data, error } = await query;

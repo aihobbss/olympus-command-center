@@ -65,12 +65,16 @@ function campaignToRow(
 
 // ── Service functions ──────────────────────────────────────
 
-export async function fetchAdCreatorCampaigns(storeId: string): Promise<AdCreatorCampaign[]> {
-  const { data, error } = await supabase
+export async function fetchAdCreatorCampaigns(storeId: string, signal?: AbortSignal): Promise<AdCreatorCampaign[]> {
+  let query = supabase
     .from("ad_creator_campaigns")
     .select(SELECT_COLS)
     .eq("store_id", storeId)
     .order("created_at", { ascending: true });
+
+  if (signal) query = query.abortSignal(signal);
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("Failed to fetch ad creator campaigns:", error.message);

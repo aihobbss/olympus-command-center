@@ -68,12 +68,16 @@ function productCopyToRow(
 
 // ── Service functions ──────────────────────────────────────
 
-export async function fetchProductCopies(storeId: string): Promise<ProductCopy[]> {
-  const { data, error } = await supabase
+export async function fetchProductCopies(storeId: string, signal?: AbortSignal): Promise<ProductCopy[]> {
+  let query = supabase
     .from("product_copies")
     .select(SELECT_COLS)
     .eq("store_id", storeId)
     .order("created_at", { ascending: true });
+
+  if (signal) query = query.abortSignal(signal);
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("Failed to fetch product copies:", error.message);

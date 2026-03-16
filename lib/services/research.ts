@@ -63,12 +63,16 @@ function sheetToRow(
 
 const SELECT_COLS = "id, store_id, product_name, ad_link, store_link, creative_urls, testing_status, creative_saved, cog, product_type, pricing, discount_percent, notes";
 
-export async function fetchResearchProducts(storeId: string): Promise<SheetProduct[]> {
-  const { data, error } = await supabase
+export async function fetchResearchProducts(storeId: string, signal?: AbortSignal): Promise<SheetProduct[]> {
+  let query = supabase
     .from("research_products")
     .select(SELECT_COLS)
     .eq("store_id", storeId)
     .order("created_at", { ascending: true });
+
+  if (signal) query = query.abortSignal(signal);
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("Failed to fetch research products:", error.message);
