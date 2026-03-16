@@ -46,11 +46,17 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!user) return;
+    let active = true;
     setLoading(true);
     fetchConnections(user.id).then((conns) => {
-      setConnections(conns);
-      setLoading(false);
+      if (active) {
+        setConnections(conns);
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (active) setLoading(false);
     });
+    return () => { active = false; };
   }, [user]);
 
   // Auto-open connect modal when redirected from module pages (?connect=shopify)
