@@ -290,7 +290,7 @@ export default function ProfitTrackerPage() {
 
     try {
       // First sync: pull full history. After that: just pull today (cron handles daily).
-      const daysToSync = profitLogs.length === 0 ? 365 : 1;
+      const daysToSync = profitLogs.length === 0 ? 1095 : 1;
 
       // Use the same ad account selection saved by Ad Manager
       let selectedAccounts: string[] | undefined;
