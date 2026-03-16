@@ -4,13 +4,12 @@ import { useEffect } from "react";
 import { Wand2 } from "lucide-react";
 import { ProductCopySheet } from "@/components/modules/ProductCopySheet";
 import { ServiceConnectionOverlay } from "@/components/modules/ServiceConnectionCard";
-import { useConnectionsStore, useAuthStore, useStoreContext } from "@/lib/store";
+import { useConnectionsStore, useAuthStore } from "@/lib/store";
 import { SERVICE_REGISTRY } from "@/lib/services/connections";
 
 export default function ProductCreationPage() {
   const user = useAuthStore((s) => s.user);
   const { loadConnections, isConnected, loaded: connectionsLoaded } = useConnectionsStore();
-  const { selectedStore } = useStoreContext();
 
   // Ensure connections are loaded (skips fetch if already loaded)
   useEffect(() => {
