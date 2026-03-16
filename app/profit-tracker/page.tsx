@@ -289,8 +289,7 @@ export default function ProfitTrackerPage() {
     setSyncError(null);
 
     try {
-      // Sync 365 days to cover full order history (not just last 30)
-      const result = await triggerProfitSync(user.id, storeId, 365);
+      const result = await triggerProfitSync(user.id, storeId);
       if (result.error) {
         setSyncError(result.error);
       } else {
@@ -469,10 +468,10 @@ export default function ProfitTrackerPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-2">
         <MetricCard
           label="Total Revenue"
-          value={parseFloat(usdToLocal(totals.revenue).toFixed(2))}
+          value={Math.round(usdToLocal(totals.revenue))}
           format="currency"
           currency={storeCurrency}
-          subtitle={`$${totals.revenue.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`}
+          subtitle={`$${Math.round(totals.revenue).toLocaleString("en-GB")} USD`}
         />
         <MetricCard
           label="Total Ad Spend"
@@ -563,8 +562,7 @@ export default function ProfitTrackerPage() {
                 <tr className="border-b border-subtle">
                   {[
                     "Date",
-                    `Revenue (${currencyCode})`,
-                    "Revenue (USD)",
+                    "Revenue",
                     "COG",
                     "Ad Spend",
                     "Transaction",
@@ -594,10 +592,7 @@ export default function ProfitTrackerPage() {
                       {fmtDate(log.date)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
-                      {fmtCurrency(usdToLocal(log.revenue), storeCurrency, 2)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
-                      {fmtCurrency(log.revenue, "$", 2)}
+                      {fmtCurrency(Math.round(usdToLocal(log.revenue)), storeCurrency)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
                       {fmtCurrency(Math.round(log.cog), "$")}
@@ -642,10 +637,7 @@ export default function ProfitTrackerPage() {
                     {monthLabel} Total
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
-                    {fmtCurrency(usdToLocal(monthTotals.revenue), storeCurrency, 2)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
-                    {fmtCurrency(monthTotals.revenue, "$", 2)}
+                    {fmtCurrency(Math.round(usdToLocal(monthTotals.revenue)), storeCurrency)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
                     {fmtCurrency(Math.round(monthTotals.cog), "$")}

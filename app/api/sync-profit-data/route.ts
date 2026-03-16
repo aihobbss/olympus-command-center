@@ -13,24 +13,6 @@ type DailyBucket = {
   adSpend: number;
 };
 
-// Helper: get "today" in a given IANA timezone as YYYY-MM-DD
-function todayInTz(tz: string): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: tz });
-}
-
-// Helper: generate an array of YYYY-MM-DD date strings in a timezone
-function dateRange(daysBack: number, tz: string): string[] {
-  const today = todayInTz(tz);
-  const dates: string[] = [];
-  // Parse today as midnight UTC to do simple day math
-  const end = new Date(today + "T12:00:00Z"); // noon to avoid DST edge cases
-  for (let i = daysBack; i >= 0; i--) {
-    const d = new Date(end.getTime() - i * 86_400_000);
-    dates.push(d.toISOString().split("T")[0]);
-  }
-  return dates;
-}
-
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -48,122 +30,83 @@ export async function POST(request: Request) {
     }
 
     const days = daysBack || 30;
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const startStr = startDate.toISOString().split("T")[0];
+    const endStr = endDate.toISOString().split("T")[0];
+
+    // Initialize daily buckets
+    const dailyData = new Map<string, DailyBucket>();
+    {
+      const d = new Date(startDate);
+      while (d <= endDate) {
+        dailyData.set(d.toISOString().split("T")[0], {
+          revenue: 0,
+          orders: 0,
+          adSpend: 0,
+        });
+        d.setTime(d.getTime() + 86_400_000); // advance exactly 1 day in ms
+      }
+    }
 
     // ── 1. Pull Shopify orders ──────────────────────────────
 
     const shopify = await getShopifyToken(userId, storeId);
 
-    // Fetch store timezone from Shopify so we bucket orders by the store's
-    // local date (fixes off-by-one for non-UTC stores like AU/UK).
-    let storeTimezone = "UTC";
     if (shopify) {
-      try {
-        const shopRes = await fetch(
-          `https://${shopify.shopifyDomain}/admin/api/2024-01/shop.json`,
-          { headers: { "X-Shopify-Access-Token": shopify.accessToken } }
-        );
-        if (shopRes.ok) {
-          const shopData = await shopRes.json();
-          storeTimezone = shopData.shop?.iana_timezone || "UTC";
-        }
-      } catch {
-        // Fall back to UTC if we can't fetch timezone
-      }
-    }
+      {
+        try {
+          // Paginate through all Shopify orders in the date range
+          let pageUrl: string | null =
+            `https://${shopify.shopifyDomain}/admin/api/2024-01/orders.json` +
+            `?status=any&created_at_min=${startStr}T00:00:00Z&created_at_max=${endStr}T23:59:59Z&limit=250`;
 
-    // Build date range in the STORE'S timezone (not UTC) — this ensures
-    // bucket keys match the local dates used for order bucketing below.
-    const localDates = dateRange(days, storeTimezone);
-    const startStr = localDates[0];
-    const endStr = localDates[localDates.length - 1];
+          while (pageUrl) {
+            const ordersRes: Response = await fetch(pageUrl, {
+              headers: {
+                "X-Shopify-Access-Token": shopify.accessToken,
+                "Content-Type": "application/json",
+              },
+            });
 
-    // Initialize daily buckets keyed by store-local dates
-    const dailyData = new Map<string, DailyBucket>();
-    for (const d of localDates) {
-      dailyData.set(d, { revenue: 0, orders: 0, adSpend: 0 });
-    }
+            if (!ordersRes.ok) break;
 
-    // Diagnostic: track sample order for debugging date issues
-    let sampleOrder: { created_at?: string; processed_at?: string; bucketedDate?: string } | null = null;
-    let orderCount = 0;
+            const ordersData = await ordersRes.json();
+            const orders = ordersData.orders || [];
 
-    if (shopify) {
-      try {
-        // Pad query range by 1 day on each side to avoid missing orders
-        // near timezone boundaries. Use processed_at (matches Shopify Analytics).
-        // NO "Z" suffix — Shopify interprets bare ISO dates in the store's timezone.
-        const padStart = new Date(new Date(startStr + "T12:00:00Z").getTime() - 86_400_000)
-          .toISOString().split("T")[0];
-        const padEnd = new Date(new Date(endStr + "T12:00:00Z").getTime() + 86_400_000)
-          .toISOString().split("T")[0];
+            for (const order of orders) {
+              const date = order.created_at?.split("T")[0];
+              if (!date || !dailyData.has(date)) continue;
 
-        // Paginate through all Shopify orders in the date range
-        // Use processed_at_min/max — this is the date Shopify Analytics uses
-        let pageUrl: string | null =
-          `https://${shopify.shopifyDomain}/admin/api/2024-01/orders.json` +
-          `?status=any&processed_at_min=${padStart}&processed_at_max=${padEnd}T23:59:59&limit=250`;
+              const bucket = dailyData.get(date)!;
+              const totalPrice = parseFloat(order.total_price || "0");
 
-        while (pageUrl) {
-          const ordersRes: Response = await fetch(pageUrl, {
-            headers: {
-              "X-Shopify-Access-Token": shopify.accessToken,
-              "Content-Type": "application/json",
-            },
-          });
-
-          if (!ordersRes.ok) break;
-
-          const ordersData = await ordersRes.json();
-          const orders = ordersData.orders || [];
-
-          for (const order of orders) {
-            // Use processed_at for date attribution (matches Shopify Analytics).
-            // Shopify REST API returns timestamps in the store's timezone with
-            // offset, e.g. "2024-12-29T15:30:00+11:00". The date part before
-            // "T" is already the correct local date — just extract it directly.
-            const ts = order.processed_at || order.created_at;
-            if (!ts) continue;
-
-            // Extract the date portion directly from the ISO string.
-            // For "2024-12-29T15:30:00+11:00", this gives "2024-12-29".
-            const date = ts.split("T")[0];
-            if (!dailyData.has(date)) continue;
-
-            orderCount++;
-            if (!sampleOrder) {
-              sampleOrder = {
-                created_at: order.created_at,
-                processed_at: order.processed_at,
-                bucketedDate: date,
-              };
-            }
-
-            const bucket = dailyData.get(date)!;
-            const totalPrice = parseFloat(order.total_price || "0");
-
-            // Subtract refunds for accurate net revenue
-            let refundTotal = 0;
-            if (order.refunds && Array.isArray(order.refunds)) {
-              for (const refund of order.refunds) {
-                if (refund.transactions && Array.isArray(refund.transactions)) {
-                  for (const txn of refund.transactions) {
-                    refundTotal += parseFloat(txn.amount || "0");
+              // Subtract refunds for accurate net revenue
+              let refundTotal = 0;
+              if (order.refunds && Array.isArray(order.refunds)) {
+                for (const refund of order.refunds) {
+                  if (refund.transactions && Array.isArray(refund.transactions)) {
+                    for (const txn of refund.transactions) {
+                      refundTotal += parseFloat(txn.amount || "0");
+                    }
                   }
                 }
               }
+
+              bucket.revenue += totalPrice - refundTotal;
+              bucket.orders += 1;
             }
 
-            bucket.revenue += totalPrice - refundTotal;
-            bucket.orders += 1;
+            // Check for next page via Link header
+            const linkHeader = ordersRes.headers.get("link") || "";
+            const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+            pageUrl = nextMatch ? nextMatch[1] : null;
           }
-
-          // Check for next page via Link header
-          const linkHeader = ordersRes.headers.get("link") || "";
-          const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
-          pageUrl = nextMatch ? nextMatch[1] : null;
+        } catch (err) {
+          console.error("Shopify orders fetch error:", err);
         }
-      } catch (err) {
-        console.error("Shopify orders fetch error:", err);
       }
     }
 
@@ -286,7 +229,6 @@ export async function POST(request: Request) {
         profit_percent: profitPercent,
         orders: bucket.orders,
         synced_from: "manual",
-        created_at: new Date().toISOString(), // Update on every sync so "last synced" stays fresh
       });
     }
 
@@ -297,16 +239,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Delete old profit data in this range first — removes stale rows from
-    // previous syncs that may have had incorrect date bucketing.
-    await supabaseAdmin
-      .from("profit_logs")
-      .delete()
-      .eq("store_id", storeId)
-      .gte("date", startStr)
-      .lte("date", endStr);
-
-    // Insert fresh data (using insert since we just deleted the range)
+    // Upsert (unique on store_id + date)
     const { error: upsertError } = await supabaseAdmin
       .from("profit_logs")
       .upsert(rows, { onConflict: "store_id,date" });
@@ -322,10 +255,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       synced: rows.length,
       dateRange: { start: startStr, end: endStr },
-      timezone: storeTimezone,
-      orderCount,
-      sampleOrder,
-      message: `Synced ${rows.length} days of profit data (tz: ${storeTimezone}, ${orderCount} orders)`,
+      message: `Synced ${rows.length} days of profit data`,
     });
   } catch (err) {
     console.error("Profit sync error:", err);
