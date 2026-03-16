@@ -297,7 +297,16 @@ export async function POST(request: Request) {
       });
     }
 
-    // Upsert (unique on store_id + date)
+    // Delete old profit data in this range first — removes stale rows from
+    // previous syncs that may have had incorrect date bucketing.
+    await supabaseAdmin
+      .from("profit_logs")
+      .delete()
+      .eq("store_id", storeId)
+      .gte("date", startStr)
+      .lte("date", endStr);
+
+    // Insert fresh data (using insert since we just deleted the range)
     const { error: upsertError } = await supabaseAdmin
       .from("profit_logs")
       .upsert(rows, { onConflict: "store_id,date" });

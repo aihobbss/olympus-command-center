@@ -289,7 +289,8 @@ export default function ProfitTrackerPage() {
     setSyncError(null);
 
     try {
-      const result = await triggerProfitSync(user.id, storeId);
+      // Sync 365 days to cover full order history (not just last 30)
+      const result = await triggerProfitSync(user.id, storeId, 365);
       if (result.error) {
         setSyncError(result.error);
       } else {
