@@ -143,6 +143,17 @@ export async function triggerProfitSync(
 
   const data = await res.json();
 
+  // Log sync diagnostics to browser console for debugging date issues
+  if (data.sampleOrder || data.timezone) {
+    console.log("[Profit Sync]", {
+      timezone: data.timezone,
+      dateRange: data.dateRange,
+      orderCount: data.orderCount,
+      sampleOrder: data.sampleOrder,
+      synced: data.synced,
+    });
+  }
+
   if (!res.ok) {
     return { synced: 0, error: data.error || "Sync failed" };
   }

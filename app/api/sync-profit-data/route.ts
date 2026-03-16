@@ -83,17 +83,25 @@ export async function POST(request: Request) {
       dailyData.set(d, { revenue: 0, orders: 0, adSpend: 0 });
     }
 
+    // Diagnostic: track sample order for debugging date issues
+    let sampleOrder: { created_at?: string; processed_at?: string; bucketedDate?: string } | null = null;
+    let orderCount = 0;
+
     if (shopify) {
       try {
-        // Query an extra day on each side to account for UTC ↔ local offset
-        // (orders near midnight could fall on adjacent UTC day)
-        const queryStart = localDates[0]; // already covers the earliest local date
-        const queryEnd = endStr;
+        // Pad query range by 1 day on each side to avoid missing orders
+        // near timezone boundaries. Use processed_at (matches Shopify Analytics).
+        // NO "Z" suffix — Shopify interprets bare ISO dates in the store's timezone.
+        const padStart = new Date(new Date(startStr + "T12:00:00Z").getTime() - 86_400_000)
+          .toISOString().split("T")[0];
+        const padEnd = new Date(new Date(endStr + "T12:00:00Z").getTime() + 86_400_000)
+          .toISOString().split("T")[0];
 
         // Paginate through all Shopify orders in the date range
+        // Use processed_at_min/max — this is the date Shopify Analytics uses
         let pageUrl: string | null =
           `https://${shopify.shopifyDomain}/admin/api/2024-01/orders.json` +
-          `?status=any&created_at_min=${queryStart}T00:00:00Z&created_at_max=${queryEnd}T23:59:59Z&limit=250`;
+          `?status=any&processed_at_min=${padStart}&processed_at_max=${padEnd}T23:59:59&limit=250`;
 
         while (pageUrl) {
           const ordersRes: Response = await fetch(pageUrl, {
@@ -109,13 +117,26 @@ export async function POST(request: Request) {
           const orders = ordersData.orders || [];
 
           for (const order of orders) {
-            // Convert order timestamp to the store's LOCAL date (not UTC)
-            // e.g. an order at 2024-11-26T22:00:00Z → Nov 27 in Melbourne (UTC+11)
-            const orderDt = new Date(order.created_at);
-            if (isNaN(orderDt.getTime())) continue;
-            // en-CA locale gives YYYY-MM-DD format
-            const date = orderDt.toLocaleDateString("en-CA", { timeZone: storeTimezone });
+            // Use processed_at for date attribution (matches Shopify Analytics).
+            // Shopify REST API returns timestamps in the store's timezone with
+            // offset, e.g. "2024-12-29T15:30:00+11:00". The date part before
+            // "T" is already the correct local date — just extract it directly.
+            const ts = order.processed_at || order.created_at;
+            if (!ts) continue;
+
+            // Extract the date portion directly from the ISO string.
+            // For "2024-12-29T15:30:00+11:00", this gives "2024-12-29".
+            const date = ts.split("T")[0];
             if (!dailyData.has(date)) continue;
+
+            orderCount++;
+            if (!sampleOrder) {
+              sampleOrder = {
+                created_at: order.created_at,
+                processed_at: order.processed_at,
+                bucketedDate: date,
+              };
+            }
 
             const bucket = dailyData.get(date)!;
             const totalPrice = parseFloat(order.total_price || "0");
@@ -293,7 +314,9 @@ export async function POST(request: Request) {
       synced: rows.length,
       dateRange: { start: startStr, end: endStr },
       timezone: storeTimezone,
-      message: `Synced ${rows.length} days of profit data (tz: ${storeTimezone})`,
+      orderCount,
+      sampleOrder,
+      message: `Synced ${rows.length} days of profit data (tz: ${storeTimezone}, ${orderCount} orders)`,
     });
   } catch (err) {
     console.error("Profit sync error:", err);
