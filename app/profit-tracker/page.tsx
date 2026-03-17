@@ -318,14 +318,15 @@ export default function ProfitTrackerPage() {
       const result = await triggerProfitSync(user.id, storeId, daysToSync, selectedAccounts);
       if (result.error) {
         setSyncError(result.error);
-      } else {
-        // synced === -1 means the request timed out but server may have written data
-        await loadData();
-        setLastSynced(new Date());
       }
+      // Always reload data — even on timeout (synced === -1), server may have written data
+      await loadData();
+      setLastSynced(new Date());
     } catch (err) {
       setSyncError("Sync failed — check your connections and try again.");
       console.error("Profit sync error:", err);
+      // Still try to reload — partial data may have been written
+      try { await loadData(); } catch { /* ignore reload errors */ }
     } finally {
       setSyncing(false);
     }

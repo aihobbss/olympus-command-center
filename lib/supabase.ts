@@ -26,5 +26,8 @@ export async function authFetch(url: string, init?: RequestInit): Promise<Respon
   if (session?.access_token) {
     headers.set("Authorization", `Bearer ${session.access_token}`);
   }
-  return fetch(url, { ...init, headers });
+  // Default 30s timeout prevents hung fetches from blocking the connection pool
+  // and leaving loading spinners stuck. Callers can override with their own signal.
+  const signal = init?.signal ?? AbortSignal.timeout(30_000);
+  return fetch(url, { ...init, headers, signal });
 }

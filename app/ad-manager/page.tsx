@@ -283,14 +283,18 @@ export default function AdManagerPage() {
         triggerMetaSync(user.id, storeId, DATE_PRESET[period]),
         triggerProfitSync(user.id, storeId, syncDays),
       ]);
-      // Check Meta result for errors
+      // Check Meta result for errors (but not timeouts — server may have written data)
       if (results[0].status === "fulfilled" && results[0].value.error) {
         setSyncError(results[0].value.error);
+      } else if (results[0].status === "rejected") {
+        setSyncError("Meta sync failed — check your connection");
       }
-      // Reload data from Supabase
+      // Always reload data from Supabase — even on timeout, server may have written data
       await loadData(period);
     } catch {
       setSyncError("Sync failed — check your connections in Settings");
+      // Still try to reload — partial data may have been written
+      try { await loadData(period); } catch { /* ignore reload errors */ }
     } finally {
       setSyncing(false);
     }

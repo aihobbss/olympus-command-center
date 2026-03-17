@@ -89,19 +89,34 @@ export async function triggerMetaSync(
   storeId: string,
   datePreset?: string
 ): Promise<{ synced: number; error?: string }> {
-  const res = await authFetch("/api/sync-meta-campaigns", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, storeId, datePreset }),
-  });
+  // 30s timeout — Meta syncs can be slow but shouldn't block indefinitely
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
 
-  const data = await res.json();
+  try {
+    const res = await authFetch("/api/sync-meta-campaigns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, storeId, datePreset }),
+      signal: controller.signal,
+    });
 
-  if (!res.ok) {
-    return { synced: 0, error: data.error || "Sync failed" };
+    clearTimeout(timeout);
+    const data = await res.json();
+
+    if (!res.ok) {
+      return { synced: 0, error: data.error || "Sync failed" };
+    }
+
+    return { synced: data.synced };
+  } catch (err) {
+    clearTimeout(timeout);
+    // If the request timed out, the server may still have written data
+    if (err instanceof DOMException && err.name === "AbortError") {
+      return { synced: -1 }; // signal to caller: data may exist, reload
+    }
+    throw err;
   }
-
-  return { synced: data.synced };
 }
 
 // ── Campaign actions (calls API route) ────────────────────
