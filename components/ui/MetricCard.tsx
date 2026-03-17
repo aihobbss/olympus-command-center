@@ -14,6 +14,7 @@ export interface MetricCardProps {
   currency?: string;
   subtitle?: string;
   className?: string;
+  valueClassName?: string;
   onClick?: () => void;
 }
 
@@ -58,6 +59,7 @@ export function MetricCard({
   currency = "$",
   subtitle,
   className,
+  valueClassName,
   onClick,
 }: MetricCardProps) {
   const [display, setDisplay] = useState(0);
@@ -82,7 +84,7 @@ export function MetricCard({
       </div>
       <div className="flex items-end justify-between gap-3">
         <div className="flex flex-col">
-          <span className="text-[26px] font-jetbrains font-semibold text-text-primary leading-none tracking-tight">
+          <span className={cn("text-[26px] font-jetbrains font-semibold text-text-primary leading-none tracking-tight", valueClassName)}>
             {formatDisplay(display, format, currency)}
           </span>
           {subtitle && (

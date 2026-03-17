@@ -305,10 +305,10 @@ export async function POST(request: Request) {
       const profitUsd = revenueUsd - cogUsd - adSpendUsd - transactionFeeUsd;
       // ROAS
       const roas = adSpendUsd > 0 ? parseFloat((revenueUsd / adSpendUsd).toFixed(2)) : 0;
-      // Profit %
-      const profitPercent = revenueUsd > 0
+      // Profit % — always compute when there's any cost, even if revenue is 0
+      const profitPercent = revenueUsd !== 0
         ? parseFloat(((profitUsd / revenueUsd) * 100).toFixed(1))
-        : 0;
+        : profitUsd < 0 ? -100.0 : 0;
 
       rows.push({
         store_id: storeId,

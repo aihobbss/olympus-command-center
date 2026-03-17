@@ -219,7 +219,10 @@ export default function ProfitTrackerPage() {
     }
     const roas =
       adSpend > 0 ? parseFloat((revenue / adSpend).toFixed(2)) : 0;
-    return { revenue, adSpend, cog, profit, roas };
+    const profitPercent = revenue !== 0
+      ? parseFloat(((profit / revenue) * 100).toFixed(1))
+      : profit < 0 ? -100.0 : 0;
+    return { revenue, adSpend, cog, profit, roas, profitPercent };
   }, [filteredLogs]);
 
   // ── Month-filtered logs (feeds table) ──
@@ -248,8 +251,9 @@ export default function ProfitTrackerPage() {
     }
     const roas =
       adSpend > 0 ? parseFloat((revenue / adSpend).toFixed(2)) : 0;
-    const profitPercent =
-      revenue > 0 ? parseFloat(((profit / revenue) * 100).toFixed(1)) : 0;
+    const profitPercent = revenue !== 0
+      ? parseFloat(((profit / revenue) * 100).toFixed(1))
+      : profit < 0 ? -100.0 : 0;
     return { revenue, cog, adSpend, transactionFee, profit, roas, profitPercent };
   }, [monthLogs]);
 
@@ -735,7 +739,7 @@ export default function ProfitTrackerPage() {
       <>
 
       {/* ─── Metric Cards ─── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-2">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-2">
         <MetricCard
           label="Total Revenue"
           value={swappedCards.has("revenue") ? Math.round(totals.revenue) : Math.round(usdToLocal(totals.revenue))}
@@ -779,6 +783,12 @@ export default function ProfitTrackerPage() {
             : `${fmtCurrency(Math.round(usdToLocal(totals.profit)), storeCurrency)} ${currencyCode}`
           }
           onClick={() => toggleCard("profit")}
+        />
+        <MetricCard
+          label="Profit %"
+          value={totals.profitPercent}
+          format="percent"
+          valueClassName={totals.profitPercent > 0 ? "text-accent-emerald" : totals.profitPercent < 0 ? "text-accent-red" : undefined}
         />
         <MetricCard
           label="Blended ROAS"
@@ -954,9 +964,11 @@ export default function ProfitTrackerPage() {
                     <td
                       className={cn(
                         "px-4 py-3 text-right font-jetbrains font-medium tabular-nums",
-                        log.profitPercent >= 0
+                        log.profitPercent > 0
                           ? "text-accent-emerald"
-                          : "text-accent-red"
+                          : log.profitPercent < 0
+                          ? "text-accent-red"
+                          : "text-text-secondary"
                       )}
                     >
                       {log.profitPercent > 0 ? "+" : ""}
@@ -1002,9 +1014,11 @@ export default function ProfitTrackerPage() {
                   <td
                     className={cn(
                       "px-4 py-3 text-right font-jetbrains font-semibold tabular-nums",
-                      monthTotals.profitPercent >= 0
+                      monthTotals.profitPercent > 0
                         ? "text-accent-emerald"
-                        : "text-accent-red"
+                        : monthTotals.profitPercent < 0
+                        ? "text-accent-red"
+                        : "text-text-secondary"
                     )}
                   >
                     {monthTotals.profitPercent > 0 ? "+" : ""}
