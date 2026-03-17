@@ -94,9 +94,18 @@ export async function POST(request: Request) {
       {
         try {
           // Paginate through all Shopify orders in the date range
+          // Pad query window by ±1 day in UTC to capture all orders that
+          // could fall within the store's local-date range.  The toLocalDate
+          // bucketing below already assigns each order to its correct local
+          // date, and orders outside the bucket range are safely skipped.
+          const fetchStartMs = new Date(startStr + "T00:00:00Z").getTime() - 86_400_000;
+          const fetchEndMs   = new Date(endStr   + "T23:59:59Z").getTime() + 86_400_000;
+          const fetchMin = new Date(fetchStartMs).toISOString();
+          const fetchMax = new Date(fetchEndMs).toISOString();
+
           let pageUrl: string | null =
             `https://${shopify.shopifyDomain}/admin/api/2024-01/orders.json` +
-            `?status=any&created_at_min=${startStr}T00:00:00Z&created_at_max=${endStr}T23:59:59Z&limit=250`;
+            `?status=any&created_at_min=${fetchMin}&created_at_max=${fetchMax}&limit=250`;
 
           while (pageUrl) {
             const ordersRes: Response = await fetch(pageUrl, {
