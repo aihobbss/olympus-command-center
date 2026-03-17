@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   TrendingUp,
@@ -10,6 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Upload,
+  X,
 } from "lucide-react";
 import { MetricCard, TimePeriodSelector, EmptyState } from "@/components/ui";
 import type { TimePeriod } from "@/components/ui";
@@ -30,6 +32,8 @@ import {
   upsertCog,
   triggerProfitSync,
   getLastProfitSync,
+  updateProfitLogFields,
+  uploadProfitLogsCsv,
 } from "@/lib/services/profit-tracker";
 import { fetchLiveCampaigns } from "@/lib/services/meta-campaigns";
 
@@ -125,6 +129,17 @@ export default function ProfitTrackerPage() {
   const [profitLogs, setProfitLogs] = useState<ProfitLog[]>([]);
   const [liveCampaigns, setLiveCampaigns] = useState<AdCampaign[]>([]);
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  // CSV export/import state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState("");
+  const [exportEndDate, setExportEndDate] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Inline editing state
+  const [editingCell, setEditingCell] = useState<{ date: string; field: "cog" | "adSpend" } | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const storeCurrency = selectedStore?.currency ?? "";
   const ptRate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
@@ -341,17 +356,40 @@ export default function ProfitTrackerPage() {
     }
   }, [storeId]);
 
-  // ── CSV export ──
+  // ── Date range for CSV export ──
 
-  const handleExportCsv = useCallback(() => {
+  const dateRange = useMemo(() => {
+    if (storeProfitLogs.length === 0) return { min: "", max: "" };
+    const dates = storeProfitLogs.map((l) => l.date).sort();
+    return { min: dates[0], max: dates[dates.length - 1] };
+  }, [storeProfitLogs]);
+
+  const openExportModal = useCallback(() => {
+    setExportStartDate(dateRange.min);
+    setExportEndDate(dateRange.max);
+    setShowExportModal(true);
+  }, [dateRange]);
+
+  // ── CSV export with date range ──
+
+  const handleExportWithRange = useCallback(() => {
     if (storeProfitLogs.length === 0) return;
-    const headers = ["Date", "Revenue", "COG", "Ad Spend", "Transaction Fee", "Profit", "ROAS", "Profit %"];
-    const rows = storeProfitLogs.map((log) => [
+    let logsToExport = storeProfitLogs;
+    if (exportStartDate && exportEndDate) {
+      logsToExport = storeProfitLogs.filter(
+        (log) => log.date >= exportStartDate && log.date <= exportEndDate
+      );
+    }
+    if (logsToExport.length === 0) return;
+
+    const headers = ["Date", "Revenue (USD)", "COG", "Ad Spend", "Transaction Fee", "Orders", "Profit", "ROAS", "Profit %"];
+    const rows = logsToExport.map((log) => [
       log.date,
       log.revenue,
       log.cog,
       log.adSpend,
       log.transactionFee,
+      log.orders ?? 0,
       log.profit,
       log.roas,
       log.profitPercent,
@@ -361,10 +399,128 @@ export default function ProfitTrackerPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `profit-tracker-${selectedStore?.name?.replace(/\s+/g, "-").toLowerCase() || "store"}-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `profit-tracker-${selectedStore?.name?.replace(/\s+/g, "-").toLowerCase() || "store"}-${exportStartDate}-to-${exportEndDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [storeProfitLogs, selectedStore]);
+    setShowExportModal(false);
+  }, [storeProfitLogs, exportStartDate, exportEndDate, selectedStore]);
+
+  // ── CSV import ──
+
+  const handleImportCsv = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !storeId) return;
+      setUploading(true);
+      setSyncError(null);
+
+      try {
+        const text = await file.text();
+        const lines = text.trim().split("\n");
+        if (lines.length < 2) {
+          setSyncError("CSV file is empty or has no data rows.");
+          return;
+        }
+
+        const logs: Array<{
+          date: string;
+          revenue: number;
+          cog: number;
+          adSpend: number;
+          transactionFee: number;
+          orders: number;
+        }> = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(",").map((v) => v.trim());
+          if (values.length < 6) continue;
+
+          const date = values[0]; // YYYY-MM-DD
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+
+          logs.push({
+            date,
+            revenue: parseFloat(values[1]) || 0,
+            cog: parseFloat(values[2]) || 0,
+            adSpend: parseFloat(values[3]) || 0,
+            transactionFee: parseFloat(values[4]) || 0,
+            orders: parseInt(values[5]) || 0,
+          });
+        }
+
+        if (logs.length === 0) {
+          setSyncError("No valid rows found in CSV.");
+          return;
+        }
+
+        const result = await uploadProfitLogsCsv(storeId, logs);
+        if (result.success > 0) {
+          await loadData();
+        } else {
+          setSyncError("Failed to upload CSV data.");
+        }
+      } catch (err) {
+        console.error("CSV import error:", err);
+        setSyncError("Failed to parse CSV file.");
+      } finally {
+        setUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    },
+    [storeId, loadData]
+  );
+
+  // ── Inline cell editing ──
+
+  const startEditing = useCallback(
+    (date: string, field: "cog" | "adSpend", currentValue: number) => {
+      setEditingCell({ date, field });
+      setEditValue(currentValue.toFixed(2));
+    },
+    []
+  );
+
+  const handleCellSave = useCallback(async () => {
+    if (!editingCell) return;
+    const { date, field } = editingCell;
+    const newValue = parseFloat(editValue);
+    if (isNaN(newValue) || newValue < 0) {
+      setEditingCell(null);
+      return;
+    }
+
+    // Optimistic local update
+    setProfitLogs((prev) =>
+      prev.map((log) => {
+        if (log.date !== date) return log;
+        const updated = { ...log };
+        if (field === "cog") updated.cog = newValue;
+        if (field === "adSpend") updated.adSpend = newValue;
+        updated.profit = updated.revenue - updated.cog - updated.adSpend - updated.transactionFee;
+        updated.roas = updated.adSpend > 0 ? parseFloat((updated.revenue / updated.adSpend).toFixed(2)) : 0;
+        updated.profitPercent = updated.revenue > 0
+          ? parseFloat(((updated.profit / updated.revenue) * 100).toFixed(1))
+          : 0;
+        return updated;
+      })
+    );
+
+    setEditingCell(null);
+
+    // Persist to DB
+    const fields: { cog_usd?: number; ad_spend_usd?: number } = {};
+    if (field === "cog") fields.cog_usd = newValue;
+    if (field === "adSpend") fields.ad_spend_usd = newValue;
+    await updateProfitLogFields(storeId, date, fields);
+  }, [editingCell, editValue, storeId]);
+
+  const handleCellKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") handleCellSave();
+      if (e.key === "Escape") setEditingCell(null);
+    },
+    [handleCellSave]
+  );
 
   // ── Last synced label ──
 
@@ -472,13 +628,30 @@ export default function ProfitTrackerPage() {
             )}
           </button>
           {hasData && (
-            <button
-              onClick={handleExportCsv}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary bg-white/[0.04] hover:bg-white/[0.08] border border-subtle transition-all duration-200"
-            >
-              <Download size={13} />
-              CSV
-            </button>
+            <>
+              <button
+                onClick={openExportModal}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary bg-white/[0.04] hover:bg-white/[0.08] border border-subtle transition-all duration-200"
+              >
+                <Download size={13} />
+                Export CSV
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary bg-white/[0.04] hover:bg-white/[0.08] border border-subtle transition-all duration-200"
+              >
+                {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                Import CSV
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleImportCsv}
+              />
+            </>
           )}
         </div>
       </div>
@@ -626,11 +799,49 @@ export default function ProfitTrackerPage() {
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
                       {fmtCurrency(log.revenue, "$", 2)}
                     </td>
-                    <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
-                      {fmtCurrency(log.cog, "$", 2)}
+                    <td
+                      className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums cursor-pointer hover:bg-white/[0.03]"
+                      onClick={() => startEditing(log.date, "cog", log.cog)}
+                    >
+                      {editingCell?.date === log.date && editingCell?.field === "cog" ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={handleCellSave}
+                          onKeyDown={handleCellKeyDown}
+                          autoFocus
+                          className="w-24 bg-bg-elevated border border-accent-indigo/50 rounded px-2 py-0.5 text-right text-sm font-jetbrains text-text-primary outline-none focus:ring-1 focus:ring-accent-indigo/50"
+                        />
+                      ) : (
+                        <span className="hover:text-accent-indigo transition-colors">
+                          {fmtCurrency(log.cog, "$", 2)}
+                        </span>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
-                      {fmtCurrency(log.adSpend, "$", 2)}
+                    <td
+                      className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums cursor-pointer hover:bg-white/[0.03]"
+                      onClick={() => startEditing(log.date, "adSpend", log.adSpend)}
+                    >
+                      {editingCell?.date === log.date && editingCell?.field === "adSpend" ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={handleCellSave}
+                          onKeyDown={handleCellKeyDown}
+                          autoFocus
+                          className="w-24 bg-bg-elevated border border-accent-indigo/50 rounded px-2 py-0.5 text-right text-sm font-jetbrains text-text-primary outline-none focus:ring-1 focus:ring-accent-indigo/50"
+                        />
+                      ) : (
+                        <span className="hover:text-accent-indigo transition-colors">
+                          {fmtCurrency(log.adSpend, "$", 2)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
                       {fmtCurrency(log.transactionFee, "$", 2)}
@@ -781,6 +992,66 @@ export default function ProfitTrackerPage() {
         </div>
       )}
       </>
+      )}
+
+      {/* ─── Export CSV Modal ─── */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-bg-card border border-subtle rounded-xl p-6 w-full max-w-sm shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-syne font-semibold text-text-primary text-lg">Export CSV</h3>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-text-secondary mb-1.5 block font-medium">Start Date</label>
+                <input
+                  type="date"
+                  value={exportStartDate}
+                  min={dateRange.min}
+                  max={dateRange.max}
+                  onChange={(e) => setExportStartDate(e.target.value)}
+                  className="w-full bg-bg-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:ring-1 focus:ring-accent-indigo/50 focus:border-accent-indigo/50"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-text-secondary mb-1.5 block font-medium">End Date</label>
+                <input
+                  type="date"
+                  value={exportEndDate}
+                  min={dateRange.min}
+                  max={dateRange.max}
+                  onChange={(e) => setExportEndDate(e.target.value)}
+                  className="w-full bg-bg-elevated border border-subtle rounded-lg px-3 py-2 text-sm text-text-primary outline-none focus:ring-1 focus:ring-accent-indigo/50 focus:border-accent-indigo/50"
+                />
+              </div>
+              <p className="text-[11px] text-text-muted">
+                {(() => {
+                  const count = storeProfitLogs.filter(
+                    (l) => l.date >= exportStartDate && l.date <= exportEndDate
+                  ).length;
+                  return `${count} day${count !== 1 ? "s" : ""} selected`;
+                })()}
+              </p>
+              <button
+                onClick={handleExportWithRange}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-accent-indigo hover:bg-accent-indigo/80 text-white shadow-lg shadow-accent-indigo/20 transition-all duration-200"
+              >
+                <Download size={14} />
+                Download CSV
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );

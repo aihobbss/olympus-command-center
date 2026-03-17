@@ -166,6 +166,109 @@ export async function triggerProfitSync(
   }
 }
 
+// ── Inline editing (single field update + recompute) ────
+
+export async function updateProfitLogFields(
+  storeId: string,
+  date: string,
+  fields: { cog_usd?: number; ad_spend_usd?: number }
+): Promise<ProfitLog | null> {
+  const { data: row, error: fetchErr } = await supabase
+    .from("profit_logs")
+    .select(LOG_COLS)
+    .eq("store_id", storeId)
+    .eq("date", date)
+    .single();
+
+  if (fetchErr || !row) {
+    console.error("Failed to fetch profit log for update:", fetchErr?.message);
+    return null;
+  }
+
+  const revenue = row.revenue_usd;
+  const cog = fields.cog_usd ?? row.cog_usd;
+  const adSpend = fields.ad_spend_usd ?? row.ad_spend_usd;
+  const txnFee = row.transaction_fee_usd;
+  const profit = revenue - cog - adSpend - txnFee;
+  const roas = adSpend > 0 ? parseFloat((revenue / adSpend).toFixed(2)) : 0;
+  const profitPercent = revenue > 0
+    ? parseFloat(((profit / revenue) * 100).toFixed(1))
+    : 0;
+
+  const updateData: Record<string, number> = {
+    profit_usd: Math.round(profit * 100) / 100,
+    roas,
+    profit_percent: profitPercent,
+  };
+  if (fields.cog_usd !== undefined) updateData.cog_usd = Math.round(fields.cog_usd * 100) / 100;
+  if (fields.ad_spend_usd !== undefined) updateData.ad_spend_usd = Math.round(fields.ad_spend_usd * 100) / 100;
+
+  const { error: updateErr } = await supabase
+    .from("profit_logs")
+    .update(updateData)
+    .eq("store_id", storeId)
+    .eq("date", date);
+
+  if (updateErr) {
+    console.error("Failed to update profit log:", updateErr.message);
+    return null;
+  }
+
+  return rowToLog({
+    ...row,
+    ...updateData,
+    cog_usd: updateData.cog_usd ?? row.cog_usd,
+    ad_spend_usd: updateData.ad_spend_usd ?? row.ad_spend_usd,
+  } as ProfitLogRow);
+}
+
+// ── CSV upload (bulk upsert) ────────────────────────────
+
+export async function uploadProfitLogsCsv(
+  storeId: string,
+  logs: Array<{
+    date: string;
+    revenue: number;
+    cog: number;
+    adSpend: number;
+    transactionFee: number;
+    orders: number;
+  }>
+): Promise<{ success: number; failed: number }> {
+  const rows = logs.map((log) => {
+    const profit = log.revenue - log.cog - log.adSpend - log.transactionFee;
+    const roas = log.adSpend > 0 ? parseFloat((log.revenue / log.adSpend).toFixed(2)) : 0;
+    const profitPercent = log.revenue > 0
+      ? parseFloat(((profit / log.revenue) * 100).toFixed(1))
+      : 0;
+
+    return {
+      store_id: storeId,
+      date: log.date,
+      revenue_usd: Math.round(log.revenue * 100) / 100,
+      cog_usd: Math.round(log.cog * 100) / 100,
+      ad_spend_usd: Math.round(log.adSpend * 100) / 100,
+      transaction_fee_usd: Math.round(log.transactionFee * 100) / 100,
+      profit_usd: Math.round(profit * 100) / 100,
+      roas,
+      profit_percent: profitPercent,
+      orders: log.orders,
+      synced_from: "csv_upload",
+    };
+  });
+
+  const { error } = await supabase
+    .from("profit_logs")
+    .upsert(rows, { onConflict: "store_id,date" });
+
+  if (error) {
+    console.error("Failed to upload profit logs:", error.message);
+    return { success: 0, failed: rows.length };
+  }
+
+  return { success: rows.length, failed: 0 };
+}
+
 export async function getLastProfitSync(storeId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from("profit_logs")

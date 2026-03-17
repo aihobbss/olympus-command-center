@@ -230,6 +230,21 @@ export async function POST(request: Request) {
 
     // ── 4. Compute daily P&L and upsert ─────────────────────
 
+    // Fetch existing COG values so syncs never overwrite user-entered COG
+    const { data: existingLogs } = await supabaseAdmin
+      .from("profit_logs")
+      .select("date, cog_usd")
+      .eq("store_id", storeId)
+      .gte("date", startStr)
+      .lte("date", endStr);
+
+    const existingCogMap = new Map<string, number>();
+    if (existingLogs) {
+      for (const log of existingLogs) {
+        existingCogMap.set(log.date, log.cog_usd);
+      }
+    }
+
     const rows = [];
     for (const [date, bucket] of Array.from(dailyData.entries())) {
       // Skip days with no data
@@ -239,8 +254,10 @@ export async function POST(request: Request) {
       const revenueUsd = bucket.revenue * exchangeRate;
       // Ad spend is already in USD (Meta reports in account currency, usually USD)
       const adSpendUsd = bucket.adSpend;
-      // COG estimate
-      const cogUsd = bucket.orders * avgCogPerOrder;
+      // Preserve user-entered COG for existing rows; only estimate for new rows
+      const cogUsd = existingCogMap.has(date)
+        ? existingCogMap.get(date)!
+        : bucket.orders * avgCogPerOrder;
       // Transaction fee: 2.9% + $0.30 per order
       const transactionFeeUsd = revenueUsd * 0.029 + bucket.orders * 0.3;
       // Profit
