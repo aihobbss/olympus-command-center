@@ -382,8 +382,11 @@ export default function ProfitTrackerPage() {
     }
     if (logsToExport.length === 0) return;
 
+    // Sort oldest → newest for the CSV
+    const sorted = [...logsToExport].sort((a, b) => a.date.localeCompare(b.date));
+
     const headers = ["Date", "Revenue (USD)", "COG", "Ad Spend", "Transaction Fee", "Orders", "Profit", "ROAS", "Profit %"];
-    const rows = logsToExport.map((log) => [
+    const rows = sorted.map((log) => [
       `"${log.date}"`,
       log.revenue,
       log.cog,
