@@ -39,7 +39,8 @@ import { fetchLiveCampaigns } from "@/lib/services/meta-campaigns";
 
 // ─── Constants ──────────────────────────────────────────────
 
-const STORE_TO_USD: Record<string, number> = { UK: 1.27, AU: 0.63 };
+// Static fallback rates — only used if Frankfurter API is unreachable
+const FALLBACK_RATES: Record<string, number> = { UK: 1.27, AU: 0.63 };
 
 type View = "store-logs" | "per-ad";
 
@@ -153,12 +154,59 @@ export default function ProfitTrackerPage() {
   }, []);
 
   const storeCurrency = selectedStore?.currency ?? "";
-  const ptRate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
-  const currencyCode = selectedStore?.market === "UK" ? "GBP" : "AUD";
+  const fallbackRate = FALLBACK_RATES[selectedStore?.market ?? ""] ?? 1;
+  const currencyCode = selectedStore?.market === "UK" ? "GBP" : selectedStore?.market === "AU" ? "AUD" : "USD";
+
+  // ── Live exchange rates from Frankfurter (ECB data) ──
+  // Keyed by date (YYYY-MM-DD) → USD-to-local rate (i.e. 1/rate_to_usd)
+  const [fxRates, setFxRates] = useState<Map<string, number>>(new Map());
+  const fxFetchedRef = useRef<string>("");
+
+  // Fetch historical rates when logs change
+  useEffect(() => {
+    if (profitLogs.length === 0 || currencyCode === "USD") return;
+    const dates = profitLogs.map((l) => l.date).sort();
+    const minDate = dates[0];
+    const maxDate = dates[dates.length - 1];
+    const cacheKey = `${currencyCode}:${minDate}:${maxDate}`;
+    if (fxFetchedRef.current === cacheKey) return;
+    fxFetchedRef.current = cacheKey;
+
+    fetch(`https://api.frankfurter.app/${minDate}..${maxDate}?from=${currencyCode}&to=USD`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data?.rates) return;
+        const map = new Map<string, number>();
+        for (const [date, currencies] of Object.entries(data.rates)) {
+          const toUsd = (currencies as Record<string, number>).USD;
+          // We need USD→local, so invert the rate
+          if (toUsd && toUsd > 0) map.set(date, 1 / toUsd);
+        }
+        setFxRates(map);
+      })
+      .catch(() => { /* silent — fallback rate used */ });
+  }, [profitLogs, currencyCode]);
+
   // DB stores everything in USD — convert back to local for display
+  // Uses per-day historical rate, falling back to nearest available or static rate
   const usdToLocal = useCallback(
-    (usdAmount: number) => ptRate > 0 ? usdAmount / ptRate : usdAmount,
-    [ptRate]
+    (usdAmount: number, date?: string) => {
+      if (currencyCode === "USD") return usdAmount;
+      if (date && fxRates.has(date)) return usdAmount * fxRates.get(date)!;
+      // Fall back to closest preceding date
+      if (date && fxRates.size > 0) {
+        const sorted = Array.from(fxRates.keys()).sort();
+        let closest = 1 / fallbackRate;
+        for (const d of sorted) {
+          if (d <= date) closest = fxRates.get(d)!;
+          else break;
+        }
+        return usdAmount * closest;
+      }
+      // Final fallback: static rate
+      return fallbackRate > 0 ? usdAmount / fallbackRate : usdAmount;
+    },
+    [fxRates, fallbackRate, currencyCode]
   );
 
   const storeId = selectedStore?.id ?? "";
@@ -205,25 +253,35 @@ export default function ProfitTrackerPage() {
   }, [period, storeProfitLogs]);
 
   // ── Aggregated totals (from filtered logs) ──
+  // USD totals for P&L calculations + local currency totals for display
 
   const totals = useMemo(() => {
     let revenue = 0,
       adSpend = 0,
       cog = 0,
-      profit = 0;
+      profit = 0,
+      revenueLocal = 0,
+      adSpendLocal = 0,
+      cogLocal = 0,
+      profitLocal = 0;
     for (const log of filteredLogs) {
       revenue += log.revenue;
       adSpend += log.adSpend;
       cog += log.cog;
       profit += log.profit;
+      revenueLocal += usdToLocal(log.revenue, log.date);
+      adSpendLocal += usdToLocal(log.adSpend, log.date);
+      cogLocal += usdToLocal(log.cog, log.date);
+      profitLocal += usdToLocal(log.profit, log.date);
     }
     const roas =
       adSpend > 0 ? parseFloat((revenue / adSpend).toFixed(2)) : 0;
     const profitPercent = revenue !== 0
       ? parseFloat(((profit / revenue) * 100).toFixed(1))
       : profit < 0 ? -100.0 : 0;
-    return { revenue, adSpend, cog, profit, roas, profitPercent };
-  }, [filteredLogs]);
+    return { revenue, adSpend, cog, profit, roas, profitPercent,
+             revenueLocal, adSpendLocal, cogLocal, profitLocal };
+  }, [filteredLogs, usdToLocal]);
 
   // ── Month-filtered logs (feeds table) ──
 
@@ -241,21 +299,23 @@ export default function ProfitTrackerPage() {
       cog = 0,
       adSpend = 0,
       transactionFee = 0,
-      profit = 0;
+      profit = 0,
+      revenueLocal = 0;
     for (const log of monthLogs) {
       revenue += log.revenue;
       cog += log.cog;
       adSpend += log.adSpend;
       transactionFee += log.transactionFee;
       profit += log.profit;
+      revenueLocal += usdToLocal(log.revenue, log.date);
     }
     const roas =
       adSpend > 0 ? parseFloat((revenue / adSpend).toFixed(2)) : 0;
     const profitPercent = revenue !== 0
       ? parseFloat(((profit / revenue) * 100).toFixed(1))
       : profit < 0 ? -100.0 : 0;
-    return { revenue, cog, adSpend, transactionFee, profit, roas, profitPercent };
-  }, [monthLogs]);
+    return { revenue, cog, adSpend, transactionFee, profit, roas, profitPercent, revenueLocal };
+  }, [monthLogs, usdToLocal]);
 
   const monthLabel = tableMonth.toLocaleDateString("en-GB", {
     month: "long",
@@ -742,45 +802,45 @@ export default function ProfitTrackerPage() {
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-2">
         <MetricCard
           label="Total Revenue"
-          value={swappedCards.has("revenue") ? Math.round(totals.revenue) : Math.round(usdToLocal(totals.revenue))}
+          value={swappedCards.has("revenue") ? Math.round(totals.revenue) : Math.round(totals.revenueLocal)}
           format="currency"
           currency={swappedCards.has("revenue") ? "$" : storeCurrency}
           subtitle={swappedCards.has("revenue")
-            ? `${fmtCurrency(Math.round(usdToLocal(totals.revenue)), storeCurrency)} ${currencyCode}`
+            ? `${fmtCurrency(Math.round(totals.revenueLocal), storeCurrency)} ${currencyCode}`
             : `$${Math.round(totals.revenue).toLocaleString("en-GB")} USD`
           }
           onClick={() => toggleCard("revenue")}
         />
         <MetricCard
           label="Total Ad Spend"
-          value={swappedCards.has("adSpend") ? Math.round(usdToLocal(totals.adSpend)) : Math.round(totals.adSpend)}
+          value={swappedCards.has("adSpend") ? Math.round(totals.adSpendLocal) : Math.round(totals.adSpend)}
           format="currency"
           currency={swappedCards.has("adSpend") ? storeCurrency : "$"}
           subtitle={swappedCards.has("adSpend")
             ? `$${Math.round(totals.adSpend).toLocaleString("en-GB")} USD`
-            : `${fmtCurrency(Math.round(usdToLocal(totals.adSpend)), storeCurrency)} ${currencyCode}`
+            : `${fmtCurrency(Math.round(totals.adSpendLocal), storeCurrency)} ${currencyCode}`
           }
           onClick={() => toggleCard("adSpend")}
         />
         <MetricCard
           label="Total COG"
-          value={swappedCards.has("cog") ? Math.round(usdToLocal(totals.cog)) : Math.round(totals.cog)}
+          value={swappedCards.has("cog") ? Math.round(totals.cogLocal) : Math.round(totals.cog)}
           format="currency"
           currency={swappedCards.has("cog") ? storeCurrency : "$"}
           subtitle={swappedCards.has("cog")
             ? `$${Math.round(totals.cog).toLocaleString("en-GB")} USD`
-            : `${fmtCurrency(Math.round(usdToLocal(totals.cog)), storeCurrency)} ${currencyCode}`
+            : `${fmtCurrency(Math.round(totals.cogLocal), storeCurrency)} ${currencyCode}`
           }
           onClick={() => toggleCard("cog")}
         />
         <MetricCard
           label="Net Profit"
-          value={swappedCards.has("profit") ? Math.round(usdToLocal(totals.profit)) : Math.round(totals.profit)}
+          value={swappedCards.has("profit") ? Math.round(totals.profitLocal) : Math.round(totals.profit)}
           format="currency"
           currency={swappedCards.has("profit") ? storeCurrency : "$"}
           subtitle={swappedCards.has("profit")
             ? `$${Math.round(totals.profit).toLocaleString("en-GB")} USD`
-            : `${fmtCurrency(Math.round(usdToLocal(totals.profit)), storeCurrency)} ${currencyCode}`
+            : `${fmtCurrency(Math.round(totals.profitLocal), storeCurrency)} ${currencyCode}`
           }
           onClick={() => toggleCard("profit")}
         />
@@ -800,8 +860,7 @@ export default function ProfitTrackerPage() {
       {/* Currency rate note + status */}
       <div className="flex items-center justify-between mb-6 pl-1">
         <p className="text-[10px] text-text-muted">
-          Displaying in {currencyCode} ({storeCurrency}) · {storeCurrency}1 ≈ $
-          {ptRate.toFixed(2)} USD
+          Displaying in {currencyCode} ({storeCurrency}) · Daily ECB exchange rates{fxRates.size > 0 ? ` (${fxRates.size} days loaded)` : ""}
         </p>
         <div className="flex items-center gap-3 text-[10px]">
           {syncError && (
@@ -850,8 +909,8 @@ export default function ProfitTrackerPage() {
             <ProfitChart
               logs={filteredLogs.map((log) => ({
                 ...log,
-                revenue: usdToLocal(log.revenue),
-                profit: usdToLocal(log.profit),
+                revenue: usdToLocal(log.revenue, log.date),
+                profit: usdToLocal(log.profit, log.date),
               }))}
               currency={storeCurrency}
               title={chartTitle}
@@ -896,7 +955,7 @@ export default function ProfitTrackerPage() {
                       {fmtDate(log.date)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
-                      {fmtCurrency(usdToLocal(log.revenue), storeCurrency, 2)}
+                      {fmtCurrency(usdToLocal(log.revenue, log.date), storeCurrency, 2)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
                       {fmtCurrency(log.revenue, "$", 2)}
@@ -984,7 +1043,7 @@ export default function ProfitTrackerPage() {
                     {monthLabel} Total
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
-                    {fmtCurrency(usdToLocal(monthTotals.revenue), storeCurrency, 2)}
+                    {fmtCurrency(monthTotals.revenueLocal, storeCurrency, 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
                     {fmtCurrency(monthTotals.revenue, "$", 2)}
