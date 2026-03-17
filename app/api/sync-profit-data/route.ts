@@ -56,7 +56,8 @@ export async function POST(request: Request) {
       .eq("id", storeId)
       .single();
 
-    const exchangeRate = store?.exchange_rate_to_usd || 1.0;
+    const storeCurrency = store?.currency || "USD";
+    const fallbackRate = store?.exchange_rate_to_usd || 1.0;
     // Will be set from Shopify store timezone if available, else fallback
     let storeTimezone = MARKET_TIMEZONE[store?.market ?? ""] || "UTC";
 
@@ -265,7 +266,45 @@ export async function POST(request: Request) {
       avgCogPerOrder = totalCog / cogRows.length;
     }
 
-    // ── 4. Compute daily P&L and upsert ─────────────────────
+    // ── 4. Fetch historical exchange rates ──────────────────
+
+    // Use Frankfurter API (free, ECB data) for accurate daily rates.
+    // Returns a map of date → rate (store currency to USD).
+    const dailyRates = new Map<string, number>();
+    if (storeCurrency !== "USD") {
+      try {
+        const rateUrl =
+          `https://api.frankfurter.app/${startStr}..${endStr}?from=${storeCurrency}&to=USD`;
+        const rateRes = await fetch(rateUrl);
+        if (rateRes.ok) {
+          const rateData = await rateRes.json();
+          const rates = rateData.rates || {};
+          for (const [date, currencies] of Object.entries(rates)) {
+            const usdRate = (currencies as Record<string, number>).USD;
+            if (usdRate) dailyRates.set(date, usdRate);
+          }
+        }
+      } catch (err) {
+        console.error("Exchange rate fetch error:", err);
+      }
+    }
+
+    // Helper: get the exchange rate for a given date, falling back to nearest
+    // available rate (weekends/holidays have no ECB data), then store default.
+    const getRateForDate = (date: string): number => {
+      if (storeCurrency === "USD") return 1.0;
+      if (dailyRates.has(date)) return dailyRates.get(date)!;
+      // Fall back to the closest preceding date with a rate
+      const sorted = Array.from(dailyRates.keys()).sort();
+      let closest = fallbackRate;
+      for (const d of sorted) {
+        if (d <= date) closest = dailyRates.get(d)!;
+        else break;
+      }
+      return closest;
+    };
+
+    // ── 5. Compute daily P&L and upsert ─────────────────────
 
     // Fetch existing COG values so syncs never overwrite user-entered COG
     const { data: existingLogs } = await supabaseAdmin
@@ -291,8 +330,8 @@ export async function POST(request: Request) {
       // Net revenue = gross sales - returns (refund line items processed on this date)
       // This matches Shopify's "total_sales" report definition.
       const netRevenue = bucket.revenue - bucket.returns;
-      // Revenue comes in store currency, convert to USD
-      const revenueUsd = netRevenue * exchangeRate;
+      // Revenue comes in store currency, convert to USD using that day's rate
+      const revenueUsd = netRevenue * getRateForDate(date);
       // Ad spend is already in USD (Meta reports in account currency, usually USD)
       const adSpendUsd = bucket.adSpend;
       // Preserve user-entered COG for existing rows; only estimate for new rows
