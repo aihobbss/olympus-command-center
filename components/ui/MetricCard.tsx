@@ -14,6 +14,7 @@ export interface MetricCardProps {
   currency?: string;
   subtitle?: string;
   className?: string;
+  onClick?: () => void;
 }
 
 function formatDisplay(
@@ -57,6 +58,7 @@ export function MetricCard({
   currency = "$",
   subtitle,
   className,
+  onClick,
 }: MetricCardProps) {
   const [display, setDisplay] = useState(0);
   const prev = useRef(0);
@@ -74,7 +76,7 @@ export function MetricCard({
   }, [value]);
 
   return (
-    <div className={cn("card p-5", className)}>
+    <div className={cn("card p-5", onClick && "cursor-pointer", className)} onClick={onClick}>
       <div className="text-[11px] text-text-secondary font-medium uppercase tracking-wider mb-3">
         {label}
       </div>

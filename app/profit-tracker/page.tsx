@@ -141,6 +141,10 @@ export default function ProfitTrackerPage() {
   const [editingCell, setEditingCell] = useState<{ date: string; field: "cog" | "adSpend" } | null>(null);
   const [editValue, setEditValue] = useState("");
 
+  // Currency display toggle: false = default layout, true = swapped
+  const [currencySwapped, setCurrencySwapped] = useState(false);
+  const toggleCurrency = useCallback(() => setCurrencySwapped((p) => !p), []);
+
   const storeCurrency = selectedStore?.currency ?? "";
   const ptRate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
   const currencyCode = selectedStore?.market === "UK" ? "GBP" : "AUD";
@@ -727,31 +731,47 @@ export default function ProfitTrackerPage() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-2">
         <MetricCard
           label="Total Revenue"
-          value={Math.round(usdToLocal(totals.revenue))}
+          value={currencySwapped ? Math.round(totals.revenue) : Math.round(usdToLocal(totals.revenue))}
           format="currency"
-          currency={storeCurrency}
-          subtitle={`$${Math.round(totals.revenue).toLocaleString("en-GB")} USD`}
+          currency={currencySwapped ? "$" : storeCurrency}
+          subtitle={currencySwapped
+            ? `${fmtCurrency(Math.round(usdToLocal(totals.revenue)), storeCurrency)} ${currencyCode}`
+            : `$${Math.round(totals.revenue).toLocaleString("en-GB")} USD`
+          }
+          onClick={toggleCurrency}
         />
         <MetricCard
           label="Total Ad Spend"
-          value={Math.round(totals.adSpend)}
+          value={currencySwapped ? Math.round(usdToLocal(totals.adSpend)) : Math.round(totals.adSpend)}
           format="currency"
-          currency="$"
-          subtitle={`${fmtCurrency(Math.round(usdToLocal(totals.adSpend)), storeCurrency)} ${currencyCode}`}
+          currency={currencySwapped ? storeCurrency : "$"}
+          subtitle={currencySwapped
+            ? `$${Math.round(totals.adSpend).toLocaleString("en-GB")} USD`
+            : `${fmtCurrency(Math.round(usdToLocal(totals.adSpend)), storeCurrency)} ${currencyCode}`
+          }
+          onClick={toggleCurrency}
         />
         <MetricCard
           label="Total COG"
-          value={Math.round(totals.cog)}
+          value={currencySwapped ? Math.round(usdToLocal(totals.cog)) : Math.round(totals.cog)}
           format="currency"
-          currency="$"
-          subtitle={`${fmtCurrency(Math.round(usdToLocal(totals.cog)), storeCurrency)} ${currencyCode}`}
+          currency={currencySwapped ? storeCurrency : "$"}
+          subtitle={currencySwapped
+            ? `$${Math.round(totals.cog).toLocaleString("en-GB")} USD`
+            : `${fmtCurrency(Math.round(usdToLocal(totals.cog)), storeCurrency)} ${currencyCode}`
+          }
+          onClick={toggleCurrency}
         />
         <MetricCard
           label="Net Profit"
-          value={Math.round(totals.profit)}
+          value={currencySwapped ? Math.round(usdToLocal(totals.profit)) : Math.round(totals.profit)}
           format="currency"
-          currency="$"
-          subtitle={`${fmtCurrency(Math.round(usdToLocal(totals.profit)), storeCurrency)} ${currencyCode}`}
+          currency={currencySwapped ? storeCurrency : "$"}
+          subtitle={currencySwapped
+            ? `$${Math.round(totals.profit).toLocaleString("en-GB")} USD`
+            : `${fmtCurrency(Math.round(usdToLocal(totals.profit)), storeCurrency)} ${currencyCode}`
+          }
+          onClick={toggleCurrency}
         />
         <MetricCard
           label="Blended ROAS"
