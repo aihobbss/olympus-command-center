@@ -445,19 +445,34 @@ export default function ProfitTrackerPage() {
           return;
         }
 
-        // Helper: parse YYYY-MM-DD, D/M/YYYY, M/D/YYYY, DD/MM/YYYY, etc.
+        // Auto-detect date format: scan all dates to figure out MM/DD vs DD/MM
+        // If any first-position value > 12, format must be DD/MM (day first)
+        // If any second-position value > 12, format must be MM/DD (month first)
+        // Default to MM/DD (Excel's default output format)
+        let dayFirst = false;
+        for (let i = 1; i < lines.length; i++) {
+          const vals = lines[i].split(",").map((v) => v.trim());
+          const raw = (vals[colIdx.date] ?? "").replace(/"/g, "").trim();
+          const m = raw.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+          if (m) {
+            const a = parseInt(m[1]), b = parseInt(m[2]);
+            if (a > 12) { dayFirst = true; break; }
+            if (b > 12) { dayFirst = false; break; }
+          }
+        }
+
+        // Helper: parse YYYY-MM-DD, or M/D/YYYY / D/M/YYYY (auto-detected)
         const parseDate = (raw: string): string | null => {
           const clean = raw.replace(/"/g, "").trim();
           // Already YYYY-MM-DD
           if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
-          // Try D/M/YYYY or DD/MM/YYYY (AU locale — day first)
+          // Slash/dot/dash separated: A/B/YYYY
           const slashMatch = clean.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
           if (slashMatch) {
             const [, a, b, year] = slashMatch;
-            // Assume DD/MM/YYYY (AU locale)
-            const day = a.padStart(2, "0");
-            const month = b.padStart(2, "0");
-            if (parseInt(month) >= 1 && parseInt(month) <= 12) {
+            const month = dayFirst ? b.padStart(2, "0") : a.padStart(2, "0");
+            const day = dayFirst ? a.padStart(2, "0") : b.padStart(2, "0");
+            if (parseInt(month) >= 1 && parseInt(month) <= 12 && parseInt(day) >= 1 && parseInt(day) <= 31) {
               return `${year}-${month}-${day}`;
             }
           }
