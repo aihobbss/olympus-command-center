@@ -420,13 +420,49 @@ export default function ProfitTrackerPage() {
 
       try {
         const raw = await file.text();
-        // Strip BOM if present
-        const text = raw.replace(/^\ufeff/, "");
-        const lines = text.trim().split("\n");
+        // Strip BOM if present, normalize line endings
+        const text = raw.replace(/^\ufeff/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        const lines = text.trim().split("\n").filter((l) => l.trim().length > 0);
         if (lines.length < 2) {
           setSyncError("CSV file is empty or has no data rows.");
           return;
         }
+
+        // Parse headers to find column indices (handles reordering / extra columns)
+        const headerCells = lines[0].split(",").map((h) => h.trim().replace(/"/g, "").toLowerCase());
+        const colIdx = {
+          date: headerCells.findIndex((h) => h === "date"),
+          revenue: headerCells.findIndex((h) => h.includes("revenue")),
+          cog: headerCells.findIndex((h) => h === "cog"),
+          adSpend: headerCells.findIndex((h) => h.includes("ad spend")),
+          txnFee: headerCells.findIndex((h) => h.includes("transaction")),
+          orders: headerCells.findIndex((h) => h === "orders"),
+        };
+
+        // Date column is required
+        if (colIdx.date === -1) {
+          setSyncError("CSV missing required 'Date' column header.");
+          return;
+        }
+
+        // Helper: parse YYYY-MM-DD, D/M/YYYY, M/D/YYYY, DD/MM/YYYY, etc.
+        const parseDate = (raw: string): string | null => {
+          const clean = raw.replace(/"/g, "").trim();
+          // Already YYYY-MM-DD
+          if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+          // Try D/M/YYYY or DD/MM/YYYY (AU locale — day first)
+          const slashMatch = clean.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+          if (slashMatch) {
+            const [, a, b, year] = slashMatch;
+            // Assume DD/MM/YYYY (AU locale)
+            const day = a.padStart(2, "0");
+            const month = b.padStart(2, "0");
+            if (parseInt(month) >= 1 && parseInt(month) <= 12) {
+              return `${year}-${month}-${day}`;
+            }
+          }
+          return null;
+        };
 
         const logs: Array<{
           date: string;
@@ -439,23 +475,22 @@ export default function ProfitTrackerPage() {
 
         for (let i = 1; i < lines.length; i++) {
           const values = lines[i].split(",").map((v) => v.trim());
-          if (values.length < 6) continue;
 
-          const date = values[0].replace(/"/g, ""); // Strip quotes if present
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+          const date = parseDate(values[colIdx.date] ?? "");
+          if (!date) continue;
 
           logs.push({
             date,
-            revenue: parseFloat(values[1]) || 0,
-            cog: parseFloat(values[2]) || 0,
-            adSpend: parseFloat(values[3]) || 0,
-            transactionFee: parseFloat(values[4]) || 0,
-            orders: parseInt(values[5]) || 0,
+            revenue: colIdx.revenue !== -1 ? parseFloat(values[colIdx.revenue]) || 0 : 0,
+            cog: colIdx.cog !== -1 ? parseFloat(values[colIdx.cog]) || 0 : 0,
+            adSpend: colIdx.adSpend !== -1 ? parseFloat(values[colIdx.adSpend]) || 0 : 0,
+            transactionFee: colIdx.txnFee !== -1 ? parseFloat(values[colIdx.txnFee]) || 0 : 0,
+            orders: colIdx.orders !== -1 ? parseInt(values[colIdx.orders]) || 0 : 0,
           });
         }
 
         if (logs.length === 0) {
-          setSyncError("No valid rows found in CSV.");
+          setSyncError(`No valid rows found. Check that the CSV has a "Date" column with dates in YYYY-MM-DD or DD/MM/YYYY format.`);
           return;
         }
 
