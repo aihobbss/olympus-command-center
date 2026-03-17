@@ -198,15 +198,17 @@ export default function ProfitTrackerPage() {
   const totals = useMemo(() => {
     let revenue = 0,
       adSpend = 0,
+      cog = 0,
       profit = 0;
     for (const log of filteredLogs) {
       revenue += log.revenue;
       adSpend += log.adSpend;
+      cog += log.cog;
       profit += log.profit;
     }
     const roas =
       adSpend > 0 ? parseFloat((revenue / adSpend).toFixed(2)) : 0;
-    return { revenue, adSpend, profit, roas };
+    return { revenue, adSpend, cog, profit, roas };
   }, [filteredLogs]);
 
   // ── Month-filtered logs (feeds table) ──
@@ -722,7 +724,7 @@ export default function ProfitTrackerPage() {
       <>
 
       {/* ─── Metric Cards ─── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-2">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-2">
         <MetricCard
           label="Total Revenue"
           value={Math.round(usdToLocal(totals.revenue))}
@@ -736,6 +738,13 @@ export default function ProfitTrackerPage() {
           format="currency"
           currency="$"
           subtitle={`${fmtCurrency(Math.round(usdToLocal(totals.adSpend)), storeCurrency)} ${currencyCode}`}
+        />
+        <MetricCard
+          label="Total COG"
+          value={Math.round(totals.cog)}
+          format="currency"
+          currency="$"
+          subtitle={`${fmtCurrency(Math.round(usdToLocal(totals.cog)), storeCurrency)} ${currencyCode}`}
         />
         <MetricCard
           label="Net Profit"
