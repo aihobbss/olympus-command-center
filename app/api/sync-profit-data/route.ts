@@ -7,9 +7,9 @@ import { getShopifyToken } from "@/lib/shopify-token";
 
 const META_API = "https://graph.facebook.com/v19.0";
 
-// Map store market to IANA timezone for correct local-date extraction
+// Fallback timezone map — only used if Shopify store timezone can't be fetched
 const MARKET_TIMEZONE: Record<string, string> = {
-  AU: "Australia/Melbourne",
+  AU: "Australia/Perth",
   UK: "Europe/London",
   US: "America/New_York",
 };
@@ -17,6 +17,7 @@ const MARKET_TIMEZONE: Record<string, string> = {
 type DailyBucket = {
   revenue: number;
   orders: number;
+  returns: number;
   adSpend: number;
 };
 
@@ -56,7 +57,8 @@ export async function POST(request: Request) {
       .single();
 
     const exchangeRate = store?.exchange_rate_to_usd || 1.0;
-    const storeTimezone = MARKET_TIMEZONE[store?.market ?? ""] || "UTC";
+    // Will be set from Shopify store timezone if available, else fallback
+    let storeTimezone = MARKET_TIMEZONE[store?.market ?? ""] || "UTC";
 
     // Helper: extract YYYY-MM-DD in the store's local timezone from any ISO timestamp
     const toLocalDate = (isoTimestamp: string): string => {
@@ -67,9 +69,9 @@ export async function POST(request: Request) {
 
     // Compute date range in the store's local timezone
     const now = new Date();
-    const endStr = toLocalDate(now.toISOString());
+    let endStr = toLocalDate(now.toISOString());
     const startMs = now.getTime() - days * 86_400_000;
-    const startStr = toLocalDate(new Date(startMs).toISOString());
+    let startStr = toLocalDate(new Date(startMs).toISOString());
 
     // Initialize daily buckets using store-local dates
     const dailyData = new Map<string, DailyBucket>();
@@ -80,7 +82,7 @@ export async function POST(request: Request) {
       while (d.getTime() <= endMs) {
         const localDate = toLocalDate(d.toISOString());
         if (!dailyData.has(localDate)) {
-          dailyData.set(localDate, { revenue: 0, orders: 0, adSpend: 0 });
+          dailyData.set(localDate, { revenue: 0, orders: 0, returns: 0, adSpend: 0 });
         }
         d.setTime(d.getTime() + 86_400_000);
       }
@@ -91,67 +93,93 @@ export async function POST(request: Request) {
     const shopify = await getShopifyToken(verifiedUserId, storeId);
 
     if (shopify) {
-      {
-        try {
-          // Paginate through all Shopify orders in the date range
-          // Pad query window by ±1 day in UTC to capture all orders that
-          // could fall within the store's local-date range.  The toLocalDate
-          // bucketing below already assigns each order to its correct local
-          // date, and orders outside the bucket range are safely skipped.
-          const fetchStartMs = new Date(startStr + "T00:00:00Z").getTime() - 86_400_000;
-          const fetchEndMs   = new Date(endStr   + "T23:59:59Z").getTime() + 86_400_000;
-          const fetchMin = new Date(fetchStartMs).toISOString();
-          const fetchMax = new Date(fetchEndMs).toISOString();
+      try {
+        // ── 1a. Fetch the Shopify store's actual IANA timezone ──
+        // This ensures dates match Shopify's own reports exactly.
+        const shopRes = await fetch(
+          `https://${shopify.shopifyDomain}/admin/api/2024-01/shop.json`,
+          { headers: { "X-Shopify-Access-Token": shopify.accessToken } }
+        );
+        if (shopRes.ok) {
+          const shopData = await shopRes.json();
+          if (shopData.shop?.iana_timezone) {
+            storeTimezone = shopData.shop.iana_timezone;
+            // Re-initialize buckets and date range with the correct timezone
+            dailyData.clear();
+            endStr = toLocalDate(now.toISOString());
+            startStr = toLocalDate(new Date(startMs).toISOString());
+            const d = new Date(startMs);
+            const endMs = now.getTime() + 86_400_000;
+            while (d.getTime() <= endMs) {
+              const localDate = toLocalDate(d.toISOString());
+              if (!dailyData.has(localDate)) {
+                dailyData.set(localDate, { revenue: 0, orders: 0, returns: 0, adSpend: 0 });
+              }
+              d.setTime(d.getTime() + 86_400_000);
+            }
+          }
+        }
 
-          let pageUrl: string | null =
-            `https://${shopify.shopifyDomain}/admin/api/2024-01/orders.json` +
-            `?status=any&created_at_min=${fetchMin}&created_at_max=${fetchMax}&limit=250`;
+        // ── 1b. Fetch orders — pad query window ±1 day for timezone safety ──
+        const fetchStartMs = new Date(startStr + "T00:00:00Z").getTime() - 86_400_000;
+        const fetchEndMs   = new Date(endStr   + "T23:59:59Z").getTime() + 86_400_000;
+        const fetchMin = new Date(fetchStartMs).toISOString();
+        const fetchMax = new Date(fetchEndMs).toISOString();
 
-          while (pageUrl) {
-            const ordersRes: Response = await fetch(pageUrl, {
-              headers: {
-                "X-Shopify-Access-Token": shopify.accessToken,
-                "Content-Type": "application/json",
-              },
-            });
+        let pageUrl: string | null =
+          `https://${shopify.shopifyDomain}/admin/api/2024-01/orders.json` +
+          `?status=any&created_at_min=${fetchMin}&created_at_max=${fetchMax}&limit=250`;
 
-            if (!ordersRes.ok) break;
+        while (pageUrl) {
+          const ordersRes: Response = await fetch(pageUrl, {
+            headers: {
+              "X-Shopify-Access-Token": shopify.accessToken,
+              "Content-Type": "application/json",
+            },
+          });
 
-            const ordersData = await ordersRes.json();
-            const orders = ordersData.orders || [];
+          if (!ordersRes.ok) break;
 
-            for (const order of orders) {
-              if (!order.created_at) continue;
-              const date = toLocalDate(order.created_at);
-              if (!dailyData.has(date)) continue;
+          const ordersData = await ordersRes.json();
+          const orders = ordersData.orders || [];
 
-              const bucket = dailyData.get(date)!;
-              const totalPrice = parseFloat(order.total_price || "0");
+          for (const order of orders) {
+            if (!order.created_at) continue;
+            const date = toLocalDate(order.created_at);
+            if (!dailyData.has(date)) continue;
 
-              // Subtract refunds for accurate net revenue
-              let refundTotal = 0;
-              if (order.refunds && Array.isArray(order.refunds)) {
-                for (const refund of order.refunds) {
-                  if (refund.transactions && Array.isArray(refund.transactions)) {
-                    for (const txn of refund.transactions) {
-                      refundTotal += parseFloat(txn.amount || "0");
-                    }
+            const bucket = dailyData.get(date)!;
+            // Gross revenue — do NOT subtract refunds here.
+            // Shopify reports attribute returns to the refund processing
+            // date, not the original order date.
+            bucket.revenue += parseFloat(order.total_price || "0");
+            bucket.orders += 1;
+
+            // Attribute refund line-item subtotals to the DATE the refund
+            // was processed (matches Shopify's "total_sales" report).
+            if (order.refunds && Array.isArray(order.refunds)) {
+              for (const refund of order.refunds) {
+                if (!refund.created_at) continue;
+                const refundDate = toLocalDate(refund.created_at);
+                if (!dailyData.has(refundDate)) continue;
+
+                const refundBucket = dailyData.get(refundDate)!;
+                if (refund.refund_line_items && Array.isArray(refund.refund_line_items)) {
+                  for (const rli of refund.refund_line_items) {
+                    refundBucket.returns += parseFloat(rli.subtotal || "0");
                   }
                 }
               }
-
-              bucket.revenue += totalPrice - refundTotal;
-              bucket.orders += 1;
             }
-
-            // Check for next page via Link header
-            const linkHeader = ordersRes.headers.get("link") || "";
-            const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
-            pageUrl = nextMatch ? nextMatch[1] : null;
           }
-        } catch (err) {
-          console.error("Shopify orders fetch error:", err);
+
+          // Check for next page via Link header
+          const linkHeader = ordersRes.headers.get("link") || "";
+          const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+          pageUrl = nextMatch ? nextMatch[1] : null;
         }
+      } catch (err) {
+        console.error("Shopify orders fetch error:", err);
       }
     }
 
@@ -257,10 +285,14 @@ export async function POST(request: Request) {
     const rows = [];
     for (const [date, bucket] of Array.from(dailyData.entries())) {
       // Skip days with no data
-      if (bucket.revenue === 0 && bucket.adSpend === 0 && bucket.orders === 0) continue;
+      if (bucket.revenue === 0 && bucket.adSpend === 0 && bucket.orders === 0
+          && bucket.returns === 0) continue;
 
+      // Net revenue = gross sales - returns (refund line items processed on this date)
+      // This matches Shopify's "total_sales" report definition.
+      const netRevenue = bucket.revenue - bucket.returns;
       // Revenue comes in store currency, convert to USD
-      const revenueUsd = bucket.revenue * exchangeRate;
+      const revenueUsd = netRevenue * exchangeRate;
       // Ad spend is already in USD (Meta reports in account currency, usually USD)
       const adSpendUsd = bucket.adSpend;
       // Preserve user-entered COG for existing rows; only estimate for new rows
