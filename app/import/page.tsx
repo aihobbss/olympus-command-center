@@ -61,10 +61,16 @@ export default function ImportPage() {
     // Use custom domain (public-facing) for store links, fall back to shopify domain
     const storeDomain = selectedStore?.customDomain || selectedStore?.shopifyDomain;
 
-    // Mark research products as Imported + create product_copies entries
-    for (const p of queuedProducts) {
-      updateSheetProduct(p.id, { testingStatus: "Imported" });
+    // Snapshot the current queue so state changes mid-loop don't affect iteration
+    const productsToImport = [...queuedProducts];
 
+    // Mark ALL research products as Imported first (optimistic batch update)
+    for (const p of productsToImport) {
+      updateSheetProduct(p.id, { testingStatus: "Imported" });
+    }
+
+    // Then create product_copies entries for each
+    for (const p of productsToImport) {
       // Convert competitor URL to our store URL (same product slug)
       let storeUrl = p.storeLink;
       if (storeDomain && p.storeLink) {
@@ -76,15 +82,19 @@ export default function ImportPage() {
         }
       }
 
-      await createProductCopy(
-        storeId,
-        {
-          productName: p.productName,
-          productUrl: storeUrl,
-          imageUrl: p.creativeUrls[0] ?? "",
-        },
-        p.id // Link back to research product for pricing lookup
-      );
+      try {
+        await createProductCopy(
+          storeId,
+          {
+            productName: p.productName,
+            productUrl: storeUrl,
+            imageUrl: p.creativeUrls[0] ?? "",
+          },
+          p.id // Link back to research product for pricing lookup
+        );
+      } catch (err) {
+        console.error("Failed to create product copy for", p.productName, err);
+      }
     }
     // Reload product copies so Product Creation page picks them up
     useProductCopyStore.getState().loadProducts(storeId);
