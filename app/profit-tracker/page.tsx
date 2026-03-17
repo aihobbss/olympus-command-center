@@ -384,7 +384,7 @@ export default function ProfitTrackerPage() {
 
     const headers = ["Date", "Revenue (USD)", "COG", "Ad Spend", "Transaction Fee", "Orders", "Profit", "ROAS", "Profit %"];
     const rows = logsToExport.map((log) => [
-      log.date,
+      `"${log.date}"`,
       log.revenue,
       log.cog,
       log.adSpend,
@@ -395,7 +395,8 @@ export default function ProfitTrackerPage() {
       log.profitPercent,
     ]);
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    // BOM (\ufeff) ensures Excel opens the file with correct UTF-8 encoding
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -415,7 +416,9 @@ export default function ProfitTrackerPage() {
       setSyncError(null);
 
       try {
-        const text = await file.text();
+        const raw = await file.text();
+        // Strip BOM if present
+        const text = raw.replace(/^\ufeff/, "");
         const lines = text.trim().split("\n");
         if (lines.length < 2) {
           setSyncError("CSV file is empty or has no data rows.");
@@ -435,7 +438,7 @@ export default function ProfitTrackerPage() {
           const values = lines[i].split(",").map((v) => v.trim());
           if (values.length < 6) continue;
 
-          const date = values[0]; // YYYY-MM-DD
+          const date = values[0].replace(/"/g, ""); // Strip quotes if present
           if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
 
           logs.push({
