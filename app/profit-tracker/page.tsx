@@ -167,6 +167,60 @@ export default function ProfitTrackerPage() {
     [fallbackRate, currencyCode]
   );
 
+  // ── Monthly average exchange rates (store currency → USD) for Revenue USD column ──
+  const [monthlyRates, setMonthlyRates] = useState<Map<string, number>>(new Map());
+  const monthlyRatesFetchedRef = useRef<string>("");
+
+  useEffect(() => {
+    if (profitLogs.length === 0 || currencyCode === "USD") return;
+    const dates = profitLogs.map((l) => l.date).sort();
+    const cacheKey = `${currencyCode}:${dates[0]}:${dates[dates.length - 1]}`;
+    if (monthlyRatesFetchedRef.current === cacheKey) return;
+    monthlyRatesFetchedRef.current = cacheKey;
+
+    // Collect unique months
+    const months = new Set<string>();
+    for (const d of dates) months.add(d.slice(0, 7));
+
+    // Fetch monthly averages from Frankfurter
+    Promise.all(
+      Array.from(months).map(async (ym) => {
+        const [y, m] = ym.split("-").map(Number);
+        const lastDay = new Date(y, m, 0).getDate();
+        try {
+          const res = await fetch(
+            `https://api.frankfurter.app/${ym}-01..${ym}-${String(lastDay).padStart(2, "0")}?from=${currencyCode}&to=USD`
+          );
+          if (!res.ok) return null;
+          const data = await res.json();
+          const rates = data.rates || {};
+          const values = Object.values(rates)
+            .map((r) => (r as Record<string, number>).USD)
+            .filter(Boolean);
+          if (values.length === 0) return null;
+          const avg = values.reduce((a, b) => a + b, 0) / values.length;
+          return [ym, avg] as [string, number];
+        } catch { return null; }
+      })
+    ).then((results) => {
+      const map = new Map<string, number>();
+      for (const r of results) {
+        if (r) map.set(r[0], r[1]);
+      }
+      setMonthlyRates(map);
+    });
+  }, [profitLogs, currencyCode]);
+
+  // Convert store currency to USD using monthly average
+  const toUsdMonthly = useCallback(
+    (localAmount: number, date: string) => {
+      if (currencyCode === "USD") return localAmount;
+      const rate = monthlyRates.get(date.slice(0, 7));
+      return rate ? localAmount * rate : localAmount * fallbackRate;
+    },
+    [monthlyRates, fallbackRate, currencyCode]
+  );
+
   const storeId = selectedStore?.id ?? "";
 
   // ── Load real data from Supabase ──
@@ -409,10 +463,11 @@ export default function ProfitTrackerPage() {
     // Sort oldest → newest for the CSV
     const sorted = [...logsToExport].sort((a, b) => a.date.localeCompare(b.date));
 
-    const headers = ["Date", `Revenue (${currencyCode})`, "COG", "Ad Spend", "Transaction Fee", "Orders", "Profit", "ROAS", "Profit %"];
+    const headers = ["Date", `Revenue (${currencyCode})`, "Revenue (USD)", "COG", "Ad Spend", "Transaction Fee", "Orders", "Profit", "ROAS", "Profit %"];
     const rows = sorted.map((log) => [
       `"${log.date}"`,
       log.revenue,
+      toUsdMonthly(log.revenue, log.date).toFixed(2),
       log.cog,
       log.adSpend,
       log.transactionFee,
@@ -867,7 +922,8 @@ export default function ProfitTrackerPage() {
                 <tr className="border-b border-subtle">
                   {[
                     "Date",
-                    "Revenue",
+                    `Revenue (${currencyCode})`,
+                    "Revenue (USD)",
                     "COG",
                     "Ad Spend",
                     "Transaction",
@@ -898,6 +954,9 @@ export default function ProfitTrackerPage() {
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
                       {fmtCurrency(log.revenue, storeCurrency, 2)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
+                      {fmtCurrency(toUsdMonthly(log.revenue, log.date), "$", 2)}
                     </td>
                     <td
                       className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums cursor-pointer hover:bg-white/[0.03]"
@@ -983,6 +1042,9 @@ export default function ProfitTrackerPage() {
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
                     {fmtCurrency(monthTotals.revenue, storeCurrency, 2)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
+                    {fmtCurrency(monthLogs.reduce((sum, l) => sum + toUsdMonthly(l.revenue, l.date), 0), "$", 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
                     {fmtCurrency(monthTotals.cog, storeCurrency, 2)}
