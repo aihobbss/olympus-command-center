@@ -3,7 +3,8 @@ import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
 import { getShopifyToken } from "@/lib/shopify-token";
 
 // Profit Data Sync — pulls Shopify orders + Meta ad spend, computes daily P&L
-// Writes daily rows to profit_logs table (all values in USD)
+// All values stored in the STORE'S CURRENCY (e.g. AUD, GBP).
+// Column names still say "_usd" (legacy) but values are in store currency.
 
 const META_API = "https://graph.facebook.com/v19.0";
 
@@ -18,7 +19,7 @@ type DailyBucket = {
   revenue: number;
   orders: number;
   returns: number;
-  adSpend: number;
+  adSpend: number; // Meta ad spend in USD — converted to store currency before storing
 };
 
 export async function POST(request: Request) {
@@ -150,9 +151,7 @@ export async function POST(request: Request) {
             if (!dailyData.has(date)) continue;
 
             const bucket = dailyData.get(date)!;
-            // Gross revenue — do NOT subtract refunds here.
-            // Shopify reports attribute returns to the refund processing
-            // date, not the original order date.
+            // Revenue in store currency (AUD/GBP) — stored as-is, no conversion.
             bucket.revenue += parseFloat(order.total_price || "0");
             bucket.orders += 1;
 
@@ -243,6 +242,8 @@ export async function POST(request: Request) {
               if (!date || !dailyData.has(date)) continue;
 
               const bucket = dailyData.get(date)!;
+              // Ad spend is in USD from Meta — stored as USD for now,
+              // converted to store currency below using monthly average.
               bucket.adSpend += parseFloat(insight.spend || "0");
             }
           }
@@ -266,45 +267,62 @@ export async function POST(request: Request) {
       avgCogPerOrder = totalCog / cogRows.length;
     }
 
-    // ── 4. Fetch historical exchange rates ──────────────────
+    // ── 4. Fetch monthly average exchange rates (USD → store currency) ──
+    // Only needed to convert Meta ad spend (USD) into store currency.
+    // Uses monthly averages — close enough and avoids daily rate complexity.
 
-    // Use Frankfurter API (free, ECB data) for accurate daily rates.
-    // Returns a map of date → rate (store currency to USD).
-    const dailyRates = new Map<string, number>();
+    const monthlyUsdToLocal = new Map<string, number>(); // "YYYY-MM" → rate
     if (storeCurrency !== "USD") {
       try {
-        const rateUrl =
-          `https://api.frankfurter.app/${startStr}..${endStr}?from=${storeCurrency}&to=USD`;
-        const rateRes = await fetch(rateUrl);
-        if (rateRes.ok) {
-          const rateData = await rateRes.json();
-          const rates = rateData.rates || {};
-          for (const [date, currencies] of Object.entries(rates)) {
-            const usdRate = (currencies as Record<string, number>).USD;
-            if (usdRate) dailyRates.set(date, usdRate);
-          }
+        // Collect unique months from the data
+        const months = new Set<string>();
+        for (const [date] of Array.from(dailyData.entries())) {
+          months.add(date.slice(0, 7)); // "YYYY-MM"
         }
+
+        // Fetch one rate per month (use 1st of each month)
+        await Promise.all(
+          Array.from(months).map(async (ym) => {
+            // Use the first and last day of the month to get an average
+            const [y, m] = ym.split("-").map(Number);
+            const lastDay = new Date(y, m, 0).getDate(); // last day of month
+            const from = `${ym}-01`;
+            const to = `${ym}-${String(lastDay).padStart(2, "0")}`;
+            try {
+              const res = await fetch(
+                `https://api.frankfurter.app/${from}..${to}?from=USD&to=${storeCurrency}`
+              );
+              if (res.ok) {
+                const data = await res.json();
+                const rates = data.rates || {};
+                const values = Object.values(rates).map(
+                  (r) => (r as Record<string, number>)[storeCurrency]
+                ).filter(Boolean);
+                if (values.length > 0) {
+                  const avg = values.reduce((a, b) => a + b, 0) / values.length;
+                  monthlyUsdToLocal.set(ym, avg);
+                }
+              }
+            } catch { /* skip month */ }
+          })
+        );
       } catch (err) {
-        console.error("Exchange rate fetch error:", err);
+        console.error("Monthly exchange rate fetch error:", err);
       }
     }
 
-    // Helper: get the exchange rate for a given date, falling back to nearest
-    // available rate (weekends/holidays have no ECB data), then store default.
-    const getRateForDate = (date: string): number => {
-      if (storeCurrency === "USD") return 1.0;
-      if (dailyRates.has(date)) return dailyRates.get(date)!;
-      // Fall back to the closest preceding date with a rate
-      const sorted = Array.from(dailyRates.keys()).sort();
-      let closest = fallbackRate;
-      for (const d of sorted) {
-        if (d <= date) closest = dailyRates.get(d)!;
-        else break;
-      }
-      return closest;
+    // Helper: convert USD to store currency using monthly average
+    const usdToStoreCurrency = (usdAmount: number, date: string): number => {
+      if (storeCurrency === "USD") return usdAmount;
+      const ym = date.slice(0, 7);
+      const rate = monthlyUsdToLocal.get(ym);
+      if (rate) return usdAmount * rate;
+      // Fallback: use inverse of store's static rate
+      return fallbackRate > 0 ? usdAmount / fallbackRate : usdAmount;
     };
 
     // ── 5. Compute daily P&L and upsert ─────────────────────
+    // ALL values stored in store currency (AUD/GBP/USD).
 
     // Fetch existing COG values so syncs never overwrite user-entered COG
     const { data: existingLogs } = await supabaseAdmin
@@ -327,36 +345,40 @@ export async function POST(request: Request) {
       if (bucket.revenue === 0 && bucket.adSpend === 0 && bucket.orders === 0
           && bucket.returns === 0) continue;
 
-      // Net revenue = gross sales - returns (refund line items processed on this date)
-      // This matches Shopify's "total_sales" report definition.
+      // Net revenue in store currency — exactly what Shopify reports show.
       const netRevenue = bucket.revenue - bucket.returns;
-      // Revenue comes in store currency, convert to USD using that day's rate
-      const revenueUsd = netRevenue * getRateForDate(date);
-      // Ad spend is already in USD (Meta reports in account currency, usually USD)
-      const adSpendUsd = bucket.adSpend;
-      // Preserve user-entered COG for existing rows; only estimate for new rows
-      const cogUsd = existingCogMap.has(date)
+
+      // Convert Meta ad spend from USD to store currency
+      const adSpendLocal = usdToStoreCurrency(bucket.adSpend, date);
+
+      // COG: preserve user-entered value, or estimate from avg
+      const cogLocal = existingCogMap.has(date)
         ? existingCogMap.get(date)!
-        : bucket.orders * avgCogPerOrder;
-      // Transaction fee: 2.9% + $0.30 per order
-      const transactionFeeUsd = revenueUsd * 0.029 + bucket.orders * 0.3;
-      // Profit
-      const profitUsd = revenueUsd - cogUsd - adSpendUsd - transactionFeeUsd;
-      // ROAS
-      const roas = adSpendUsd > 0 ? parseFloat((revenueUsd / adSpendUsd).toFixed(2)) : 0;
-      // Profit % — always compute when there's any cost, even if revenue is 0
-      const profitPercent = revenueUsd !== 0
-        ? parseFloat(((profitUsd / revenueUsd) * 100).toFixed(1))
-        : profitUsd < 0 ? -100.0 : 0;
+        : usdToStoreCurrency(bucket.orders * avgCogPerOrder, date);
+
+      // Transaction fee: 2.9% + $0.30 per order (converted to store currency)
+      const feePerOrder = usdToStoreCurrency(0.3, date);
+      const transactionFeeLocal = netRevenue * 0.029 + bucket.orders * feePerOrder;
+
+      // Profit in store currency
+      const profit = netRevenue - cogLocal - adSpendLocal - transactionFeeLocal;
+
+      // ROAS (revenue / ad spend, both in store currency)
+      const roas = adSpendLocal > 0 ? parseFloat((netRevenue / adSpendLocal).toFixed(2)) : 0;
+
+      // Profit %
+      const profitPercent = netRevenue !== 0
+        ? parseFloat(((profit / netRevenue) * 100).toFixed(1))
+        : profit < 0 ? -100.0 : 0;
 
       rows.push({
         store_id: storeId,
         date,
-        revenue_usd: Math.round(revenueUsd * 100) / 100,
-        cog_usd: Math.round(cogUsd * 100) / 100,
-        ad_spend_usd: Math.round(adSpendUsd * 100) / 100,
-        transaction_fee_usd: Math.round(transactionFeeUsd * 100) / 100,
-        profit_usd: Math.round(profitUsd * 100) / 100,
+        revenue_usd: Math.round(netRevenue * 100) / 100,
+        cog_usd: Math.round(cogLocal * 100) / 100,
+        ad_spend_usd: Math.round(adSpendLocal * 100) / 100,
+        transaction_fee_usd: Math.round(transactionFeeLocal * 100) / 100,
+        profit_usd: Math.round(profit * 100) / 100,
         roas,
         profit_percent: profitPercent,
         orders: bucket.orders,
