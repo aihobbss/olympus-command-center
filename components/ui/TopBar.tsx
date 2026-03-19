@@ -35,19 +35,19 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Load connections to check expiry
-  useEffect(() => {
-    if (user) loadConnections();
-  }, [user, loadConnections]);
-
-  const metaDaysLeft = getExpiryDaysLeft("facebook");
-
-  const hasMultipleStores = stores.length > 1;
-
   // Load stores on mount / when user changes
   useEffect(() => {
     loadStores();
   }, [loadStores, user?.storeIds]);
+
+  // Load connections after store is available (re-fetch on store switch since loaded is reset)
+  useEffect(() => {
+    if (user) loadConnections();
+  }, [user, selectedStore?.id, loadConnections]);
+
+  const metaDaysLeft = getExpiryDaysLeft("facebook");
+
+  const hasMultipleStores = stores.length > 1;
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

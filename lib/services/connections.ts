@@ -9,6 +9,8 @@ export type ServiceConnection = {
   service: ServiceId;
   connected: boolean;
   expiresAt: string | null;
+  /** True if the token can be auto-refreshed server-side (e.g. Shopify client_credentials) */
+  autoRefreshable?: boolean;
 };
 
 export type ServiceMeta = {
@@ -60,7 +62,7 @@ export const SERVICE_REGISTRY: ServiceMeta[] = [
 export async function fetchConnections(userId: string, storeId?: string, signal?: AbortSignal): Promise<ServiceConnection[]> {
   let query = supabase
     .from("oauth_tokens")
-    .select("id, service, expires_at, access_token")
+    .select("id, service, expires_at, access_token, client_id")
     .eq("user_id", userId);
 
   if (storeId) {
@@ -85,6 +87,8 @@ export async function fetchConnections(userId: string, storeId?: string, signal?
       service: row.service as ServiceId,
       connected: true,
       expiresAt: row.expires_at,
+      // Tokens with client_id stored can be auto-refreshed server-side (e.g. Shopify client_credentials)
+      autoRefreshable: !!row.client_id,
     }));
 }
 
@@ -121,7 +125,9 @@ export function isServiceConnected(
 ): boolean {
   const conn = connections.find((c) => c.service === serviceId);
   if (!conn) return false;
-  // Check expiry
-  if (conn.expiresAt && new Date(conn.expiresAt) < new Date()) return false;
+  // Auto-refreshable tokens (e.g. Shopify client_credentials) are always "connected"
+  // — the server-side getShopifyToken() handles refresh transparently.
+  // Only check expiry for tokens that require user re-auth (e.g. Meta OAuth).
+  if (!conn.autoRefreshable && conn.expiresAt && new Date(conn.expiresAt) < new Date()) return false;
   return true;
 }

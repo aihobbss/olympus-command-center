@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Settings, Shield, X, Key } from "lucide-react";
-import { useAuthStore } from "@/lib/store";
+import { useAuthStore, useStoreContext, useConnectionsStore } from "@/lib/store";
 import {
   SERVICE_REGISTRY,
   fetchConnections,
@@ -24,6 +24,7 @@ function isApiKeyService(service: ServiceId) {
 
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
+  const selectedStore = useStoreContext((s) => s.selectedStore);
   const searchParams = useSearchParams();
   const [connections, setConnections] = useState<ServiceConnection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,16 +49,18 @@ export default function SettingsPage() {
     if (!user) return;
     let active = true;
     setLoading(true);
-    fetchConnections(user.id).then((conns) => {
+    fetchConnections(user.id, selectedStore?.id).then((conns) => {
       if (active) {
         setConnections(conns);
         setLoading(false);
+        // Sync to global store so other pages reflect the latest state
+        useConnectionsStore.setState({ connections: conns, loaded: true, loading: false });
       }
     }).catch(() => {
       if (active) setLoading(false);
     });
     return () => { active = false; };
-  }, [user]);
+  }, [user, selectedStore?.id]);
 
   // Auto-open connect modal when redirected from module pages (?connect=shopify)
   useEffect(() => {
@@ -136,16 +139,17 @@ export default function SettingsPage() {
         return;
       }
 
-      // Refresh connections
-      const conns = await fetchConnections(user.id);
+      // Refresh connections (scoped to current store)
+      const conns = await fetchConnections(user.id, selectedStore?.id);
       setConnections(conns);
+      useConnectionsStore.setState({ connections: conns, loaded: true, loading: false });
       setApiKeyModal(null);
     } catch {
       setApiKeyError("Network error. Please try again.");
     } finally {
       setApiKeyLoading(false);
     }
-  }, [apiKeyModal, apiKeyInput, user]);
+  }, [apiKeyModal, apiKeyInput, user, selectedStore?.id]);
 
   const handleShopifySubmit = useCallback(async () => {
     if (!user) return;
@@ -166,26 +170,30 @@ export default function SettingsPage() {
         return;
       }
 
-      // Success — refresh connections and close modal
-      const conns = await fetchConnections(user.id);
+      // Success — refresh connections and close modal (scoped to current store)
+      const conns = await fetchConnections(user.id, selectedStore?.id);
       setConnections(conns);
+      useConnectionsStore.setState({ connections: conns, loaded: true, loading: false });
       setShopifyModal(false);
     } catch {
       setShopifyError("Network error. Please try again.");
     } finally {
       setShopifyLoading(false);
     }
-  }, [shopifyDomain, user]);
+  }, [shopifyDomain, user, selectedStore?.id]);
 
   const handleDisconnect = useCallback(
     async (service: ServiceId) => {
       if (!user) return;
-      const ok = await disconnectService(user.id, service);
+      const ok = await disconnectService(user.id, service, selectedStore?.id);
       if (ok) {
-        setConnections((prev) => prev.filter((c) => c.service !== service));
+        const updated = connections.filter((c) => c.service !== service);
+        setConnections(updated);
+        // Sync removal to global store so other pages reflect immediately
+        useConnectionsStore.setState({ connections: updated });
       }
     },
-    [user]
+    [user, selectedStore?.id, connections]
   );
 
   return (

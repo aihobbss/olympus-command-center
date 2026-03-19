@@ -203,7 +203,8 @@ import {
 } from "@/lib/services/research";
 
 // Debounce map for batching rapid edits before writing to DB
-const updateTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+type PendingWrite = { timer: ReturnType<typeof setTimeout>; flush: () => void };
+const updateTimers: Record<string, PendingWrite> = {};
 
 // AbortController for in-flight research product loads — cancels stale fetches on rapid navigation
 let _researchLoadController: AbortController | null = null;
@@ -255,14 +256,17 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
       ),
     }));
 
-    // Debounced DB write (300ms) — batches rapid edits
-    clearTimeout(updateTimers[id]);
-    updateTimers[id] = setTimeout(() => {
-      const store = useStoreContext.getState().selectedStore;
-      if (store) {
-        updateResearchProductDB(id, updates, store.id);
-      }
-    }, 300);
+    // Debounced DB write (300ms) — batches rapid edits, flushable on store switch
+    if (updateTimers[id]) clearTimeout(updateTimers[id].timer);
+    const store = useStoreContext.getState().selectedStore;
+    const flush = () => {
+      if (store) updateResearchProductDB(id, updates, store.id);
+      delete updateTimers[id];
+    };
+    updateTimers[id] = {
+      timer: setTimeout(flush, 300),
+      flush,
+    };
   },
 
   importAllUnimported: () => {
@@ -328,7 +332,7 @@ interface ProductCopyStore {
 }
 
 // Debounce timers for product copy updates
-const copyUpdateTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+const copyUpdateTimers: Record<string, PendingWrite> = {};
 
 // AbortController for in-flight product copy loads
 let _copyLoadController: AbortController | null = null;
@@ -379,13 +383,15 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
       ),
     }));
 
-    // Debounced DB write
+    // Debounced DB write — flushable on store switch
     const store = useStoreContext.getState().selectedStore;
     if (store) {
-      clearTimeout(copyUpdateTimers[id]);
-      copyUpdateTimers[id] = setTimeout(() => {
+      if (copyUpdateTimers[id]) clearTimeout(copyUpdateTimers[id].timer);
+      const flush = () => {
         updateProductCopyDB(id, updates, store.id);
-      }, 300);
+        delete copyUpdateTimers[id];
+      };
+      copyUpdateTimers[id] = { timer: setTimeout(flush, 300), flush };
     }
   },
 
@@ -647,7 +653,7 @@ interface AdCreatorStore {
 }
 
 // Debounce timers for ad creator updates
-const adCreatorUpdateTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+const adCreatorUpdateTimers: Record<string, PendingWrite> = {};
 
 // AbortController for in-flight ad creator campaign loads
 let _adCreatorLoadController: AbortController | null = null;
@@ -691,13 +697,15 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
       ),
     }));
 
-    // Debounced DB write
+    // Debounced DB write — flushable on store switch
     const store = useStoreContext.getState().selectedStore;
     if (store) {
-      clearTimeout(adCreatorUpdateTimers[id]);
-      adCreatorUpdateTimers[id] = setTimeout(() => {
+      if (adCreatorUpdateTimers[id]) clearTimeout(adCreatorUpdateTimers[id].timer);
+      const flush = () => {
         updateAdCreatorDB(id, updates, store.id);
-      }, 300);
+        delete adCreatorUpdateTimers[id];
+      };
+      adCreatorUpdateTimers[id] = { timer: setTimeout(flush, 300), flush };
     }
   },
 
@@ -750,6 +758,8 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
             c.id === id ? { ...c, status: "Live" as const } : c
           ),
         }));
+        // Persist "Live" status to DB so it survives page refresh
+        if (store) updateAdCreatorDB(id, { status: "Live" }, store.id);
       } else {
         const err = await res.json().catch(() => ({}));
         console.error("Push to Meta failed:", err.error);
@@ -1041,18 +1051,18 @@ export const useStoreContext = create<StoreContext>((set) => ({
     }
   },
   setSelectedStore: (store) => {
-    // Clear all pending debounce timers to prevent cross-store writes
+    // Flush all pending debounce writes to the OLD store before switching
     for (const key of Object.keys(updateTimers)) {
-      clearTimeout(updateTimers[key]);
-      delete updateTimers[key];
+      clearTimeout(updateTimers[key].timer);
+      updateTimers[key].flush();
     }
     for (const key of Object.keys(copyUpdateTimers)) {
-      clearTimeout(copyUpdateTimers[key]);
-      delete copyUpdateTimers[key];
+      clearTimeout(copyUpdateTimers[key].timer);
+      copyUpdateTimers[key].flush();
     }
     for (const key of Object.keys(adCreatorUpdateTimers)) {
-      clearTimeout(adCreatorUpdateTimers[key]);
-      delete adCreatorUpdateTimers[key];
+      clearTimeout(adCreatorUpdateTimers[key].timer);
+      adCreatorUpdateTimers[key].flush();
     }
     // Cancel any in-flight creative generation timers
     while (_creativeTimers.length) clearTimeout(_creativeTimers.pop());
