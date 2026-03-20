@@ -22,13 +22,15 @@ export async function GET(request: Request) {
     );
   }
 
-  // Decode userId + storeId from state
+  // Decode userId + storeId + csrf from state
   let userId: string | null = null;
   let storeId: string | null = null;
+  let csrf: string | null = null;
   try {
     const decoded = JSON.parse(Buffer.from(stateParam, "base64url").toString());
     userId = decoded.userId;
     storeId = decoded.storeId || null;
+    csrf = decoded.csrf || null;
   } catch {
     return NextResponse.redirect(
       new URL("/settings?error=meta_invalid_state", request.url)
@@ -40,6 +42,39 @@ export async function GET(request: Request) {
       new URL("/settings?error=meta_missing_user", request.url)
     );
   }
+
+  // Validate CSRF token (one-time use, 10-minute TTL)
+  if (!csrf) {
+    return NextResponse.redirect(
+      new URL("/settings?error=meta_csrf_invalid", request.url)
+    );
+  }
+
+  const { data: csrfRow, error: csrfLookupError } = await supabaseAdmin
+    .from("oauth_csrf_tokens")
+    .select("id, expires_at")
+    .eq("csrf_token", csrf)
+    .eq("user_id", userId)
+    .eq("service", "facebook")
+    .single();
+
+  if (csrfLookupError || !csrfRow) {
+    return NextResponse.redirect(
+      new URL("/settings?error=meta_csrf_invalid", request.url)
+    );
+  }
+
+  // Check expiry
+  if (new Date(csrfRow.expires_at) < new Date()) {
+    // Delete expired token
+    await supabaseAdmin.from("oauth_csrf_tokens").delete().eq("id", csrfRow.id);
+    return NextResponse.redirect(
+      new URL("/settings?error=meta_csrf_invalid", request.url)
+    );
+  }
+
+  // Delete token (one-time use)
+  await supabaseAdmin.from("oauth_csrf_tokens").delete().eq("id", csrfRow.id);
 
   const appId = process.env.FACEBOOK_APP_ID || process.env.META_APP_ID;
   const appSecret = process.env.FACEBOOK_APP_SECRET || process.env.META_APP_SECRET;

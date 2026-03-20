@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
+import { apiError } from "@/lib/api-error";
 
 // Claude AI (Anthropic) API key connection
 // User enters their API key in Settings, we validate + store it.
@@ -8,10 +9,7 @@ export async function POST(request: Request) {
   // Verify caller identity via JWT
   const authResult = await verifyApiUser(request);
   if ("error" in authResult) {
-    return NextResponse.json(
-      { error: "UNAUTHORIZED", message: authResult.error },
-      { status: authResult.status }
-    );
+    return apiError("unauthorized", authResult.error, authResult.status);
   }
   const userId = authResult.userId;
 
@@ -20,10 +18,7 @@ export async function POST(request: Request) {
   const storeId = body.storeId as string | undefined;
 
   if (!apiKey || !apiKey.startsWith("sk-ant-")) {
-    return NextResponse.json(
-      { error: "INVALID_KEY", message: "Provide a valid Claude API key (starts with sk-ant-)." },
-      { status: 400 }
-    );
+    return apiError("invalid_key", "Provide a valid Claude API key (starts with sk-ant-).", 400);
   }
 
   // Store API key in oauth_tokens (scoped to store if provided)
@@ -41,10 +36,7 @@ export async function POST(request: Request) {
 
   if (upsertError) {
     console.error("Failed to save Anthropic key:", upsertError.message);
-    return NextResponse.json(
-      { error: "SAVE_FAILED", message: "Failed to save API key." },
-      { status: 500 }
-    );
+    return apiError("save_failed", "Failed to save API key.", 500, true);
   }
 
   return NextResponse.json({ success: true, message: "Claude AI connected." });

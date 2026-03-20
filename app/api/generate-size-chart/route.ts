@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
+import { apiError } from "@/lib/api-error";
 
 const SYSTEM_PROMPT = `You are a precise data extraction assistant. Given an image of a size chart, extract all measurements and return them as a clean HTML table.
 
@@ -18,16 +19,13 @@ export async function POST(request: Request) {
     const { imageUrl, storeId } = body;
 
     if (!imageUrl) {
-      return NextResponse.json(
-        { error: "Missing required field: imageUrl" },
-        { status: 400 }
-      );
+      return apiError("missing_field", "Missing required field: imageUrl", 400);
     }
 
     // Verify caller identity via JWT
     const authResult = await verifyApiUser(request, storeId);
     if ("error" in authResult) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+      return apiError("auth_failed", authResult.error, authResult.status);
     }
     const userId = authResult.userId;
 
@@ -45,10 +43,7 @@ export async function POST(request: Request) {
     const { data: tokenRow, error: tokenError } = await tokenQuery.single();
 
     if (tokenError || !tokenRow?.access_token) {
-      return NextResponse.json(
-        { error: "NO_API_KEY", message: "Connect your Claude AI API key in Settings first." },
-        { status: 401 }
-      );
+      return apiError("no_api_key", "Connect your Claude AI API key in Settings first.", 401);
     }
 
     const apiKey = tokenRow.access_token;
@@ -61,10 +56,7 @@ export async function POST(request: Request) {
       // Data URL from paste/file upload — extract base64 directly
       const match = imageUrl.match(/^data:(image\/\w+);base64,(.+)$/);
       if (!match) {
-        return NextResponse.json(
-          { error: "INVALID_DATA_URL", message: "Invalid image data." },
-          { status: 400 }
-        );
+        return apiError("invalid_data_url", "Invalid image data.", 400);
       }
       mediaType = match[1] as typeof mediaType;
       base64Image = match[2];
@@ -74,10 +66,7 @@ export async function POST(request: Request) {
       try {
         parsedUrl = new URL(imageUrl);
       } catch {
-        return NextResponse.json(
-          { error: "INVALID_URL", message: "Invalid image URL." },
-          { status: 400 }
-        );
+        return apiError("invalid_url", "Invalid image URL.", 400);
       }
 
       const ALLOWED_HOSTS = [
@@ -91,18 +80,12 @@ export async function POST(request: Request) {
         parsedUrl.protocol !== "https:" ||
         !ALLOWED_HOSTS.some((h) => parsedUrl.hostname === h || parsedUrl.hostname.endsWith(`.${h}`))
       ) {
-        return NextResponse.json(
-          { error: "BLOCKED_URL", message: "Image URL must be from a trusted source." },
-          { status: 400 }
-        );
+        return apiError("blocked_url", "Image URL must be from a trusted source.", 400);
       }
 
       const imageResponse = await fetch(imageUrl);
       if (!imageResponse.ok) {
-        return NextResponse.json(
-          { error: "IMAGE_FETCH_FAILED", message: "Could not fetch the size chart image." },
-          { status: 400 }
-        );
+        return apiError("image_fetch_failed", "Could not fetch the size chart image.", 400);
       }
 
       const imageBuffer = await imageResponse.arrayBuffer();
@@ -151,25 +134,16 @@ export async function POST(request: Request) {
       const err = await response.text();
       console.error("Claude Vision API error:", response.status, err);
       if (response.status === 401) {
-        return NextResponse.json(
-          { error: "INVALID_API_KEY", message: "Your Claude API key is invalid. Update it in Settings." },
-          { status: 401 }
-        );
+        return apiError("invalid_api_key", "Your Claude API key is invalid. Update it in Settings.", 401);
       }
-      return NextResponse.json(
-        { error: "API_ERROR", message: "Failed to process size chart. Please try again." },
-        { status: 502 }
-      );
+      return apiError("claude_api_error", "Failed to process size chart. Please try again.", 502, true);
     }
 
     const result = await response.json();
     const textContent = result.content?.[0]?.text;
 
     if (!textContent) {
-      return NextResponse.json(
-        { error: "EMPTY_RESPONSE", message: "Claude returned an empty response." },
-        { status: 502 }
-      );
+      return apiError("empty_response", "Claude returned an empty response.", 502, true);
     }
 
     // Clean up: extract just the table HTML
@@ -197,9 +171,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ sizeChartTable: tableHtml });
   } catch (error) {
     console.error("Generate size chart error:", error);
-    return NextResponse.json(
-      { error: "SERVER_ERROR", message: "Internal server error." },
-      { status: 500 }
-    );
+    return apiError("server_error", "Internal server error.", 500, true);
   }
 }

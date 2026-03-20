@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
+import { apiError } from "@/lib/api-error";
 
 // Meta Ad Accounts — discover and manage multiple ad accounts per user
 // GET: list user's saved ad accounts
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
 
   const authResult = await verifyApiUser(request);
   if ("error" in authResult) {
-    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    return apiError("auth_failed", authResult.error, authResult.status);
   }
   // Use verified userId instead of query param
   const verifiedUserId = authResult.userId;
@@ -33,10 +34,7 @@ export async function GET(request: Request) {
   const { data, error } = await query;
 
   if (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch ad accounts", details: error.message },
-      { status: 500 }
-    );
+    return apiError("fetch_ad_accounts_failed", "Failed to fetch ad accounts", 500, true);
   }
 
   return NextResponse.json({ accounts: data || [] });
@@ -50,15 +48,12 @@ export async function POST(request: Request) {
     const { storeId } = body as { userId: string; storeId: string };
 
     if (!storeId) {
-      return NextResponse.json(
-        { error: "storeId is required" },
-        { status: 400 }
-      );
+      return apiError("missing_field", "storeId is required", 400);
     }
 
     const authResult = await verifyApiUser(request, storeId);
     if ("error" in authResult) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+      return apiError("auth_failed", authResult.error, authResult.status);
     }
     const verifiedUserId = authResult.userId;
 
@@ -71,17 +66,11 @@ export async function POST(request: Request) {
       .single();
 
     if (!tokenRow?.access_token) {
-      return NextResponse.json(
-        { error: "Meta not connected. Connect Facebook in Settings first." },
-        { status: 401 }
-      );
+      return apiError("meta_not_connected", "Meta not connected. Connect Facebook in Settings first.", 401);
     }
 
     if (tokenRow.expires_at && new Date(tokenRow.expires_at) < new Date()) {
-      return NextResponse.json(
-        { error: "Meta token expired. Please reconnect Facebook in Settings." },
-        { status: 401 }
-      );
+      return apiError("meta_token_expired", "Meta token expired. Please reconnect Facebook in Settings.", 401);
     }
 
     // 2. Fetch all ad accounts from Meta
@@ -91,11 +80,8 @@ export async function POST(request: Request) {
     );
 
     if (!meRes.ok) {
-      const err = await meRes.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: "Failed to fetch ad accounts from Meta", details: err },
-        { status: 502 }
-      );
+      await meRes.json().catch(() => ({}));
+      return apiError("meta_fetch_failed", "Failed to fetch ad accounts from Meta", 502, true);
     }
 
     const meData = await meRes.json();
@@ -108,10 +94,7 @@ export async function POST(request: Request) {
     }[];
 
     if (!accounts || accounts.length === 0) {
-      return NextResponse.json(
-        { error: "No ad accounts found on this Facebook account" },
-        { status: 404 }
-      );
+      return apiError("no_ad_accounts", "No ad accounts found on this Facebook account", 404);
     }
 
     // 3. Upsert all discovered accounts
@@ -130,10 +113,7 @@ export async function POST(request: Request) {
 
     if (upsertError) {
       console.error("Failed to save ad accounts:", upsertError.message);
-      return NextResponse.json(
-        { error: "Failed to save ad accounts", details: upsertError.message },
-        { status: 500 }
-      );
+      return apiError("save_ad_accounts_failed", "Failed to save ad accounts", 500, true);
     }
 
     // 4. Return updated list
@@ -151,10 +131,7 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     console.error("Ad account discovery error:", err);
-    return NextResponse.json(
-      { error: "Internal server error during ad account discovery" },
-      { status: 500 }
-    );
+    return apiError("server_error", "Internal server error during ad account discovery", 500, true);
   }
 }
 
@@ -166,15 +143,12 @@ export async function PATCH(request: Request) {
     const { accountId, active } = body as { accountId: string; active: boolean };
 
     if (!accountId || typeof active !== "boolean") {
-      return NextResponse.json(
-        { error: "accountId and active (boolean) are required" },
-        { status: 400 }
-      );
+      return apiError("missing_fields", "accountId and active (boolean) are required", 400);
     }
 
     const authResult = await verifyApiUser(request);
     if ("error" in authResult) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+      return apiError("auth_failed", authResult.error, authResult.status);
     }
 
     const { error } = await supabaseAdmin
@@ -184,18 +158,12 @@ export async function PATCH(request: Request) {
       .eq("user_id", authResult.userId);
 
     if (error) {
-      return NextResponse.json(
-        { error: "Failed to update ad account", details: error.message },
-        { status: 500 }
-      );
+      return apiError("update_ad_account_failed", "Failed to update ad account", 500, true);
     }
 
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Ad account update error:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError("server_error", "Internal server error", 500, true);
   }
 }

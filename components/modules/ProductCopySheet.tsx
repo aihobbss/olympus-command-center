@@ -1015,8 +1015,12 @@ export function ProductCopySheet() {
               "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
-            <Sparkles size={14} />
-            Generate All
+            {copyProducts.some((p) => p.status === "Generating") ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Sparkles size={14} />
+            )}
+            {copyProducts.some((p) => p.status === "Generating") ? "Generating..." : "Generate All"}
           </button>
         )}
 
@@ -1035,8 +1039,12 @@ export function ProductCopySheet() {
               "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
-            <Upload size={14} />
-            Push All to Store
+            {copyProducts.some((p) => p.pushStatus === "pushing") ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Upload size={14} />
+            )}
+            {copyProducts.some((p) => p.pushStatus === "pushing") ? "Pushing..." : "Push All to Store"}
           </button>
         )}
 

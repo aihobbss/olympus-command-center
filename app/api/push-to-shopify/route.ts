@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { getShopifyToken } from "@/lib/shopify-token";
+import { apiError } from "@/lib/api-error";
 
 // Push product copy to an EXISTING Shopify product (imported via Kopy).
 // Flow: extract handle from store URL → look up product by handle → update it.
@@ -113,20 +114,14 @@ export async function POST(request: Request) {
     } = body;
 
     if (!productName || !userId) {
-      return NextResponse.json(
-        { error: "Missing required fields: productName, userId" },
-        { status: 400 }
-      );
+      return apiError("missing_fields", "Missing required fields: productName, userId", 400);
     }
 
     // Fetch user's Shopify token (auto-refreshes if expired)
     const shopify = await getShopifyToken(userId, storeId);
 
     if (!shopify) {
-      return NextResponse.json(
-        { error: "NO_SHOPIFY_TOKEN", message: "Connect your Shopify store in Settings first." },
-        { status: 401 }
-      );
+      return apiError("no_shopify_token", "Connect your Shopify store in Settings first.", 401);
     }
 
     const shopDomain = shopify.shopifyDomain;
@@ -239,10 +234,7 @@ export async function POST(request: Request) {
       if (!updateRes.ok) {
         const errText = await updateRes.text();
         console.error("Shopify update error:", updateRes.status, errText);
-        return NextResponse.json(
-          { error: "SHOPIFY_API_ERROR", message: "Failed to update product in Shopify." },
-          { status: 502 }
-        );
+        return apiError("shopify_api_error", "Failed to update product in Shopify.", 502, true);
       }
 
       // Update pricing on ALL variants (not just the first)
@@ -334,16 +326,10 @@ export async function POST(request: Request) {
         console.error("Shopify create error:", createRes.status, errText);
 
         if (createRes.status === 401 || createRes.status === 403) {
-          return NextResponse.json(
-            { error: "SHOPIFY_AUTH_FAILED", message: "Shopify token is invalid or expired. Reconnect in Settings." },
-            { status: 401 }
-          );
+          return apiError("shopify_auth_failed", "Shopify token is invalid or expired. Reconnect in Settings.", 401);
         }
 
-        return NextResponse.json(
-          { error: "SHOPIFY_API_ERROR", message: "Failed to create product in Shopify." },
-          { status: 502 }
-        );
+        return apiError("shopify_api_error", "Failed to create product in Shopify.", 502, true);
       }
 
       const result = await createRes.json();
@@ -376,9 +362,6 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     console.error("Push to Shopify error:", error);
-    return NextResponse.json(
-      { error: "SERVER_ERROR", message: "Internal server error." },
-      { status: 500 }
-    );
+    return apiError("server_error", "Internal server error.", 500, true);
   }
 }

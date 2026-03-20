@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
+import { apiError } from "@/lib/api-error";
 
 // Shopify Dev Dashboard custom app connection
 // Uses client_credentials grant (no OAuth redirect needed).
@@ -7,39 +8,29 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 // Tokens expire after 24h — auto-refreshed by getShopifyToken() helper.
 
 export async function GET() {
-  return NextResponse.json(
-    { error: "USE_POST", message: "POST { storeDomain, userId } to connect." },
-    { status: 400 }
-  );
+  return apiError("use_post", "POST { storeDomain } to connect.", 400);
 }
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const storeDomain = body.storeDomain as string;
-  const userId = body.userId as string;
 
-  if (!userId) {
-    return NextResponse.json(
-      { error: "UNAUTHORIZED", message: "You must be logged in." },
-      { status: 401 }
-    );
+  // Authenticate via JWT — never trust body-supplied userId
+  const auth = await verifyApiUser(request);
+  if ("error" in auth) {
+    return apiError("unauthorized", auth.error, auth.status);
   }
+  const userId = auth.userId;
 
   if (!storeDomain || !storeDomain.endsWith(".myshopify.com")) {
-    return NextResponse.json(
-      { error: "INVALID_DOMAIN", message: "Provide a valid .myshopify.com domain." },
-      { status: 400 }
-    );
+    return apiError("invalid_domain", "Provide a valid .myshopify.com domain.", 400);
   }
 
   const clientId = process.env.SHOPIFY_CLIENT_ID;
   const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    return NextResponse.json(
-      { error: "SHOPIFY_NOT_CONFIGURED", message: "Shopify app credentials not configured." },
-      { status: 503 }
-    );
+    return apiError("shopify_not_configured", "Shopify app credentials not configured.", 503, true);
   }
 
   // Look up user's active store
@@ -50,18 +41,12 @@ export async function POST(request: Request) {
     .single();
 
   if (!profile) {
-    return NextResponse.json(
-      { error: "UNAUTHORIZED", message: "Invalid user." },
-      { status: 401 }
-    );
+    return apiError("unauthorized", "Invalid user.", 401);
   }
 
   const storeId = profile.active_store_id;
   if (!storeId) {
-    return NextResponse.json(
-      { error: "NO_STORE", message: "Create a store first." },
-      { status: 400 }
-    );
+    return apiError("no_store", "Create a store first.", 400);
   }
 
   // Client credentials grant — form-encoded, NOT JSON
@@ -83,10 +68,7 @@ export async function POST(request: Request) {
     if (!tokenRes.ok) {
       const errBody = await tokenRes.text().catch(() => "");
       console.error("Shopify client_credentials failed:", tokenRes.status, errBody);
-      return NextResponse.json(
-        { error: "TOKEN_FAILED", message: `Shopify returned ${tokenRes.status}: ${errBody.slice(0, 200)}` },
-        { status: 400 }
-      );
+      return apiError("token_failed", `Shopify returned ${tokenRes.status}: ${errBody.slice(0, 200)}`, 400);
     }
 
     const tokenData = await tokenRes.json();
@@ -116,10 +98,7 @@ export async function POST(request: Request) {
 
     if (upsertError) {
       console.error("Failed to save Shopify token:", upsertError.message);
-      return NextResponse.json(
-        { error: "SAVE_FAILED", message: "Failed to save connection." },
-        { status: 500 }
-      );
+      return apiError("save_failed", "Failed to save connection.", 500, true);
     }
 
     // Update store's shopify_domain
@@ -131,9 +110,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, message: "Shopify connected." });
   } catch (err) {
     console.error("Shopify connection error:", err);
-    return NextResponse.json(
-      { error: "CONNECTION_FAILED", message: "Could not reach Shopify. Check your store domain." },
-      { status: 502 }
-    );
+    return apiError("connection_failed", "Could not reach Shopify. Check your store domain.", 502, true);
   }
 }

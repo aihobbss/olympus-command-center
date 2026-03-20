@@ -12,7 +12,7 @@ import {
   Image,
   Trash2,
 } from "lucide-react";
-import { useResearchStore, useStoreContext } from "@/lib/store";
+import { useResearchStore, useStoreContext, flushAllProductWrites } from "@/lib/store";
 import {
   type SheetProduct,
   type ProductType,
@@ -358,6 +358,13 @@ export function ResearchSheet() {
       loadProducts(storeId);
     }
   }, [storeId, loadProducts]);
+
+  // Flush any pending debounced writes when navigating away from this page
+  useEffect(() => {
+    return () => {
+      flushAllProductWrites();
+    };
+  }, []);
 
   // Auto-fill product data when an afterlib/winninghunter link is pasted
   const handleAdLinkSave = useCallback(

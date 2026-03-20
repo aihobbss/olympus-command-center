@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
+import { apiError } from "@/lib/api-error";
 
 // Meta Graph API v19.0 — Campaign Actions (Kill / Scale / Pass)
 // Kill: pauses campaign | Scale: updates daily budget | Pass: logs decision only
@@ -19,24 +20,18 @@ export async function POST(request: Request) {
     };
 
     if (!userId || !campaignId || !action) {
-      return NextResponse.json(
-        { error: "userId, campaignId, and action are required" },
-        { status: 400 }
-      );
+      return apiError("missing_fields", "userId, campaignId, and action are required", 400);
     }
 
     // Verify caller identity
     const authResult = await verifyApiUser(request);
     if ("error" in authResult) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+      return apiError("auth_failed", authResult.error, authResult.status);
     }
     const verifiedUserId = authResult.userId;
 
     if (action === "scale" && (!newBudget || newBudget <= 0)) {
-      return NextResponse.json(
-        { error: "newBudget is required for scale action and must be positive" },
-        { status: 400 }
-      );
+      return apiError("invalid_budget", "newBudget is required for scale action and must be positive", 400);
     }
 
     // 1. Get campaign details (need meta_campaign_id)
@@ -47,10 +42,7 @@ export async function POST(request: Request) {
       .single();
 
     if (campaignError || !campaign) {
-      return NextResponse.json(
-        { error: "Campaign not found" },
-        { status: 404 }
-      );
+      return apiError("campaign_not_found", "Campaign not found", 404);
     }
 
     // Verify the user has access to this campaign's store
@@ -61,14 +53,11 @@ export async function POST(request: Request) {
       .eq("store_id", campaign.store_id)
       .single();
     if (!storeMembership) {
-      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+      return apiError("campaign_not_found", "Campaign not found", 404);
     }
 
     if (!campaign.meta_campaign_id) {
-      return NextResponse.json(
-        { error: "Campaign has no Meta campaign ID — cannot perform action" },
-        { status: 400 }
-      );
+      return apiError("no_meta_campaign_id", "Campaign has no Meta campaign ID — cannot perform action", 400);
     }
 
     // 2. Get user's Meta access token
@@ -80,17 +69,11 @@ export async function POST(request: Request) {
       .single();
 
     if (tokenError || !tokenRow?.access_token) {
-      return NextResponse.json(
-        { error: "Meta not connected" },
-        { status: 401 }
-      );
+      return apiError("meta_not_connected", "Meta not connected", 401);
     }
 
     if (tokenRow.expires_at && new Date(tokenRow.expires_at) < new Date()) {
-      return NextResponse.json(
-        { error: "Meta token expired. Please reconnect." },
-        { status: 401 }
-      );
+      return apiError("meta_token_expired", "Meta token expired. Please reconnect.", 401);
     }
 
     const accessToken = tokenRow.access_token;
@@ -110,10 +93,7 @@ export async function POST(request: Request) {
 
       if (!res.ok) {
         await res.json().catch(() => ({}));
-        return NextResponse.json(
-          { error: "Failed to pause campaign on Meta" },
-          { status: 502 }
-        );
+        return apiError("meta_pause_failed", "Failed to pause campaign on Meta", 502, true);
       }
 
       // Update local DB
@@ -149,10 +129,7 @@ export async function POST(request: Request) {
 
       if (!res.ok) {
         await res.json().catch(() => ({}));
-        return NextResponse.json(
-          { error: "Failed to update budget on Meta" },
-          { status: 502 }
-        );
+        return apiError("meta_budget_update_failed", "Failed to update budget on Meta", 502, true);
       }
 
       // Append to budget history
@@ -218,15 +195,9 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json(
-      { error: `Unknown action: ${action}. Use kill, scale, or pass.` },
-      { status: 400 }
-    );
+    return apiError("unknown_action", `Unknown action: ${action}. Use kill, scale, or pass.`, 400);
   } catch (err) {
     console.error("Meta campaign action error:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError("server_error", "Internal server error", 500, true);
   }
 }

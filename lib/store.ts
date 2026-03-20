@@ -204,8 +204,29 @@ import {
 } from "@/lib/services/products";
 
 // Debounce map for batching rapid edits before writing to DB
-type PendingWrite = { timer: ReturnType<typeof setTimeout>; flush: () => void };
+type PendingWrite = {
+  timer: ReturnType<typeof setTimeout>;
+  flush: () => void;
+  pendingUpdates?: Partial<SheetProduct>;
+};
 const updateTimers: Record<string, PendingWrite> = {};
+
+// Collect promises from in-flight DB writes so we can await them
+const _pendingWritePromises: Promise<unknown>[] = [];
+
+// Flush all pending product writes — call before loading from DB or navigating away
+// Returns a promise that resolves when all flushed writes have completed in DB
+export async function flushAllProductWrites(): Promise<void> {
+  for (const key of Object.keys(updateTimers)) {
+    clearTimeout(updateTimers[key].timer);
+    updateTimers[key].flush();
+  }
+  // Wait for all in-flight write promises to settle
+  if (_pendingWritePromises.length > 0) {
+    await Promise.allSettled(_pendingWritePromises);
+    _pendingWritePromises.length = 0;
+  }
+}
 
 // AbortController for in-flight research product loads — cancels stale fetches on rapid navigation
 let _researchLoadController: AbortController | null = null;
@@ -230,6 +251,10 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
   error: null,
 
   loadProducts: async (storeId) => {
+    // Flush all pending debounced writes BEFORE fetching from DB
+    // This prevents stale DB data from overwriting optimistic local edits
+    await flushAllProductWrites();
+
     // Abort any in-flight load to free the browser connection
     _researchLoadController?.abort();
     const controller = new AbortController();
@@ -261,16 +286,23 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
       ),
     }));
 
-    // Debounced DB write (300ms) — batches rapid edits, flushable on store switch
-    if (updateTimers[id]) clearTimeout(updateTimers[id].timer);
+    // Debounced DB write (300ms) — accumulates rapid edits, flushable on store switch
+    const existing = updateTimers[id];
+    if (existing) clearTimeout(existing.timer);
+    // Merge new updates into any pending updates for this product
+    const accumulated = { ...(existing?.pendingUpdates ?? {}), ...updates };
     const store = useStoreContext.getState().selectedStore;
     const flush = () => {
-      if (store) updateResearchProductDB(id, updates, store.id);
+      if (store) {
+        const p = updateResearchProductDB(id, accumulated, store.id);
+        _pendingWritePromises.push(p);
+      }
       delete updateTimers[id];
     };
     updateTimers[id] = {
       timer: setTimeout(flush, 300),
       flush,
+      pendingUpdates: accumulated,
     };
 
     // Cross-store name propagation: when productName changes, update all downstream modules
@@ -329,26 +361,49 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
     const store = useStoreContext.getState().selectedStore;
     if (!store) return;
 
-    set({ adding: true });
+    set({ adding: true, error: null });
     try {
       const product = await createResearchProduct(store.id);
       if (product) {
         set((s) => ({
           sheetProducts: [...s.sheetProducts, product],
         }));
+      } else {
+        set({ error: "Failed to add product. Please try again." });
       }
+    } catch (err) {
+      console.error("Failed to add product:", err);
+      set({ error: "Failed to add product. Please try again." });
     } finally {
       set({ adding: false });
     }
   },
 
-  deleteSheetProduct: (id) => {
+  deleteSheetProduct: async (id) => {
     const store = useStoreContext.getState().selectedStore;
+    // Cancel any pending debounced writes for this product
+    if (updateTimers[id]) {
+      clearTimeout(updateTimers[id].timer);
+      delete updateTimers[id];
+    }
+    // Save snapshot for rollback
+    const snapshot = get().sheetProducts;
+    // Optimistic remove
     set((s) => ({
       sheetProducts: s.sheetProducts.filter((p) => p.id !== id),
     }));
-    // Fire-and-forget DB delete
-    import("@/lib/services/products").then((m) => m.deleteProduct(id, store?.id));
+    // Await DB delete — revert on failure
+    try {
+      const { deleteProduct } = await import("@/lib/services/products");
+      const ok = await deleteProduct(id, store?.id);
+      if (!ok) {
+        console.error("Delete failed for product", id, "— reverting");
+        set({ sheetProducts: snapshot });
+      }
+    } catch (err) {
+      console.error("Delete threw for product", id, "— reverting:", err);
+      set({ sheetProducts: snapshot });
+    }
   },
 }));
 
@@ -1226,6 +1281,8 @@ export const useConnectionsStore = create<ConnectionsStore>((set, get) => ({
       .connections
       .filter((c) => {
         if (!c.expiresAt) return false;
+        // Skip auto-refreshable tokens (e.g. Shopify) — they renew server-side
+        if (c.autoRefreshable) return false;
         const diff = new Date(c.expiresAt).getTime() - now;
         return diff <= threshold; // includes already-expired (diff <= 0)
       })

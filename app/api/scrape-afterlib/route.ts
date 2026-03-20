@@ -1,3 +1,5 @@
+import { apiError } from "@/lib/api-error";
+
 // Edge Runtime — uses V8/chromium TLS stack which passes Cloudflare's
 // TLS fingerprinting (Node.js runtime gets 403).
 export const runtime = "edge";
@@ -7,12 +9,12 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    return apiError("invalid_json", "Invalid JSON body", 400);
   }
 
   const adId = body.adId;
   if (!adId || typeof adId !== "string") {
-    return Response.json({ error: "Missing adId" }, { status: 400 });
+    return apiError("missing_field", "Missing adId", 400);
   }
 
   try {
@@ -27,11 +29,8 @@ export async function POST(request: Request) {
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      return Response.json(
-        { error: `Afterlib returned ${res.status}`, details: text.slice(0, 200) },
-        { status: 502 }
-      );
+      await res.text().catch(() => "");
+      return apiError("afterlib_api_error", `Afterlib returned ${res.status}`, 502, true);
     }
 
     const raw = await res.json();
@@ -66,9 +65,6 @@ export async function POST(request: Request) {
       daysActive: null,
     });
   } catch (err) {
-    return Response.json(
-      { error: `Scrape failed: ${err instanceof Error ? err.message : "Unknown"}` },
-      { status: 502 }
-    );
+    return apiError("scrape_failed", `Scrape failed: ${err instanceof Error ? err.message : "Unknown"}`, 502, true);
   }
 }

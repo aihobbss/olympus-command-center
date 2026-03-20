@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
+import { apiError } from "@/lib/api-error";
 
 // SSRF protection — only allow fetching images from known e-commerce CDNs
 const ALLOWED_IMAGE_HOSTS = new Set([
@@ -126,16 +127,13 @@ export async function POST(request: Request) {
     let { productType, price, compareAtPrice } = body;
 
     if (!productName) {
-      return NextResponse.json(
-        { error: "Missing required field: productName" },
-        { status: 400 }
-      );
+      return apiError("missing_field", "Missing required field: productName", 400);
     }
 
     // Verify caller identity via JWT
     const authResult = await verifyApiUser(request, storeId);
     if ("error" in authResult) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+      return apiError("auth_failed", authResult.error, authResult.status);
     }
     const userId = authResult.userId;
 
@@ -180,10 +178,7 @@ export async function POST(request: Request) {
     const { data: tokenRow, error: tokenError } = await tokenQuery.single();
 
     if (tokenError || !tokenRow?.access_token) {
-      return NextResponse.json(
-        { error: "NO_API_KEY", message: "Connect your Claude AI API key in Settings first." },
-        { status: 401 }
-      );
+      return apiError("no_api_key", "Connect your Claude AI API key in Settings first.", 401);
     }
 
     const apiKey = tokenRow.access_token;
@@ -293,25 +288,16 @@ Return ONLY the JSON object, no markdown, no code fences.`;
       const err = await response.text();
       console.error("Claude API error:", response.status, err);
       if (response.status === 401) {
-        return NextResponse.json(
-          { error: "INVALID_API_KEY", message: "Your Claude API key is invalid. Update it in Settings." },
-          { status: 401 }
-        );
+        return apiError("invalid_api_key", "Your Claude API key is invalid. Update it in Settings.", 401);
       }
-      return NextResponse.json(
-        { error: "API_ERROR", message: "Failed to generate copy. Please try again." },
-        { status: 502 }
-      );
+      return apiError("claude_api_error", "Failed to generate copy. Please try again.", 502, true);
     }
 
     const result = await response.json();
     const textContent = result.content?.[0]?.text;
 
     if (!textContent) {
-      return NextResponse.json(
-        { error: "EMPTY_RESPONSE", message: "Claude returned an empty response." },
-        { status: 502 }
-      );
+      return apiError("empty_response", "Claude returned an empty response.", 502, true);
     }
 
     // Parse the JSON response from Claude
@@ -321,10 +307,7 @@ Return ONLY the JSON object, no markdown, no code fences.`;
       parsed = JSON.parse(cleaned);
     } catch {
       console.error("Failed to parse Claude response:", textContent);
-      return NextResponse.json(
-        { error: "PARSE_ERROR", message: "Failed to parse generated copy." },
-        { status: 502 }
-      );
+      return apiError("parse_error", "Failed to parse generated copy.", 502, true);
     }
 
     return NextResponse.json({
@@ -334,9 +317,6 @@ Return ONLY the JSON object, no markdown, no code fences.`;
     });
   } catch (error) {
     console.error("Generate copy error:", error);
-    return NextResponse.json(
-      { error: "SERVER_ERROR", message: "Internal server error." },
-      { status: 500 }
-    );
+    return apiError("server_error", "Internal server error.", 500, true);
   }
 }

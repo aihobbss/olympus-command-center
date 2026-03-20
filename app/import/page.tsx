@@ -11,6 +11,7 @@ import {
   XCircle,
   RotateCcw,
   CheckCheck,
+  Loader2,
 } from "lucide-react";
 import { useResearchStore, useStoreContext, useProductCopyStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ export default function ImportPage() {
   const { sheetProducts, updateSheetProduct, loadProducts } = useResearchStore();
   const { selectedStore } = useStoreContext();
   const [csvGenerated, setCsvGenerated] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   // Ensure research products are loaded (user may navigate here directly)
   const storeId = selectedStore?.id;
@@ -57,20 +59,21 @@ export default function ImportPage() {
   }
 
   async function clearQueueImported() {
-    if (!storeId) return;
+    if (!storeId || importing) return;
+    setImporting(true);
     // Use custom domain (public-facing) for store links, fall back to shopify domain
     const storeDomain = selectedStore?.customDomain || selectedStore?.shopifyDomain;
 
     // Snapshot the current queue so state changes mid-loop don't affect iteration
     const productsToImport = [...queuedProducts];
 
-    // Mark ALL research products as Imported first (optimistic batch update)
+    // Create product_copies entries for each, then mark as Imported only on success
     for (const p of productsToImport) {
-      updateSheetProduct(p.id, { testingStatus: "Imported", pipelineStatus: "imported" });
-    }
+      if (!p.storeLink) {
+        console.warn("Skipping product without store link:", p.productName);
+        continue;
+      }
 
-    // Then create product_copies entries for each
-    for (const p of productsToImport) {
       // Convert competitor URL to our store URL (same product slug)
       let storeUrl = p.storeLink;
       if (storeDomain && p.storeLink) {
@@ -92,13 +95,16 @@ export default function ImportPage() {
           },
           p.id // Link back to research product for pricing lookup
         );
+        // Only mark as Imported AFTER successful copy creation
+        updateSheetProduct(p.id, { testingStatus: "Imported", pipelineStatus: "imported" });
       } catch (err) {
-        console.error("Failed to create product copy for", p.productName, err);
+        console.error("Failed to create product copy for", p.productName, "— product stays queued:", err);
       }
     }
     // Reload product copies so Product Creation page picks them up
     useProductCopyStore.getState().loadProducts(storeId);
     setCsvGenerated(false);
+    setImporting(false);
   }
 
   function generateCSV() {
@@ -135,7 +141,10 @@ export default function ImportPage() {
             Import
           </h1>
           <p className="text-sm text-text-secondary">
-            Queue products from Research, then export a CSV to import via Kopy
+            Export your products as CSV and import them into Kopy for listing optimization.
+          </p>
+          <p className="text-xs text-text-muted mt-1">
+            Queue products from Research, generate a CSV of their store links, then upload that file to Kopy&apos;s &ldquo;Multiple Product Links&rdquo; section to bulk-import listings.
           </p>
         </div>
       </div>
@@ -174,10 +183,12 @@ export default function ImportPage() {
             <div className="ml-auto flex items-center gap-2">
               <button
                 onClick={clearQueueReset}
+                disabled={importing}
                 className={cn(
                   "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
                   "border border-subtle text-text-secondary",
-                  "hover:border-[var(--border-hover)] hover:text-text-primary transition-colors duration-150"
+                  "hover:border-[var(--border-hover)] hover:text-text-primary transition-colors duration-150",
+                  "disabled:opacity-50 disabled:cursor-not-allowed"
                 )}
               >
                 <RotateCcw size={13} />
@@ -185,22 +196,28 @@ export default function ImportPage() {
               </button>
               <button
                 onClick={clearQueueImported}
+                disabled={importing}
                 className={cn(
                   "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
                   "bg-[var(--accent-emerald)]/15 text-[var(--accent-emerald)]",
-                  "hover:bg-[var(--accent-emerald)]/25 transition-colors duration-150"
+                  "hover:bg-[var(--accent-emerald)]/25 transition-colors duration-150",
+                  "disabled:opacity-50 disabled:cursor-not-allowed"
                 )}
               >
-                <CheckCheck size={13} />
-                Mark All Imported
+                {importing ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <CheckCheck size={13} />
+                )}
+                {importing ? "Importing..." : "Mark All Imported"}
               </button>
               <button
                 onClick={generateCSV}
-                disabled={validProducts.length === 0}
+                disabled={validProducts.length === 0 || importing}
                 className={cn(
                   "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium",
                   "transition-colors duration-150",
-                  validProducts.length > 0
+                  validProducts.length > 0 && !importing
                     ? "bg-accent-indigo text-white hover:bg-accent-indigo/80"
                     : "bg-white/[0.04] text-text-muted cursor-not-allowed"
                 )}

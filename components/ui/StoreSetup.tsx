@@ -29,6 +29,7 @@ export function StoreSetup() {
   const initialize = useAuthStore((s) => s.initialize);
 
   const [storeName, setStoreName] = useState("");
+  const [shopifyDomain, setShopifyDomain] = useState("");
   const [market, setMarket] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -59,14 +60,18 @@ export function StoreSetup() {
     }
 
     // Create the store
-    const { error: storeError } = await supabase.from("stores").insert({
+    const storePayload: Record<string, unknown> = {
       id: storeId,
       name: storeName.trim(),
       market: selectedMarket.value,
       currency: selectedMarket.currency,
       owner_id: user.id,
       exchange_rate_to_usd: selectedMarket.rate,
-    });
+    };
+    if (shopifyDomain.trim()) {
+      storePayload.shopify_domain = shopifyDomain.trim().replace(/\.myshopify\.com$/, "") + ".myshopify.com";
+    }
+    const { error: storeError } = await supabase.from("stores").insert(storePayload);
 
     if (storeError) {
       if (storeError.code === "23505") {
@@ -159,6 +164,37 @@ export function StoreSetup() {
               Store ID: <span className="font-mono-metric text-text-secondary">{slugify(storeName.trim()) || "—"}</span>
             </p>
           )}
+        </div>
+
+        {/* Shopify Domain (optional) */}
+        <div className="mb-5">
+          <label
+            htmlFor="shopifyDomain"
+            className="block text-xs font-medium text-text-secondary mb-2 uppercase tracking-wider"
+          >
+            Shopify Domain <span className="text-text-muted font-normal normal-case">(optional)</span>
+          </label>
+          <div className="flex items-center gap-0">
+            <input
+              id="shopifyDomain"
+              type="text"
+              value={shopifyDomain}
+              onChange={(e) => setShopifyDomain(e.target.value)}
+              placeholder="your-store"
+              className={cn(
+                "flex-1 px-4 py-3 rounded-l-xl text-sm text-text-primary placeholder:text-text-muted",
+                "bg-bg-primary border border-r-0 border-subtle",
+                "focus:outline-none focus:ring-2 focus:ring-accent-indigo/40 focus:border-accent-indigo/40",
+                "transition-all duration-200"
+              )}
+            />
+            <span className="px-3 py-3 rounded-r-xl text-xs text-text-muted bg-bg-elevated border border-subtle">
+              .myshopify.com
+            </span>
+          </div>
+          <p className="mt-1.5 text-[11px] text-text-muted">
+            Used for Shopify integration. You can add this later in Settings.
+          </p>
         </div>
 
         {/* Market */}

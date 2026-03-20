@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
 import { getShopifyToken } from "@/lib/shopify-token";
+import { apiError } from "@/lib/api-error";
 
 // Profit Data Sync — pulls Shopify orders + Meta ad spend, computes daily P&L
 // All values stored in the STORE'S CURRENCY (e.g. AUD, GBP).
@@ -34,15 +35,12 @@ export async function POST(request: Request) {
     console.log("[profit-sync API] adAccountIds received:", adAccountIds);
 
     if (!storeId) {
-      return NextResponse.json(
-        { error: "storeId is required" },
-        { status: 400 }
-      );
+      return apiError("missing_field", "storeId is required", 400);
     }
 
     const authResult = await verifyApiUser(request, storeId);
     if ("error" in authResult) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+      return apiError("auth_failed", authResult.error, authResult.status);
     }
     const verifiedUserId = authResult.userId;
 
@@ -399,10 +397,7 @@ export async function POST(request: Request) {
 
     if (upsertError) {
       console.error("Failed to upsert profit logs:", upsertError.message);
-      return NextResponse.json(
-        { error: "Failed to save profit data", details: upsertError.message },
-        { status: 500 }
-      );
+      return apiError("save_profit_data_failed", "Failed to save profit data", 500, true);
     }
 
     return NextResponse.json({
@@ -412,9 +407,6 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     console.error("Profit sync error:", err);
-    return NextResponse.json(
-      { error: "Internal server error during profit sync" },
-      { status: 500 }
-    );
+    return apiError("server_error", "Internal server error during profit sync", 500, true);
   }
 }

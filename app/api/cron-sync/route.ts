@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-server";
+import { apiError } from "@/lib/api-error";
 
 // Cron Sync Endpoint — triggered by Vercel Cron every hour (0 * * * *)
 // Checks each store's timezone and only syncs stores where it's currently midnight (00:xx).
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
   // Verify cron secret
   const authHeader = request.headers.get("authorization");
   if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("unauthorized", "Unauthorized", 401);
   }
 
   const results: { storeId: string; storeName: string; timezone: string; meta?: string; profit?: string; skipped?: boolean; error?: string }[] = [];
@@ -169,9 +170,6 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     console.error("Cron sync error:", err);
-    return NextResponse.json(
-      { error: "Cron sync failed", details: String(err) },
-      { status: 500 }
-    );
+    return apiError("cron_sync_failed", "Cron sync failed", 500, true);
   }
 }

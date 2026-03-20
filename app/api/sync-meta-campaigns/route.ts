@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
+import { apiError } from "@/lib/api-error";
 
 // Meta Graph API v19.0 — Campaign Insights sync
 // Pulls campaign-level performance data from ALL active ad accounts
@@ -59,15 +60,12 @@ export async function POST(request: Request) {
     };
 
     if (!storeId) {
-      return NextResponse.json(
-        { error: "storeId is required" },
-        { status: 400 }
-      );
+      return apiError("missing_field", "storeId is required", 400);
     }
 
     const authResult = await verifyApiUser(request, storeId);
     if ("error" in authResult) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+      return apiError("auth_failed", authResult.error, authResult.status);
     }
     const verifiedUserId = authResult.userId;
 
@@ -80,18 +78,12 @@ export async function POST(request: Request) {
       .single();
 
     if (tokenError || !tokenRow?.access_token) {
-      return NextResponse.json(
-        { error: "Meta not connected. Please connect your Facebook account in Settings." },
-        { status: 401 }
-      );
+      return apiError("meta_not_connected", "Meta not connected. Please connect your Facebook account in Settings.", 401);
     }
 
     // Check token expiry
     if (tokenRow.expires_at && new Date(tokenRow.expires_at) < new Date()) {
-      return NextResponse.json(
-        { error: "Meta token expired. Please reconnect Facebook in Settings." },
-        { status: 401 }
-      );
+      return apiError("meta_token_expired", "Meta token expired. Please reconnect Facebook in Settings.", 401);
     }
 
     const accessToken = tokenRow.access_token;
@@ -129,10 +121,7 @@ export async function POST(request: Request) {
     }
 
     if (accountsToSync.length === 0) {
-      return NextResponse.json(
-        { error: "No ad accounts found. Discover accounts in Settings after connecting Facebook." },
-        { status: 404 }
-      );
+      return apiError("no_ad_accounts", "No ad accounts found. Discover accounts in Settings after connecting Facebook.", 404);
     }
 
     // 3. Sync campaigns from all active accounts
@@ -273,9 +262,6 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     console.error("Meta sync error:", err);
-    return NextResponse.json(
-      { error: "Internal server error during Meta sync" },
-      { status: 500 }
-    );
+    return apiError("server_error", "Internal server error during Meta sync", 500, true);
   }
 }

@@ -537,8 +537,12 @@ export function AdCreatorSheet() {
               "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
-            <Rocket size={14} />
-            Create All ({readyCount})
+            {campaigns.some((c) => c.status === "Pushing") ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Rocket size={14} />
+            )}
+            {campaigns.some((c) => c.status === "Pushing") ? "Pushing..." : `Create All (${readyCount})`}
           </button>
         )}
 

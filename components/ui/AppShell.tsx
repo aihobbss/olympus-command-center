@@ -2,14 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Store, ArrowLeft, Clock } from "lucide-react";
+import Link from "next/link";
+import { Store, ArrowLeft, Clock, AlertTriangle, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { MobileNav } from "./MobileNav";
 import { LoginScreen } from "./LoginScreen";
 import { StoreSetup } from "./StoreSetup";
-import { useAuthStore, useCoachViewStore } from "@/lib/store";
+import { useAuthStore, useCoachViewStore, useConnectionsStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import type { ServiceId } from "@/lib/services/connections";
 
 function ApprovalGate() {
   const logout = useAuthStore((s) => s.logout);
@@ -43,6 +46,76 @@ function ApprovalGate() {
         </button>
       </div>
     </div>
+  );
+}
+
+// ─── Service display names ──────────────────────────────
+const SERVICE_LABELS: Record<ServiceId, string> = {
+  shopify: "Shopify",
+  facebook: "Facebook",
+  nanobanana: "Nanobanana Pro",
+  anthropic: "Claude API",
+};
+
+function formatTimeLeft(hoursLeft: number): string {
+  if (hoursLeft <= 0) return "has expired";
+  if (hoursLeft < 1) return "expires in less than 1 hour";
+  if (hoursLeft < 24) return `expires in ${hoursLeft} hour${hoursLeft === 1 ? "" : "s"}`;
+  const days = Math.ceil(hoursLeft / 24);
+  return `expires in ${days} day${days === 1 ? "" : "s"}`;
+}
+
+function TokenExpiryBanner() {
+  const [dismissed, setDismissed] = useState(false);
+  const expiring = useConnectionsStore((s) => s.getExpiringServices(24));
+
+  if (dismissed || expiring.length === 0) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: "auto" }}
+        exit={{ opacity: 0, height: 0 }}
+        transition={{ duration: 0.2, ease: "easeInOut" }}
+        className={cn(
+          "mx-6 mt-4 mb-0 rounded-xl border px-4 py-3",
+          "bg-[var(--bg-elevated)] border-[var(--accent-amber)]/30"
+        )}
+      >
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 mt-0.5">
+            <AlertTriangle size={16} className="text-[var(--accent-amber)]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            {expiring.map(({ service, hoursLeft }) => (
+              <p key={service} className="text-sm text-[var(--text-primary)]">
+                Your <span className="font-medium">{SERVICE_LABELS[service]}</span> connection{" "}
+                {formatTimeLeft(hoursLeft)}.{" "}
+                <Link
+                  href="/settings"
+                  className="text-[var(--accent-amber)] hover:underline font-medium"
+                >
+                  Reconnect
+                </Link>{" "}
+                <span className="text-[var(--text-secondary)]">to avoid disruption.</span>
+              </p>
+            ))}
+          </div>
+          <button
+            onClick={() => setDismissed(true)}
+            className={cn(
+              "shrink-0 p-1 rounded-md transition-colors",
+              "text-[var(--text-muted)] hover:text-[var(--text-secondary)]",
+              "hover:bg-white/[0.06]"
+            )}
+            aria-label="Dismiss warning"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
@@ -132,6 +205,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
         style={{ paddingTop: 64 + bannerOffset }}
       >
+        <TokenExpiryBanner />
         <div className="p-6">{children}</div>
       </main>
 

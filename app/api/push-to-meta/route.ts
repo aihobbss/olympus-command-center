@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
+import { apiError } from "@/lib/api-error";
 
 // Push an Ad Creator campaign to Meta as a real Facebook campaign
 // Creates: Campaign → Ad Set → Ad (with creative)
@@ -37,10 +38,7 @@ export async function POST(request: Request) {
     };
 
     if (!userId || !campaignId) {
-      return NextResponse.json(
-        { error: "userId and campaignId are required" },
-        { status: 400 }
-      );
+      return apiError("missing_fields", "userId and campaignId are required", 400);
     }
 
     // 1. Get campaign details from ad_creator_campaigns (include product_id)
@@ -51,15 +49,12 @@ export async function POST(request: Request) {
       .single();
 
     if (campaignError || !campaign) {
-      return NextResponse.json(
-        { error: "Campaign not found" },
-        { status: 404 }
-      );
+      return apiError("campaign_not_found", "Campaign not found", 404);
     }
 
     const authResult = await verifyApiUser(request, campaign.store_id);
     if ("error" in authResult) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+      return apiError("auth_failed", authResult.error, authResult.status);
     }
     const verifiedUserId = authResult.userId;
 
@@ -72,17 +67,11 @@ export async function POST(request: Request) {
       .single();
 
     if (tokenError || !tokenRow?.access_token) {
-      return NextResponse.json(
-        { error: "Meta not connected. Connect Facebook in Settings." },
-        { status: 401 }
-      );
+      return apiError("meta_not_connected", "Meta not connected. Connect Facebook in Settings.", 401);
     }
 
     if (tokenRow.expires_at && new Date(tokenRow.expires_at) < new Date()) {
-      return NextResponse.json(
-        { error: "Meta token expired. Please reconnect." },
-        { status: 401 }
-      );
+      return apiError("meta_token_expired", "Meta token expired. Please reconnect.", 401);
     }
 
     const accessToken = tokenRow.access_token;
@@ -109,10 +98,7 @@ export async function POST(request: Request) {
     }
 
     if (!adAccountId) {
-      return NextResponse.json(
-        { error: "No ad account found. Discover accounts in Settings after connecting Facebook." },
-        { status: 400 }
-      );
+      return apiError("no_ad_account", "No ad account found. Discover accounts in Settings after connecting Facebook.", 400);
     }
 
     // 3. Get a Facebook Page ID (needed for ads)
@@ -124,10 +110,7 @@ export async function POST(request: Request) {
     const pageId = pagesData.data?.[0]?.id;
 
     if (!pageId) {
-      return NextResponse.json(
-        { error: "No Facebook Page found. You need at least one Facebook Page to create ads." },
-        { status: 400 }
-      );
+      return apiError("no_facebook_page", "No Facebook Page found. You need at least one Facebook Page to create ads.", 400);
     }
 
     // 4. Create Campaign on Meta
@@ -146,11 +129,8 @@ export async function POST(request: Request) {
     });
 
     if (!campaignRes.ok) {
-      const err = await campaignRes.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: "Failed to create campaign on Meta", details: err },
-        { status: 502 }
-      );
+      await campaignRes.json().catch(() => ({}));
+      return apiError("meta_campaign_create_failed", "Failed to create campaign on Meta", 502, true);
     }
 
     const { id: metaCampaignId } = await campaignRes.json();
@@ -182,16 +162,13 @@ export async function POST(request: Request) {
     });
 
     if (!adSetRes.ok) {
-      const err = await adSetRes.json().catch(() => ({}));
+      await adSetRes.json().catch(() => ({}));
       // Clean up: delete the campaign we just created
       await fetch(`${META_API}/${metaCampaignId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
       }).catch((cleanupErr) => console.error("Failed to clean up Meta campaign:", cleanupErr));
-      return NextResponse.json(
-        { error: "Failed to create ad set on Meta", details: err },
-        { status: 502 }
-      );
+      return apiError("meta_adset_create_failed", "Failed to create ad set on Meta", 502, true);
     }
 
     const { id: adSetId } = await adSetRes.json();
@@ -218,11 +195,8 @@ export async function POST(request: Request) {
     });
 
     if (!creativeRes.ok) {
-      const err = await creativeRes.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: "Failed to create ad creative on Meta", details: err },
-        { status: 502 }
-      );
+      await creativeRes.json().catch(() => ({}));
+      return apiError("meta_creative_create_failed", "Failed to create ad creative on Meta", 502, true);
     }
 
     const { id: creativeId } = await creativeRes.json();
@@ -240,11 +214,8 @@ export async function POST(request: Request) {
     });
 
     if (!adRes.ok) {
-      const err = await adRes.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: "Failed to create ad on Meta", details: err },
-        { status: 502 }
-      );
+      await adRes.json().catch(() => ({}));
+      return apiError("meta_ad_create_failed", "Failed to create ad on Meta", 502, true);
     }
 
     // 8. Update our DB: mark campaign as Live + store Meta campaign ID + ad account
@@ -290,9 +261,6 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     console.error("Push to Meta error:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError("server_error", "Internal server error", 500, true);
   }
 }
