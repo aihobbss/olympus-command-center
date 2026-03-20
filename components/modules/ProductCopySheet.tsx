@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X, Upload, Check, ChevronRight, ImageIcon, Table2, Trash2, DollarSign, Tag, Percent, Image as ImageLucide } from "lucide-react";
+import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X, Upload, Check, ChevronRight, ImageIcon, Table2, Trash2, DollarSign, Tag, Percent, Image as ImageLucide, AlertTriangle } from "lucide-react";
 import { useProductCopyStore, useProductsStore, useStoreContext } from "@/lib/store";
 import { type ProductCopy, type AdStatus, type ProductType, type SheetProduct } from "@/data/mock";
 import { cn } from "@/lib/utils";
@@ -870,7 +870,7 @@ type StatusFilter = "All" | "Pending" | "Generating" | "Completed" | "Blank";
 // ── Main sheet component ───────────────────────────────────
 
 export function ProductCopySheet() {
-  const { copyProducts, loading, loadProducts, updateCopyProduct, deleteCopyProduct, generateCopy, generateAll, pushToStore, pushAllToStore, generateSizeChart } =
+  const { copyProducts, loading, error, loadProducts, updateCopyProduct, deleteCopyProduct, generateCopy, generateAll, pushToStore, pushAllToStore, generateSizeChart } =
     useProductCopyStore();
   const { sheetProducts } = useProductsStore();
   const { selectedStore } = useStoreContext();
@@ -931,6 +931,23 @@ export function ProductCopySheet() {
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <Loader2 size={24} className="animate-spin text-accent-indigo mb-3" />
         <p className="text-sm text-text-secondary">Loading products…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="w-12 h-12 rounded-xl bg-accent-red/10 flex items-center justify-center mb-4">
+          <AlertTriangle size={20} className="text-accent-red" />
+        </div>
+        <p className="text-sm text-text-secondary mb-3">{error}</p>
+        <button
+          onClick={() => storeId && loadProducts(storeId)}
+          className="px-4 py-2 text-sm rounded-lg bg-accent-indigo/10 text-accent-indigo hover:bg-accent-indigo/20 transition-colors"
+        >
+          Retry Connection
+        </button>
       </div>
     );
   }

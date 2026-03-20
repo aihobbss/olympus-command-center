@@ -275,6 +275,11 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
       if (!controller.signal.aborted) {
         set({ loading: false, error: "Failed to load products. Please try again." });
       }
+    } finally {
+      // Safety net: if this controller is still the active one and loading is stuck, reset it
+      if (_researchLoadController === controller && get().loading) {
+        set({ loading: false });
+      }
     }
   },
 
@@ -465,6 +470,10 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
       if ((err as Error).name === "AbortError") return;
       if (!controller.signal.aborted) {
         set({ loading: false, error: "Failed to load product copies. Please try again." });
+      }
+    } finally {
+      if (_copyLoadController === controller && get().loading) {
+        set({ loading: false });
       }
     }
   },
@@ -793,6 +802,10 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
       console.error("Failed to load ad creator campaigns:", err);
       if (!controller.signal.aborted) {
         set({ campaigns: [], loading: false, error: "Failed to load campaigns. Please try again." });
+      }
+    } finally {
+      if (_adCreatorLoadController === controller && get().loading) {
+        set({ loading: false });
       }
     }
   },
@@ -1262,6 +1275,10 @@ export const useConnectionsStore = create<ConnectionsStore>((set, get) => ({
       if ((err as Error).name === "AbortError") return;
       console.error("Failed to load connections:", err);
       if (!controller.signal.aborted) set({ loading: false, loaded: true });
+    } finally {
+      if (_connectionsLoadController === controller && get().loading) {
+        set({ loading: false });
+      }
     }
   },
 

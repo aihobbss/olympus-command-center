@@ -11,6 +11,7 @@ import {
   Loader2,
   Image,
   Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { useResearchStore, useStoreContext, flushAllProductWrites } from "@/lib/store";
 import {
@@ -344,7 +345,7 @@ type TestingStatusFilter =
 // ── Main sheet component ───────────────────────────────────
 
 export function ResearchSheet() {
-  const { sheetProducts, updateSheetProduct, importAllUnimported, addSheetProduct, deleteSheetProduct, loadProducts, loading, adding } =
+  const { sheetProducts, updateSheetProduct, importAllUnimported, addSheetProduct, deleteSheetProduct, loadProducts, loading, adding, error } =
     useResearchStore();
   const { selectedStore } = useStoreContext();
   const [search, setSearch] = useState("");
@@ -485,6 +486,23 @@ export function ResearchSheet() {
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="w-8 h-8 border-2 border-accent-indigo/30 border-t-accent-indigo rounded-full animate-spin mb-4" />
         <p className="text-sm text-text-secondary">Loading products...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="w-12 h-12 rounded-xl bg-accent-red/10 flex items-center justify-center mb-4">
+          <AlertTriangle size={20} className="text-accent-red" />
+        </div>
+        <p className="text-sm text-text-secondary mb-3">{error}</p>
+        <button
+          onClick={() => storeId && loadProducts(storeId)}
+          className="px-4 py-2 text-sm rounded-lg bg-accent-indigo/10 text-accent-indigo hover:bg-accent-indigo/20 transition-colors"
+        >
+          Retry Connection
+        </button>
       </div>
     );
   }
