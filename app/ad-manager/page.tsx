@@ -197,12 +197,6 @@ export default function AdManagerPage() {
     (localAmount: number) => Math.round(localAmount * rate),
     [rate]
   );
-  // Convert USD back to store currency for display
-  const usdToLocal = useCallback(
-    (usdAmount: number) => rate > 0 ? Math.round(usdAmount / rate) : usdAmount,
-    [rate]
-  );
-
   // ── Load ad accounts (discover from Meta to get real names + all accounts) ──
   useEffect(() => {
     if (!user || !storeId || !metaConnected) return;
@@ -224,13 +218,6 @@ export default function AdManagerPage() {
   }, [user, storeId, metaConnected]);
 
   // ── Map period to Meta date_preset + days back for profit sync ──
-  const DATE_PRESET: Record<TimePeriod, string> = {
-    today: "today",
-    "3d": "last_3d",
-    "7d": "last_7d",
-    "30d": "last_30d",
-    all: "maximum",
-  };
   const DAYS_BACK: Record<TimePeriod, number> = {
     today: 1,
     "3d": 3,
@@ -297,11 +284,11 @@ export default function AdManagerPage() {
     setBackgroundSyncing(true);
     setSyncError(null);
     try {
-      // Cap sync to 30 days to stay within Vercel 10s timeout
-      const syncDays = Math.min(DAYS_BACK[period], 30);
+      // Always sync Meta with "maximum" to get lifetime campaign spend
+      // (campaigns store cumulative spend; period filtering happens client-side via profit logs)
       const results = await Promise.allSettled([
-        triggerMetaSync(user.id, storeId, DATE_PRESET[period]),
-        triggerProfitSync(user.id, storeId, syncDays),
+        triggerMetaSync(user.id, storeId, "maximum"),
+        triggerProfitSync(user.id, storeId, 30),
       ]);
       if (results[0].status === "fulfilled" && results[0].value.error) {
         setSyncError(results[0].value.error);
@@ -325,10 +312,10 @@ export default function AdManagerPage() {
     setSyncing(true);
     setSyncError(null);
     try {
-      const syncDays = Math.min(DAYS_BACK[period], 30);
+      // Always sync Meta with "maximum" to get lifetime campaign spend
       const results = await Promise.allSettled([
-        triggerMetaSync(user.id, storeId, DATE_PRESET[period]),
-        triggerProfitSync(user.id, storeId, syncDays),
+        triggerMetaSync(user.id, storeId, "maximum"),
+        triggerProfitSync(user.id, storeId, 30),
       ]);
       if (results[0].status === "fulfilled" && results[0].value.error) {
         setSyncError(results[0].value.error);
@@ -676,21 +663,21 @@ export default function AdManagerPage() {
                   label="Total Spend"
                   value={totals.spend}
                   format="currency"
-                  currency="$"
+                  currency={currencySymbol}
                 />
                 <MetricCard
                   label="Revenue"
-                  value={usdToLocal(totals.revenue)}
+                  value={totals.revenue}
                   format="currency"
                   currency={currencySymbol}
-                  subtitle={`$${Math.round(totals.revenue).toLocaleString()} USD`}
+                  subtitle={`$${Math.round(toUsd(totals.revenue)).toLocaleString()} USD`}
                 />
                 <MetricCard
                   label="Profit"
                   value={totals.profit}
                   format="currency"
-                  currency="$"
-                  subtitle={`${currencySymbol}${Math.round(usdToLocal(totals.profit)).toLocaleString()} ${storeCurrency}`}
+                  currency={currencySymbol}
+                  subtitle={`$${Math.round(toUsd(totals.profit)).toLocaleString()} USD`}
                 />
                 <MetricCard label="Orders" value={totals.orders} format="number" />
                 <MetricCard
