@@ -221,9 +221,15 @@ export async function flushAllProductWrites(): Promise<void> {
     clearTimeout(updateTimers[key].timer);
     updateTimers[key].flush();
   }
-  // Wait for all in-flight write promises to settle
+  // Wait for all in-flight write promises to settle, but cap at 5s
+  // to prevent blocking loadProducts indefinitely if writes hang
   if (_pendingWritePromises.length > 0) {
-    await Promise.allSettled(_pendingWritePromises);
+    let timeoutId: ReturnType<typeof setTimeout>;
+    await Promise.race([
+      Promise.allSettled(_pendingWritePromises),
+      new Promise<void>((resolve) => { timeoutId = setTimeout(resolve, 5_000); }),
+    ]);
+    clearTimeout(timeoutId!);
     _pendingWritePromises.length = 0;
   }
 }

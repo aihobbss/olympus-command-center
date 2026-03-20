@@ -84,8 +84,12 @@ export async function fetchProducts(storeId: string, signal?: AbortSignal): Prom
   const { data, error } = await query;
 
   if (error) {
-    console.error("Failed to fetch products:", error.message);
-    return [];
+    // If the caller's signal was aborted, throw a proper AbortError so the store
+    // can distinguish cancellation from real failures and preserve cached data.
+    if (signal?.aborted) {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }
+    throw new Error(error.message);
   }
 
   return (data as ProductRow[]).map(rowToProduct);

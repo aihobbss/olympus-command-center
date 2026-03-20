@@ -367,6 +367,31 @@ export function ResearchSheet() {
     };
   }, []);
 
+  // Safety net: if loading stays true for 20s, force-reset with an error
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setTimeout(() => {
+      if (useResearchStore.getState().loading) {
+        useResearchStore.setState({ loading: false, error: "Loading timed out. Please try again." });
+      }
+    }, 20_000);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  // Auto-retry when browser tab regains focus if data is empty or errored
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && storeId) {
+        const state = useResearchStore.getState();
+        if (state.sheetProducts.length === 0 || state.error) {
+          loadProducts(storeId);
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [storeId, loadProducts]);
+
   // Auto-fill product data when an afterlib/winninghunter link is pasted
   const handleAdLinkSave = useCallback(
     async (productId: string, link: string) => {

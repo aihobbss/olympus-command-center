@@ -80,8 +80,10 @@ export async function fetchAdCreatorCampaigns(storeId: string, signal?: AbortSig
   const { data, error } = await query;
 
   if (error) {
-    console.error("Failed to fetch ad creator campaigns:", error.message);
-    return [];
+    if (signal?.aborted) {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }
+    throw new Error(error.message);
   }
 
   return (data as AdCreatorRow[]).map(rowToCampaign);

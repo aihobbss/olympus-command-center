@@ -82,8 +82,10 @@ export async function fetchProductCopies(storeId: string, signal?: AbortSignal):
   const { data, error } = await query;
 
   if (error) {
-    console.error("Failed to fetch product copies:", error.message);
-    return [];
+    if (signal?.aborted) {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }
+    throw new Error(error.message);
   }
 
   return (data as ProductCopyRow[]).map(rowToProductCopy);

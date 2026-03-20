@@ -10,9 +10,15 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     fetch: (input, init) => {
-      // Only add a timeout if no signal is already set
-      const signal = init?.signal ?? AbortSignal.timeout(15000);
-      return fetch(input, { ...init, signal });
+      const timeoutMs = 15_000;
+      if (init?.signal) {
+        // ALWAYS enforce a timeout even when a caller provides their own signal.
+        // Previously the timeout was skipped when a custom signal was set, meaning
+        // requests could hang forever if the network stalled after a tab switch.
+        const signal = AbortSignal.any([init.signal, AbortSignal.timeout(timeoutMs)]);
+        return fetch(input, { ...init, signal });
+      }
+      return fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
     },
   },
 });
