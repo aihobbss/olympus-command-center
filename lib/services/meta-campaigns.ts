@@ -6,6 +6,7 @@ import type { AdCampaign } from "@/data/mock";
 type AdCampaignRow = {
   id: string;
   store_id: string;
+  product_id: string | null;
   meta_campaign_id: string | null;
   ad_account_id: string | null;
   campaign_name: string | null;
@@ -27,13 +28,14 @@ type AdCampaignRow = {
 };
 
 const SELECT_COLS =
-  "id, store_id, meta_campaign_id, ad_account_id, campaign_name, product, spend, budget, cpc, ctr, atc, roas, revenue, orders, profit, status, recommendation, recommendation_reason, last_synced_at, budget_history";
+  "id, store_id, product_id, meta_campaign_id, ad_account_id, campaign_name, product, spend, budget, cpc, ctr, atc, roas, revenue, orders, profit, status, recommendation, recommendation_reason, last_synced_at, budget_history";
 
 // ── Mappers ────────────────────────────────────────────────
 
 function rowToCampaign(row: AdCampaignRow): AdCampaign {
   return {
     id: row.id,
+    productId: row.product_id ?? undefined,
     campaignName: row.campaign_name ?? "",
     product: row.product ?? "",
     adAccountId: row.ad_account_id ?? undefined,
@@ -85,7 +87,7 @@ export async function getLastSyncedAt(storeId: string): Promise<string | null> {
 // ── Sync trigger (calls API route) ────────────────────────
 
 export async function triggerMetaSync(
-  userId: string,
+  _userId: string,
   storeId: string,
   datePreset?: string
 ): Promise<{ synced: number; error?: string }> {
@@ -97,7 +99,7 @@ export async function triggerMetaSync(
     const res = await authFetch("/api/sync-meta-campaigns", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, storeId, datePreset }),
+      body: JSON.stringify({ storeId, datePreset }),
       signal: controller.signal,
     });
 

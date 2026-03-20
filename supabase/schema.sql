@@ -117,9 +117,9 @@ CREATE INDEX idx_user_ad_accounts_user ON user_ad_accounts(user_id);
 CREATE INDEX idx_user_ad_accounts_store ON user_ad_accounts(store_id);
 
 -- ============================================
--- 5. RESEARCH PRODUCTS
+-- 5. PRODUCTS (unified product entity, renamed from research_products)
 -- ============================================
-CREATE TABLE IF NOT EXISTS research_products (
+CREATE TABLE IF NOT EXISTS products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
   product_name TEXT,
@@ -132,20 +132,23 @@ CREATE TABLE IF NOT EXISTS research_products (
   days_active INTEGER,
   brands_running INTEGER,
   creatives_count INTEGER,
-  testing_status TEXT DEFAULT 'Queued' CHECK (testing_status IN ('Queued', 'Testing', 'Killed', 'Imported')),
+  testing_status TEXT CHECK (testing_status IN ('', 'Queued', 'Testing', 'Killed', 'Imported', 'Scheduled', 'Live')),
   creative_saved BOOLEAN DEFAULT false,
   cog NUMERIC,
   product_type TEXT,
   pricing NUMERIC,
   discount_percent NUMERIC,
+  compare_at_price NUMERIC,
   notes TEXT,
   scraped_from TEXT CHECK (scraped_from IN ('afterlib', 'winning_hunter', NULL)),
+  pipeline_status TEXT DEFAULT 'research' CHECK (pipeline_status IN ('research', 'imported', 'copy_created', 'pushed_to_shopify', 'ad_testing', 'live', 'killed')),
+  shopify_product_id TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_research_products_store ON research_products(store_id);
-CREATE INDEX idx_research_products_status ON research_products(testing_status);
+CREATE INDEX idx_products_store ON products(store_id);
+CREATE INDEX idx_products_status ON products(testing_status);
 
 -- ============================================
 -- 6. PRODUCT COPIES
@@ -153,7 +156,8 @@ CREATE INDEX idx_research_products_status ON research_products(testing_status);
 CREATE TABLE IF NOT EXISTS product_copies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  research_product_id UUID REFERENCES research_products(id) ON DELETE SET NULL,
+  product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+  research_product_id UUID REFERENCES products(id) ON DELETE SET NULL,
   product_name TEXT NOT NULL,
   product_url TEXT,
   image_url TEXT,
@@ -179,6 +183,7 @@ CREATE INDEX idx_product_copies_push ON product_copies(push_status);
 CREATE TABLE IF NOT EXISTS ad_creator_campaigns (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id) ON DELETE SET NULL,
   product_name TEXT,
   product_url TEXT,
   primary_text TEXT,
@@ -204,6 +209,7 @@ CREATE INDEX idx_ad_creator_store ON ad_creator_campaigns(store_id);
 CREATE TABLE IF NOT EXISTS ad_campaigns (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id) ON DELETE SET NULL,
   meta_campaign_id TEXT,
   ad_account_id TEXT,              -- Which Meta ad account owns this campaign
   campaign_name TEXT,
@@ -249,6 +255,7 @@ CREATE TABLE IF NOT EXISTS ad_actions (
 CREATE TABLE IF NOT EXISTS creatives (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id) ON DELETE SET NULL,
   product_name TEXT,
   prompt_template TEXT,
   prompt TEXT,
@@ -291,6 +298,7 @@ CREATE INDEX idx_profit_logs_store_date ON profit_logs(store_id, date);
 CREATE TABLE IF NOT EXISTS product_cogs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id) ON DELETE SET NULL,
   product_name TEXT NOT NULL,
   cog_usd NUMERIC NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -376,7 +384,7 @@ DECLARE
 BEGIN
   FOR t IN
     SELECT unnest(ARRAY[
-      'profiles', 'research_products', 'product_copies',
+      'profiles', 'products', 'product_copies',
       'ad_creator_campaigns', 'ad_campaigns', 'oauth_tokens',
       'customer_cases', 'user_ad_accounts'
     ])

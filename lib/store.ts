@@ -191,16 +191,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   login: (user) => set({ user }),
 }));
 
-// ─── Research Store ──────────────────────────────────────
-// Manages the Research Sheet (product research tracking).
-// Persisted to Supabase via lib/services/research.ts.
+// ─── Products Store ──────────────────────────────────────
+// Manages the unified product entity (formerly Research Sheet).
+// Persisted to Supabase via lib/services/products.ts.
+// Products flow: Research → Import → Product Creation → Creative → Ad → Profit.
 
 import {
-  fetchResearchProducts,
-  createResearchProduct,
-  updateResearchProduct as updateResearchProductDB,
+  fetchProducts as fetchResearchProducts,
+  createProduct as createResearchProduct,
+  updateProduct as updateResearchProductDB,
   bulkUpdateStatus,
-} from "@/lib/services/research";
+} from "@/lib/services/products";
 
 // Debounce map for batching rapid edits before writing to DB
 type PendingWrite = { timer: ReturnType<typeof setTimeout>; flush: () => void };
@@ -214,6 +215,7 @@ interface ResearchStore {
   sheetProducts: SheetProduct[];
   loading: boolean;
   adding: boolean;
+  error: string | null;
   loadProducts: (storeId: string) => Promise<void>;
   updateSheetProduct: (id: string, updates: Partial<SheetProduct>) => void;
   importAllUnimported: () => void;
@@ -225,6 +227,7 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
   sheetProducts: [],
   loading: false,
   adding: false,
+  error: null,
 
   loadProducts: async (storeId) => {
     // Abort any in-flight load to free the browser connection
@@ -237,14 +240,16 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
     if (!hasData) {
       set({ loading: true });
     }
+    set({ error: null });
     try {
       const products = await fetchResearchProducts(storeId, controller.signal);
       if (controller.signal.aborted) return; // stale — newer load in progress
-      set({ sheetProducts: products, loading: false });
+      set({ sheetProducts: products, loading: false, error: null });
     } catch (err) {
       if ((err as Error).name === "AbortError") return; // cancelled, not an error
-      // Ensure loading is always cleared even on unexpected errors
-      if (!controller.signal.aborted) set({ loading: false });
+      if (!controller.signal.aborted) {
+        set({ loading: false, error: "Failed to load products. Please try again." });
+      }
     }
   },
 
@@ -310,9 +315,12 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
       sheetProducts: s.sheetProducts.filter((p) => p.id !== id),
     }));
     // Fire-and-forget DB delete
-    import("@/lib/services/research").then((m) => m.deleteResearchProduct(id, store?.id));
+    import("@/lib/services/products").then((m) => m.deleteProduct(id, store?.id));
   },
 }));
+
+// Export alias: useProductsStore is the canonical name for the product entity store
+export const useProductsStore = useResearchStore;
 
 // ─── Product Copy Store ─────────────────────────────────
 // Manages the Product Creation / Copy Generation sheet.
@@ -321,6 +329,7 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
 interface ProductCopyStore {
   copyProducts: ProductCopy[];
   loading: boolean;
+  error: string | null;
   loadProducts: (storeId: string) => Promise<void>;
   updateCopyProduct: (id: string, updates: Partial<ProductCopy>) => void;
   deleteCopyProduct: (id: string) => void;
@@ -345,6 +354,7 @@ async function updateProductCopyDB(id: string, updates: Partial<ProductCopy>, st
 export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
   copyProducts: [],
   loading: false,
+  error: null,
 
   loadProducts: async (storeId: string) => {
     // Abort any in-flight load to free the browser connection
@@ -357,14 +367,17 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
     if (!hasData) {
       set({ loading: true });
     }
+    set({ error: null });
     try {
       const { fetchProductCopies } = await import("@/lib/services/product-copy");
       const products = await fetchProductCopies(storeId, controller.signal);
       if (controller.signal.aborted) return;
-      set({ copyProducts: products, loading: false });
+      set({ copyProducts: products, loading: false, error: null });
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      if (!controller.signal.aborted) set({ loading: false });
+      if (!controller.signal.aborted) {
+        set({ loading: false, error: "Failed to load product copies. Please try again." });
+      }
     }
   },
 
@@ -410,7 +423,6 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
     if (current?.status === "Generating") return;
 
     const store = useStoreContext.getState().selectedStore;
-    const user = useAuthStore.getState().user;
     // Set to Generating immediately
     set((s) => ({
       copyProducts: s.copyProducts.map((p) =>
@@ -432,7 +444,6 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
           market: store?.market || "AU",
           currency: store?.currency || "AUD",
           storeName: store?.name || "",
-          userId: user?.id,
           storeId: store?.id,
           productCopyId: id, // API uses this to look up research product pricing
         }),
@@ -577,7 +588,6 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
     if (current?.sizeChartStatus === "generating") return;
 
     const store = useStoreContext.getState().selectedStore;
-    const user = useAuthStore.getState().user;
     set((s) => ({
       copyProducts: s.copyProducts.map((p) =>
         p.id === id ? { ...p, sizeChartStatus: "generating" as const } : p
@@ -593,7 +603,6 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           imageUrl: product?.sizeChartImage || "",
-          userId: user?.id,
           storeId: store?.id,
         }),
       });
@@ -644,6 +653,7 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
 interface AdCreatorStore {
   campaigns: AdCreatorCampaign[];
   loading: boolean;
+  error: string | null;
   loadCampaigns: (storeId: string) => Promise<void>;
   updateCampaign: (id: string, updates: Partial<AdCreatorCampaign>) => void;
   addCampaign: () => void;
@@ -666,6 +676,7 @@ async function updateAdCreatorDB(id: string, updates: Partial<AdCreatorCampaign>
 export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
   campaigns: [],
   loading: false,
+  error: null,
 
   loadCampaigns: async (storeId: string) => {
     // Abort any in-flight load to free the browser connection
@@ -677,15 +688,18 @@ export const useAdCreatorStore = create<AdCreatorStore>((set, get) => ({
     if (!hasData) {
       set({ loading: true });
     }
+    set({ error: null });
     try {
       const { fetchAdCreatorCampaigns } = await import("@/lib/services/ad-creator");
       const campaigns = await fetchAdCreatorCampaigns(storeId, controller.signal);
       if (controller.signal.aborted) return;
-      set({ campaigns, loading: false });
+      set({ campaigns, loading: false, error: null });
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       console.error("Failed to load ad creator campaigns:", err);
-      if (!controller.signal.aborted) set({ campaigns: [], loading: false });
+      if (!controller.signal.aborted) {
+        set({ campaigns: [], loading: false, error: "Failed to load campaigns. Please try again." });
+      }
     }
   },
 
@@ -946,7 +960,12 @@ export const useCreativeGeneratorStore = create<CreativeGeneratorStore>(
 );
 
 // ─── Cross-store subscription: ProductCopy → Creative Generator batch queue ──
+// Uses productId for matching (falls back to productCopyId for legacy data).
+// Guarded by selectedStore to prevent cross-store data leakage.
 useProductCopyStore.subscribe((state) => {
+  const selectedStore = useStoreContext.getState().selectedStore;
+  if (!selectedStore) return;
+
   const pushed = state.copyProducts.filter((p) => p.pushStatus === "pushed");
   const currentQueue = useCreativeGeneratorStore.getState().batchQueue;
   const existingIds = new Set(currentQueue.map((q) => q.productCopyId));
@@ -958,6 +977,7 @@ useProductCopyStore.subscribe((state) => {
         ...s.batchQueue,
         ...newProducts.map((p) => ({
           id: `bq-${Date.now()}-${p.id}`,
+          productId: p.productId,
           productCopyId: p.id,
           productName: p.productName,
           productUrl: p.productUrl,
@@ -970,16 +990,22 @@ useProductCopyStore.subscribe((state) => {
 });
 
 // ─── Cross-store subscription: Creatives → Ad Creator auto-attach ──
+// Uses productId for matching (falls back to productName for legacy data).
+// Guarded by selectedStore to prevent cross-store data leakage.
 useCreativeGeneratorStore.subscribe((state) => {
+  const selectedStore = useStoreContext.getState().selectedStore;
+  if (!selectedStore) return;
+
   const completed = state.productCreatives.filter((c) => c.status === "completed");
   if (completed.length === 0) return;
 
   const adStore = useAdCreatorStore.getState();
 
   for (const creative of completed) {
-    const campaign = adStore.campaigns.find(
-      (c) => c.productName === creative.productName
-    );
+    // Match by productId first, fallback to productName
+    const campaign = creative.productId
+      ? adStore.campaigns.find((c) => c.productId === creative.productId)
+      : adStore.campaigns.find((c) => c.productName === creative.productName);
     if (!campaign) continue;
 
     const alreadyAttached = campaign.creatives.some((c) => c.id === creative.id);
@@ -1079,12 +1105,14 @@ export const useStoreContext = create<StoreContext>((set) => ({
     _adCreatorLoadController?.abort();
     _adCreatorLoadController = null;
 
-    // Clear all module data so pages reload fresh for the new store
-    useResearchStore.setState({ sheetProducts: [], loading: false });
-    useProductCopyStore.setState({ copyProducts: [], loading: false });
-    useAdCreatorStore.setState({ campaigns: [], loading: false });
+    // Set loading: true BEFORE clearing data so skeleton loaders appear during reload
+    // (instead of a blank flash). Each module's loadProducts(storeId) useEffect will
+    // fire and replace skeletons with fresh data.
+    useResearchStore.setState({ sheetProducts: [], loading: true, error: null });
+    useProductCopyStore.setState({ copyProducts: [], loading: true, error: null });
+    useAdCreatorStore.setState({ campaigns: [], loading: true, error: null });
     useCreativeGeneratorStore.setState({ batchQueue: [], productCreatives: [], loaded: false });
-    useConnectionsStore.setState({ connections: [], loading: false, loaded: false });
+    useConnectionsStore.setState({ connections: [], loading: true, loaded: false });
   },
 }));
 

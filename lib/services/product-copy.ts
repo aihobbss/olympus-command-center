@@ -6,6 +6,7 @@ import type { ProductCopy } from "@/data/mock";
 type ProductCopyRow = {
   id: string;
   store_id: string;
+  product_id: string | null;
   research_product_id: string | null;
   product_name: string;
   product_url: string;
@@ -22,13 +23,14 @@ type ProductCopyRow = {
 };
 
 const SELECT_COLS =
-  "id, store_id, research_product_id, product_name, product_url, image_url, ad_status, shopify_description, facebook_copy, size_chart_image_url, size_chart_table, size_chart_status, copy_status, push_status, shopify_product_id";
+  "id, store_id, product_id, research_product_id, product_name, product_url, image_url, ad_status, shopify_description, facebook_copy, size_chart_image_url, size_chart_table, size_chart_status, copy_status, push_status, shopify_product_id";
 
 // ── Mappers ────────────────────────────────────────────────
 
 function rowToProductCopy(row: ProductCopyRow): ProductCopy {
   return {
     id: row.id,
+    productId: row.product_id ?? undefined,
     adStatus: (row.ad_status || "red") as ProductCopy["adStatus"],
     productName: row.product_name ?? "",
     productUrl: row.product_url ?? "",
@@ -90,7 +92,7 @@ export async function fetchProductCopies(storeId: string, signal?: AbortSignal):
 export async function createProductCopy(
   storeId: string,
   initial?: Partial<ProductCopy>,
-  researchProductId?: string
+  productId?: string
 ): Promise<ProductCopy | null> {
   const row: Record<string, unknown> = {
     store_id: storeId,
@@ -105,7 +107,7 @@ export async function createProductCopy(
     size_chart_image_url: "",
     size_chart_table: "",
     size_chart_status: "",
-    ...(researchProductId ? { research_product_id: researchProductId } : {}),
+    ...(productId ? { product_id: productId, research_product_id: productId } : {}),
   };
 
   const { data, error } = await supabase

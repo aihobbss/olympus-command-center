@@ -22,6 +22,7 @@ type ProfitLogRow = {
 type ProductCogRow = {
   id: string;
   store_id: string;
+  product_id: string | null;
   product_name: string;
   cog_usd: number;
 };
@@ -85,34 +86,43 @@ export async function fetchProfitLogsByDateRange(
 
 // ── COG Management ─────────────────────────────────────────
 
-export async function fetchCogs(storeId: string): Promise<Record<string, number>> {
+export async function fetchCogs(storeId: string): Promise<{
+  byName: Record<string, number>;
+  byProductId: Record<string, number>;
+}> {
   const { data, error } = await supabase
     .from("product_cogs")
-    .select("product_name, cog_usd")
+    .select("product_id, product_name, cog_usd")
     .eq("store_id", storeId);
 
   if (error) {
     console.error("Failed to fetch COGs:", error.message);
-    return {};
+    return { byName: {}, byProductId: {} };
   }
 
-  const result: Record<string, number> = {};
+  const byName: Record<string, number> = {};
+  const byProductId: Record<string, number> = {};
   for (const row of (data as ProductCogRow[]) ?? []) {
-    result[row.product_name] = row.cog_usd;
+    byName[row.product_name] = row.cog_usd;
+    if (row.product_id) {
+      byProductId[row.product_id] = row.cog_usd;
+    }
   }
-  return result;
+  return { byName, byProductId };
 }
 
 export async function upsertCog(
   storeId: string,
   productName: string,
-  cogUsd: number
+  cogUsd: number,
+  productId?: string
 ): Promise<boolean> {
   const { error } = await supabase
     .from("product_cogs")
     .upsert(
       {
         store_id: storeId,
+        product_id: productId || null,
         product_name: productName,
         cog_usd: cogUsd,
         updated_at: new Date().toISOString(),
@@ -131,7 +141,7 @@ export async function upsertCog(
 // ── Sync trigger (calls API route) ────────────────────────
 
 export async function triggerProfitSync(
-  userId: string,
+  _userId: string,
   storeId: string,
   daysBack?: number,
   adAccountIds?: string[]
@@ -144,7 +154,7 @@ export async function triggerProfitSync(
     const res = await authFetch("/api/sync-profit-data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, storeId, daysBack, adAccountIds }),
+      body: JSON.stringify({ storeId, daysBack, adAccountIds }),
       signal: controller.signal,
     });
 

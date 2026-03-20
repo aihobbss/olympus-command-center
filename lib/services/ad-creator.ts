@@ -6,6 +6,7 @@ import type { AdCreatorCampaign, AdCreative } from "@/data/mock";
 type AdCreatorRow = {
   id: string;
   store_id: string;
+  product_id: string | null;
   product_name: string | null;
   product_url: string | null;
   primary_text: string | null;
@@ -21,13 +22,14 @@ type AdCreatorRow = {
 };
 
 const SELECT_COLS =
-  "id, store_id, product_name, product_url, primary_text, headline, description, cta, country, daily_budget, gender, creatives, status, meta_campaign_id";
+  "id, store_id, product_id, product_name, product_url, primary_text, headline, description, cta, country, daily_budget, gender, creatives, status, meta_campaign_id";
 
 // ── Mappers ────────────────────────────────────────────────
 
 function rowToCampaign(row: AdCreatorRow): AdCreatorCampaign {
   return {
     id: row.id,
+    productId: row.product_id ?? undefined,
     productName: row.product_name ?? "",
     productUrl: row.product_url ?? "",
     primaryText: row.primary_text ?? "",
@@ -48,6 +50,7 @@ function campaignToRow(
 ): Record<string, unknown> {
   const row: Record<string, unknown> = { store_id: storeId };
 
+  if (campaign.productId !== undefined) row.product_id = campaign.productId || null;
   if (campaign.productName !== undefined) row.product_name = campaign.productName || null;
   if (campaign.productUrl !== undefined) row.product_url = campaign.productUrl || null;
   if (campaign.primaryText !== undefined) row.primary_text = campaign.primaryText || null;

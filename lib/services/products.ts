@@ -3,7 +3,7 @@ import type { SheetProduct } from "@/data/mock";
 
 // ── DB row shape (snake_case) ──────────────────────────────
 
-type ResearchRow = {
+type ProductRow = {
   id: string;
   store_id: string;
   product_name: string | null;
@@ -16,12 +16,15 @@ type ResearchRow = {
   product_type: string | null;
   pricing: number | null;
   discount_percent: number | null;
+  compare_at_price: number | null;
   notes: string | null;
+  pipeline_status: string | null;
+  shopify_product_id: string | null;
 };
 
 // ── Mappers ────────────────────────────────────────────────
 
-function rowToSheet(row: ResearchRow): SheetProduct {
+function rowToProduct(row: ProductRow): SheetProduct {
   return {
     id: row.id,
     productName: row.product_name ?? "",
@@ -34,11 +37,14 @@ function rowToSheet(row: ResearchRow): SheetProduct {
     productType: (row.product_type ?? "") as SheetProduct["productType"],
     pricing: row.pricing,
     discountPercent: row.discount_percent ?? 42,
+    compareAtPrice: row.compare_at_price,
     notes: row.notes ?? "",
+    pipelineStatus: (row.pipeline_status ?? "research") as SheetProduct["pipelineStatus"],
+    shopifyProductId: row.shopify_product_id ?? undefined,
   };
 }
 
-function sheetToRow(
+function productToRow(
   product: Partial<SheetProduct>,
   storeId: string
 ): Record<string, unknown> {
@@ -54,18 +60,21 @@ function sheetToRow(
   if (product.productType !== undefined) row.product_type = product.productType || null;
   if (product.pricing !== undefined) row.pricing = product.pricing;
   if (product.discountPercent !== undefined) row.discount_percent = product.discountPercent;
+  if (product.compareAtPrice !== undefined) row.compare_at_price = product.compareAtPrice;
   if (product.notes !== undefined) row.notes = product.notes || null;
+  if (product.pipelineStatus !== undefined) row.pipeline_status = product.pipelineStatus;
+  if (product.shopifyProductId !== undefined) row.shopify_product_id = product.shopifyProductId || null;
 
   return row;
 }
 
 // ── Service functions ──────────────────────────────────────
 
-const SELECT_COLS = "id, store_id, product_name, ad_link, store_link, creative_urls, testing_status, creative_saved, cog, product_type, pricing, discount_percent, notes";
+const SELECT_COLS = "id, store_id, product_name, ad_link, store_link, creative_urls, testing_status, creative_saved, cog, product_type, pricing, discount_percent, compare_at_price, notes, pipeline_status, shopify_product_id";
 
-export async function fetchResearchProducts(storeId: string, signal?: AbortSignal): Promise<SheetProduct[]> {
+export async function fetchProducts(storeId: string, signal?: AbortSignal): Promise<SheetProduct[]> {
   let query = supabase
-    .from("research_products")
+    .from("products")
     .select(SELECT_COLS)
     .eq("store_id", storeId)
     .order("created_at", { ascending: true });
@@ -75,16 +84,16 @@ export async function fetchResearchProducts(storeId: string, signal?: AbortSigna
   const { data, error } = await query;
 
   if (error) {
-    console.error("Failed to fetch research products:", error.message);
+    console.error("Failed to fetch products:", error.message);
     return [];
   }
 
-  return (data as ResearchRow[]).map(rowToSheet);
+  return (data as ProductRow[]).map(rowToProduct);
 }
 
-export async function createResearchProduct(storeId: string): Promise<SheetProduct | null> {
+export async function createProduct(storeId: string): Promise<SheetProduct | null> {
   const { data, error } = await supabase
-    .from("research_products")
+    .from("products")
     .insert({
       store_id: storeId,
       product_name: null,
@@ -97,44 +106,46 @@ export async function createResearchProduct(storeId: string): Promise<SheetProdu
       product_type: null,
       pricing: null,
       discount_percent: 42,
+      compare_at_price: null,
       notes: null,
+      pipeline_status: "research",
     })
     .select(SELECT_COLS)
     .single();
 
   if (error) {
-    console.error("Failed to create research product:", error.message);
+    console.error("Failed to create product:", error.message);
     return null;
   }
 
-  return rowToSheet(data as ResearchRow);
+  return rowToProduct(data as ProductRow);
 }
 
-export async function updateResearchProduct(
+export async function updateProduct(
   id: string,
   updates: Partial<SheetProduct>,
   storeId: string
 ): Promise<boolean> {
-  const row = sheetToRow(updates, storeId);
+  const row = productToRow(updates, storeId);
   // Remove store_id from update payload (shouldn't change)
   delete row.store_id;
 
   const { error } = await supabase
-    .from("research_products")
+    .from("products")
     .update(row)
     .eq("id", id);
 
   if (error) {
-    console.error("Failed to update research product:", error.message);
+    console.error("Failed to update product:", error.message);
     return false;
   }
 
   return true;
 }
 
-export async function deleteResearchProduct(id: string, storeId?: string): Promise<boolean> {
+export async function deleteProduct(id: string, storeId?: string): Promise<boolean> {
   let query = supabase
-    .from("research_products")
+    .from("products")
     .delete()
     .eq("id", id);
 
@@ -145,7 +156,7 @@ export async function deleteResearchProduct(id: string, storeId?: string): Promi
   const { error } = await query;
 
   if (error) {
-    console.error("Failed to delete research product:", error.message);
+    console.error("Failed to delete product:", error.message);
     return false;
   }
 
@@ -158,7 +169,7 @@ export async function bulkUpdateStatus(
   storeId?: string
 ): Promise<boolean> {
   let query = supabase
-    .from("research_products")
+    .from("products")
     .update({ testing_status: status })
     .in("id", ids);
 
@@ -175,3 +186,11 @@ export async function bulkUpdateStatus(
 
   return true;
 }
+
+// Legacy re-exports for backwards compatibility during migration
+export {
+  fetchProducts as fetchResearchProducts,
+  createProduct as createResearchProduct,
+  updateProduct as updateResearchProduct,
+  deleteProduct as deleteResearchProduct,
+};

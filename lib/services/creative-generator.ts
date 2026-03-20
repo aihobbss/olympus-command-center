@@ -6,6 +6,7 @@ import type { ProductCreative, BatchQueueProduct } from "@/data/mock";
 type CreativeRow = {
   id: string;
   store_id: string;
+  product_id: string | null;
   product_name: string | null;
   prompt_template: string | null;
   prompt: string | null;
@@ -18,7 +19,7 @@ type CreativeRow = {
 };
 
 const SELECT_COLS =
-  "id, store_id, product_name, prompt_template, prompt, asset_url, thumbnail_url, type, status, reference_image_url, created_at";
+  "id, store_id, product_id, product_name, prompt_template, prompt, asset_url, thumbnail_url, type, status, reference_image_url, created_at";
 
 // Placeholder gradients for creatives without thumbnails
 const GRADIENTS = [
@@ -35,8 +36,9 @@ const GRADIENTS = [
 function rowToCreative(row: CreativeRow, idx: number): ProductCreative {
   return {
     id: row.id,
+    productId: row.product_id ?? undefined,
     productName: row.product_name ?? "",
-    productCopyId: "", // Not stored in creatives table; linked by product_name
+    productCopyId: "", // Not stored in creatives table; linked by product_id
     concept: row.prompt_template ?? "",
     placeholderGradient: GRADIENTS[idx % GRADIENTS.length],
     status: row.status === "saved" || row.status === "ready"
@@ -83,14 +85,16 @@ export async function fetchSavedCreatives(storeId: string): Promise<ProductCreat
 export async function createCreative(
   storeId: string,
   creative: {
+    productId?: string;
     productName: string;
     promptTemplate: string;
     prompt: string;
     referenceImageUrl?: string;
   }
 ): Promise<ProductCreative | null> {
-  const row = {
+  const row: Record<string, unknown> = {
     store_id: storeId,
+    product_id: creative.productId || null,
     product_name: creative.productName,
     prompt_template: creative.promptTemplate,
     prompt: creative.prompt,
@@ -162,7 +166,7 @@ export async function deleteCreative(id: string, storeId?: string): Promise<bool
 export async function fetchBatchQueue(storeId: string): Promise<BatchQueueProduct[]> {
   const { data, error } = await supabase
     .from("product_copies")
-    .select("id, store_id, product_name, product_url, image_url, push_status")
+    .select("id, store_id, product_id, product_name, product_url, image_url, push_status")
     .eq("store_id", storeId)
     .eq("push_status", "pushed")
     .order("updated_at", { ascending: false });
@@ -172,27 +176,33 @@ export async function fetchBatchQueue(storeId: string): Promise<BatchQueueProduc
     return [];
   }
 
-  // Check which products already have creatives
+  // Check which products already have creatives (by product_id first, fallback to name)
   const { data: existingCreatives } = await supabase
     .from("creatives")
-    .select("product_name, status")
+    .select("product_id, product_name, status")
     .eq("store_id", storeId);
 
-  const creativesByProduct = new Map<string, string>();
+  const creativesByProductId = new Map<string, string>();
+  const creativesByName = new Map<string, string>();
   for (const c of existingCreatives ?? []) {
+    if (c.product_id) {
+      creativesByProductId.set(c.product_id, c.status);
+    }
     if (c.product_name) {
-      creativesByProduct.set(c.product_name, c.status);
+      creativesByName.set(c.product_name, c.status);
     }
   }
 
   return (data ?? []).map((row) => {
-    const existingStatus = creativesByProduct.get(row.product_name ?? "");
+    const existingStatus = (row.product_id ? creativesByProductId.get(row.product_id) : null)
+      ?? creativesByName.get(row.product_name ?? "");
     let status: BatchQueueProduct["status"] = "queued";
     if (existingStatus === "generating") status = "generating";
     else if (existingStatus === "ready" || existingStatus === "saved") status = "completed";
 
     return {
       id: `bq-${row.id}`,
+      productId: row.product_id ?? undefined,
       productCopyId: row.id,
       productName: row.product_name ?? "",
       productUrl: row.product_url ?? "",

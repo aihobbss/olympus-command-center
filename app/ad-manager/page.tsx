@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { BarChart3, RefreshCw, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MetricCard, TimePeriodSelector } from "@/components/ui";
@@ -28,6 +28,9 @@ type AdTab = "live" | "creator";
 
 // ─── Exchange rates (store currency → USD) ─────────────────
 const STORE_TO_USD: Record<string, number> = { UK: 1.27, AU: 0.63 };
+
+// ─── Cache staleness threshold (2 minutes) ─────────────────
+const CACHE_TTL_MS = 2 * 60 * 1000;
 
 function computeRecommendation(c: {
   spend: number;
@@ -123,12 +126,17 @@ export default function AdManagerPage() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const [backgroundSyncing, setBackgroundSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"live" | "paused" | "all">("live");
   const [shopifyTotals, setShopifyTotals] = useState({ revenue: 0, orders: 0, profit: 0 });
+  // All profit logs loaded from Supabase (unfiltered) — used for local period filtering
+  const [allProfitLogs, setAllProfitLogs] = useState<{ date: string; revenue: number; orders?: number; profit: number }[]>([]);
 
   const storeId = selectedStore?.id ?? "";
+  // Track which store we've loaded cached data for, to avoid redundant fetches
+  const loadedStoreRef = useRef<string | null>(null);
 
   // ── Ad account switcher state (multi-select, persisted per store) ──
   const [adAccounts, setAdAccounts] = useState<UserAdAccount[]>([]);
@@ -245,13 +253,14 @@ export default function AdManagerPage() {
     };
   }
 
-  // ── Load just data from Supabase (no external API calls) ──
-  const loadData = useCallback(async (p: TimePeriod) => {
+  // ── Load cached data from Supabase (no external API calls) ──
+  // Fetches all campaigns and the widest profit log range ("all") so period changes can filter locally
+  const loadCachedData = useCallback(async () => {
     if (!storeId) return;
-    const { start, end } = getDateRange(p);
+    // Fetch all profit logs (widest range) so we can filter locally for any period
     const [data, profitLogs, synced] = await Promise.all([
       fetchLiveCampaigns(storeId),
-      fetchProfitLogsByDateRange(storeId, start, end),
+      fetchProfitLogsByDateRange(storeId, "2000-01-01", new Date().toISOString().split("T")[0]),
       getLastSyncedAt(storeId),
     ]);
     const withRecs = data.map((c) => {
@@ -260,63 +269,116 @@ export default function AdManagerPage() {
     });
     setCampaigns(withRecs);
     setLastSynced(synced);
+    setAllProfitLogs(profitLogs);
+  }, [storeId]);
 
+  // ── Compute shopifyTotals from allProfitLogs filtered by the current period ──
+  useEffect(() => {
+    if (allProfitLogs.length === 0) {
+      setShopifyTotals({ revenue: 0, orders: 0, profit: 0 });
+      return;
+    }
+    const { start, end } = getDateRange(period);
     let rev = 0, ord = 0, prof = 0;
-    for (const log of profitLogs) {
-      rev += log.revenue;
-      ord += log.orders ?? 0;
-      prof += log.profit;
+    for (const log of allProfitLogs) {
+      if (log.date >= start && log.date <= end) {
+        rev += log.revenue;
+        ord += log.orders ?? 0;
+        prof += log.profit;
+      }
     }
     setShopifyTotals({ revenue: rev, orders: ord, profit: prof });
-  }, [storeId]); // getDateRange uses DAYS_BACK which is a static const
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allProfitLogs, period]);
 
-  // ── Sync: pull fresh data from Meta + Shopify, then reload ──
-  const handleSync = useCallback(async () => {
+  // ── Background sync: pull fresh data from Meta + Shopify, then reload cache ──
+  const runBackgroundSync = useCallback(async () => {
     if (!user || !storeId) return;
-    setSyncing(true);
+    setBackgroundSyncing(true);
     setSyncError(null);
     try {
-      // Run Meta campaign sync and Shopify profit sync in parallel
       // Cap sync to 30 days to stay within Vercel 10s timeout
       const syncDays = Math.min(DAYS_BACK[period], 30);
       const results = await Promise.allSettled([
         triggerMetaSync(user.id, storeId, DATE_PRESET[period]),
         triggerProfitSync(user.id, storeId, syncDays),
       ]);
-      // Check Meta result for errors (but not timeouts — server may have written data)
       if (results[0].status === "fulfilled" && results[0].value.error) {
         setSyncError(results[0].value.error);
       } else if (results[0].status === "rejected") {
         setSyncError("Meta sync failed — check your connection");
       }
-      // Always reload data from Supabase — even on timeout, server may have written data
-      await loadData(period);
+      // Reload cached data from Supabase after sync
+      await loadCachedData();
     } catch {
       setSyncError("Sync failed — check your connections in Settings");
-      // Still try to reload — partial data may have been written
-      try { await loadData(period); } catch { /* ignore reload errors */ }
+      try { await loadCachedData(); } catch { /* ignore reload errors */ }
+    } finally {
+      setBackgroundSyncing(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, storeId, period, loadCachedData]);
+
+  // ── Manual "Sync Now": always triggers a fresh Meta API call ──
+  const handleSync = useCallback(async () => {
+    if (!user || !storeId) return;
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const syncDays = Math.min(DAYS_BACK[period], 30);
+      const results = await Promise.allSettled([
+        triggerMetaSync(user.id, storeId, DATE_PRESET[period]),
+        triggerProfitSync(user.id, storeId, syncDays),
+      ]);
+      if (results[0].status === "fulfilled" && results[0].value.error) {
+        setSyncError(results[0].value.error);
+      } else if (results[0].status === "rejected") {
+        setSyncError("Meta sync failed — check your connection");
+      }
+      await loadCachedData();
+    } catch {
+      setSyncError("Sync failed — check your connections in Settings");
+      try { await loadCachedData(); } catch { /* ignore reload errors */ }
     } finally {
       setSyncing(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, storeId, period, loadData]);
+  }, [user, storeId, period, loadCachedData]);
 
-  // ── Auto-sync on first load if connected (resets when storeId changes) ──
-  const [hasAutoSynced, setHasAutoSynced] = useState<string | null>(null);
+  // ── Cache-first load on page mount / store change ──
+  // 1. Show cached data from Supabase immediately
+  // 2. If last sync was >2 minutes ago, trigger a non-blocking background sync
   useEffect(() => {
-    if (metaConnected && user && storeId && hasAutoSynced !== storeId) {
-      setHasAutoSynced(storeId);
-      handleSync();
-    }
-  }, [metaConnected, user, storeId, hasAutoSynced, handleSync]);
+    if (!metaConnected || !user || !storeId) return;
+    // Avoid redundant loads for the same store
+    if (loadedStoreRef.current === storeId) return;
+    loadedStoreRef.current = storeId;
 
-  // ── Re-sync when period changes (after initial sync) ──
-  useEffect(() => {
-    if (hasAutoSynced && metaConnected && user && storeId) {
-      handleSync();
-    }
+    let cancelled = false;
+
+    (async () => {
+      // Step 1: Load cached data immediately (fast — Supabase only)
+      await loadCachedData();
+      if (cancelled) return;
+
+      // Step 2: Check cache staleness — sync in background if stale
+      const syncedAt = await getLastSyncedAt(storeId);
+      if (cancelled) return;
+
+      const isStale = !syncedAt || (Date.now() - new Date(syncedAt).getTime() > CACHE_TTL_MS);
+      if (isStale) {
+        // Non-blocking background sync
+        runBackgroundSync();
+      }
+    })();
+
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
+  }, [metaConnected, user, storeId]);
+
+  // ── Period changes: filter locally from cached data, do NOT re-sync from Meta ──
+  // shopifyTotals are recomputed via the useEffect above when `period` changes.
+  // Campaigns are not date-filtered (they represent current state), so no action needed.
 
   // ── Filter campaigns by account + status ──
   const isLive = (c: AdCampaign) => c.campaignStatus === "Active" || c.campaignStatus === "Scaling";
@@ -370,33 +432,33 @@ export default function AdManagerPage() {
     setPanelOpen(false);
     const result = await scaleCampaign(user.id, id, newBudget);
     if (result.success) {
-      await loadData(period);
+      await loadCachedData();
     } else {
       setSyncError(result.error || "Failed to scale campaign");
     }
-  }, [user, period, loadData]);
+  }, [user, loadCachedData]);
 
   const handleKill = useCallback(async (id: string) => {
     if (!user) return;
     setPanelOpen(false);
     const result = await killCampaign(user.id, id);
     if (result.success) {
-      await loadData(period);
+      await loadCachedData();
     } else {
       setSyncError(result.error || "Failed to kill campaign");
     }
-  }, [user, period, loadData]);
+  }, [user, loadCachedData]);
 
   const handlePass = useCallback(async (id: string) => {
     if (!user) return;
     setPanelOpen(false);
     const result = await passCampaign(user.id, id);
     if (result.success) {
-      await loadData(period);
+      await loadCachedData();
     } else {
       setSyncError(result.error || "Failed to pass campaign");
     }
-  }, [user, period, loadData]);
+  }, [user, loadCachedData]);
 
   const tabs: { key: AdTab; label: string }[] = [
     { key: "live", label: "Live Campaigns" },
@@ -517,9 +579,15 @@ export default function AdManagerPage() {
             )}
 
             <TimePeriodSelector value={period} onChange={setPeriod} />
+            {backgroundSyncing && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent-indigo/10 text-accent-indigo text-xs font-medium">
+                <RefreshCw size={12} className="animate-spin" />
+                Syncing...
+              </div>
+            )}
             <button
               onClick={handleSync}
-              disabled={syncing}
+              disabled={syncing || backgroundSyncing}
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-elevated text-text-secondary hover:text-text-primary hover:bg-border-subtle transition-all text-sm disabled:opacity-50"
             >
               <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />

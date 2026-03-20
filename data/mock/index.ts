@@ -71,6 +71,8 @@ export function getPriceForType(productType: ProductType, market: string): numbe
   return market === "AU" ? entry.aud : entry.gbp;
 }
 
+export type PipelineStatus = "research" | "imported" | "copy_created" | "pushed_to_shopify" | "ad_testing" | "live" | "killed";
+
 export type SheetProduct = {
   id: string;
   productName: string;
@@ -83,7 +85,10 @@ export type SheetProduct = {
   productType: ProductType;
   pricing: number | null;
   discountPercent: number;
+  compareAtPrice: number | null;
   notes: string;
+  pipelineStatus: PipelineStatus;
+  shopifyProductId?: string;
 };
 
 export const initialSheetProducts: SheetProduct[] = [
@@ -100,6 +105,8 @@ export const initialSheetProducts: SheetProduct[] = [
     pricing: 38,
     discountPercent: 42,
     notes: "GOOD",
+    compareAtPrice: null,
+    pipelineStatus: "live",
   },
   {
     id: "sp-002",
@@ -114,6 +121,8 @@ export const initialSheetProducts: SheetProduct[] = [
     pricing: 28,
     discountPercent: 42,
     notes: "good",
+    compareAtPrice: null,
+    pipelineStatus: "research",
   },
   {
     id: "sp-003",
@@ -128,6 +137,8 @@ export const initialSheetProducts: SheetProduct[] = [
     pricing: 38,
     discountPercent: 42,
     notes: "GOOD",
+    compareAtPrice: null,
+    pipelineStatus: "live",
   },
   {
     id: "sp-004",
@@ -142,6 +153,8 @@ export const initialSheetProducts: SheetProduct[] = [
     pricing: 38,
     discountPercent: 42,
     notes: "Not DS",
+    compareAtPrice: null,
+    pipelineStatus: "research",
   },
   {
     id: "sp-005",
@@ -156,6 +169,8 @@ export const initialSheetProducts: SheetProduct[] = [
     pricing: 32,
     discountPercent: 42,
     notes: "Creative is branded",
+    compareAtPrice: null,
+    pipelineStatus: "killed",
   },
   {
     id: "sp-006",
@@ -170,6 +185,8 @@ export const initialSheetProducts: SheetProduct[] = [
     pricing: 48,
     discountPercent: 42,
     notes: "avoid",
+    compareAtPrice: null,
+    pipelineStatus: "research",
   },
   {
     id: "sp-007",
@@ -184,6 +201,8 @@ export const initialSheetProducts: SheetProduct[] = [
     pricing: 38,
     discountPercent: 42,
     notes: "",
+    compareAtPrice: null,
+    pipelineStatus: "research",
   },
   {
     id: "sp-008",
@@ -198,6 +217,8 @@ export const initialSheetProducts: SheetProduct[] = [
     pricing: 28,
     discountPercent: 42,
     notes: "Good margins",
+    compareAtPrice: null,
+    pipelineStatus: "research",
   },
   {
     id: "sp-009",
@@ -212,6 +233,8 @@ export const initialSheetProducts: SheetProduct[] = [
     pricing: 32,
     discountPercent: 42,
     notes: "",
+    compareAtPrice: null,
+    pipelineStatus: "research",
   },
 ];
 
@@ -242,6 +265,7 @@ export type SizeChartStatus = "" | "generating" | "done" | "error";
 
 export type ProductCopy = {
   id: string;
+  productId?: string;
   adStatus: AdStatus;
   productUrl: string;
   productName: string;
@@ -345,6 +369,7 @@ export type AdGender = "Male" | "Female" | "All" | "";
 
 export type AdCreatorCampaign = {
   id: string;
+  productId?: string;
   productName: string;
   productUrl: string;
   primaryText: string;
@@ -465,6 +490,7 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
 
 export type BatchQueueProduct = {
   id: string;
+  productId?: string;
   productCopyId: string;
   productName: string;
   productUrl: string;
@@ -474,6 +500,7 @@ export type BatchQueueProduct = {
 
 export type ProductCreative = {
   id: string;
+  productId?: string;
   productName: string;
   productCopyId: string;
   concept: string;
@@ -507,6 +534,7 @@ export type CampaignStatus = "Active" | "Paused" | "Killed" | "Scaling";
 
 export type AdCampaign = {
   id: string;
+  productId?: string;
   campaignName: string;
   product: string;
   adAccountId?: string;
