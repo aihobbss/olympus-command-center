@@ -160,7 +160,7 @@ export async function POST(request: Request) {
 
       if (copyRow?.research_product_id) {
         const { data: researchRow } = await supabaseAdmin
-          .from("research_products")
+          .from("products")
           .select("product_type, pricing, discount_percent")
           .eq("id", copyRow.research_product_id)
           .single();
@@ -270,6 +270,25 @@ export async function POST(request: Request) {
         }
       }
 
+      // Update the products table with shopify_product_id + pipeline_status
+      if (productCopyId && shopifyProductId) {
+        const { data: copyRow } = await supabaseAdmin
+          .from("product_copies")
+          .select("product_id")
+          .eq("id", productCopyId)
+          .single();
+
+        if (copyRow?.product_id) {
+          await supabaseAdmin
+            .from("products")
+            .update({
+              shopify_product_id: shopifyProductId,
+              pipeline_status: "pushed_to_shopify",
+            })
+            .eq("id", copyRow.product_id);
+        }
+      }
+
       return NextResponse.json({
         success: true,
         shopifyProductId,
@@ -329,6 +348,25 @@ export async function POST(request: Request) {
 
       const result = await createRes.json();
       shopifyProductId = result.product?.id?.toString() || null;
+
+      // Update the products table with shopify_product_id + pipeline_status
+      if (productCopyId && shopifyProductId) {
+        const { data: copyRow } = await supabaseAdmin
+          .from("product_copies")
+          .select("product_id")
+          .eq("id", productCopyId)
+          .single();
+
+        if (copyRow?.product_id) {
+          await supabaseAdmin
+            .from("products")
+            .update({
+              shopify_product_id: shopifyProductId,
+              pipeline_status: "pushed_to_shopify",
+            })
+            .eq("id", copyRow.product_id);
+        }
+      }
 
       return NextResponse.json({
         success: true,

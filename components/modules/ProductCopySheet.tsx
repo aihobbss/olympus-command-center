@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X, Upload, Check, ChevronRight, ImageIcon, Table2, Trash2 } from "lucide-react";
-import { useProductCopyStore, useStoreContext } from "@/lib/store";
-import { type ProductCopy, type AdStatus } from "@/data/mock";
+import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X, Upload, Check, ChevronRight, ImageIcon, Table2, Trash2, DollarSign, Tag, Percent, Image as ImageLucide } from "lucide-react";
+import { useProductCopyStore, useProductsStore, useStoreContext } from "@/lib/store";
+import { type ProductCopy, type AdStatus, type ProductType, type SheetProduct } from "@/data/mock";
 import { cn } from "@/lib/utils";
 
 // Sanitize HTML to prevent XSS — only allows safe table/formatting tags
@@ -683,6 +683,186 @@ function SizeChartPanel({
   );
 }
 
+// ── Product type options for dropdown ────────────────────────
+
+const PRODUCT_TYPE_OPTIONS: ProductType[] = [
+  "",
+  "Shoes",
+  "Regular Jacket",
+  "Light Jacket",
+  "Luxury Jacket",
+  "Light Sweater",
+  "Heavy Sweater",
+  "Light Top",
+  "Heavy Top",
+  "All Accessories",
+  "Sandals",
+  "Dress",
+  "Set",
+  "Light Pants",
+  "Heavy Pants",
+];
+
+// ── Entity fields panel (shown in expanded row) ─────────────
+
+function EntityFieldsPanel({
+  entity,
+}: {
+  entity: SheetProduct | undefined;
+}) {
+  const updateEntity = useProductsStore.getState().updateSheetProduct;
+
+  // If no matching entity, show a muted message
+  if (!entity) {
+    return (
+      <div className="flex items-center justify-center py-4 text-xs text-text-muted">
+        No linked product entity found
+      </div>
+    );
+  }
+
+  const labelClass = "text-[11px] font-medium text-text-muted uppercase tracking-wider mb-1.5";
+  const inputClass = cn(
+    "w-full text-xs py-1.5 px-2.5 rounded-lg",
+    "bg-bg-elevated border border-subtle outline-none",
+    "text-text-primary placeholder:text-text-muted",
+    "focus:border-accent-indigo/40 transition-colors duration-150",
+  );
+  const selectStyle = {
+    backgroundColor: "var(--bg-elevated)",
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A9B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+        <Tag size={12} className="text-accent-indigo" />
+        Product Entity
+      </p>
+
+      {/* Creatives — read-only list */}
+      {entity.creativeUrls && entity.creativeUrls.length > 0 && (
+        <div>
+          <p className={labelClass}>Creatives</p>
+          <div className="flex flex-col gap-1 max-h-[80px] overflow-y-auto">
+            {entity.creativeUrls.map((url, i) => (
+              <a
+                key={i}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-accent-indigo hover:underline truncate flex items-center gap-1"
+                title={url}
+              >
+                <ImageLucide size={10} className="shrink-0" />
+                {url.replace(/^https?:\/\//, "").slice(0, 40)}…
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* COG */}
+      <div>
+        <p className={labelClass}>COG</p>
+        <div className="relative">
+          <DollarSign size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            type="number"
+            step="0.01"
+            value={entity.cog ?? ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? null : parseFloat(e.target.value);
+              updateEntity(entity.id, { cog: val });
+            }}
+            placeholder="0.00"
+            className={cn(inputClass, "pl-7 font-mono-metric")}
+          />
+        </div>
+      </div>
+
+      {/* Product Type */}
+      <div>
+        <p className={labelClass}>Product Type</p>
+        <select
+          value={entity.productType}
+          onChange={(e) => updateEntity(entity.id, { productType: e.target.value as ProductType })}
+          className={cn(
+            inputClass,
+            "cursor-pointer appearance-none bg-[length:12px] bg-[right_8px_center] bg-no-repeat pr-7"
+          )}
+          style={selectStyle}
+        >
+          {PRODUCT_TYPE_OPTIONS.map((pt) => (
+            <option key={pt || "__empty"} value={pt}>
+              {pt || "— Select —"}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Price */}
+      <div>
+        <p className={labelClass}>Price</p>
+        <div className="relative">
+          <DollarSign size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            type="number"
+            step="0.01"
+            value={entity.pricing ?? ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? null : parseFloat(e.target.value);
+              updateEntity(entity.id, { pricing: val });
+            }}
+            placeholder="0.00"
+            className={cn(inputClass, "pl-7 font-mono-metric")}
+          />
+        </div>
+      </div>
+
+      {/* Discount % */}
+      <div>
+        <p className={labelClass}>Discount %</p>
+        <div className="relative">
+          <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            type="number"
+            step="1"
+            min="0"
+            max="100"
+            value={entity.discountPercent}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value) || 0;
+              updateEntity(entity.id, { discountPercent: val });
+            }}
+            placeholder="0"
+            className={cn(inputClass, "pl-7 font-mono-metric")}
+          />
+        </div>
+      </div>
+
+      {/* Compare At */}
+      <div>
+        <p className={labelClass}>Compare At</p>
+        <div className="relative">
+          <DollarSign size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            type="number"
+            step="0.01"
+            value={entity.compareAtPrice ?? ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? null : parseFloat(e.target.value);
+              updateEntity(entity.id, { compareAtPrice: val });
+            }}
+            placeholder="0.00"
+            className={cn(inputClass, "pl-7 font-mono-metric")}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Filter types ──────────────────────────────────────────────
 
 type StatusFilter = "All" | "Pending" | "Generating" | "Completed" | "Blank";
@@ -692,12 +872,23 @@ type StatusFilter = "All" | "Pending" | "Generating" | "Completed" | "Blank";
 export function ProductCopySheet() {
   const { copyProducts, loading, loadProducts, updateCopyProduct, deleteCopyProduct, generateCopy, generateAll, pushToStore, pushAllToStore, generateSizeChart } =
     useProductCopyStore();
+  const { sheetProducts } = useProductsStore();
   const { selectedStore } = useStoreContext();
   const storeId = selectedStore?.id;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Build a lookup map: productId → SheetProduct entity
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const entityMap = useMemo(() => {
+    const map = new Map<string, SheetProduct>();
+    for (const sp of sheetProducts) {
+      map.set(sp.id, sp);
+    }
+    return map;
+  }, [sheetProducts]);
 
   // Load products from Supabase when store changes
   useEffect(() => {
@@ -1057,20 +1248,32 @@ export function ProductCopySheet() {
                 </td>
               </tr>
 
-              {/* ── Expanded row: Size Chart upload ── */}
+              {/* ── Expanded row: Size Chart + Entity Fields ── */}
               {isExpanded && (
                 <tr className="border-b border-subtle/50">
                   <td colSpan={10} className="px-6 py-4 bg-white/[0.01]">
-                    <SizeChartPanel
-                      product={product}
-                      onImageChange={(url) =>
-                        updateCopyProduct(product.id, { sizeChartImage: url })
-                      }
-                      onGenerate={() => generateSizeChart(product.id)}
-                      onTableChange={(html) =>
-                        updateCopyProduct(product.id, { sizeChartTable: html })
-                      }
-                    />
+                    <div className="flex gap-8 items-start">
+                      {/* Size Chart panel */}
+                      <div className="flex-1 min-w-0">
+                        <SizeChartPanel
+                          product={product}
+                          onImageChange={(url) =>
+                            updateCopyProduct(product.id, { sizeChartImage: url })
+                          }
+                          onGenerate={() => generateSizeChart(product.id)}
+                          onTableChange={(html) =>
+                            updateCopyProduct(product.id, { sizeChartTable: html })
+                          }
+                        />
+                      </div>
+
+                      {/* Entity fields panel */}
+                      <div className="w-[220px] flex-shrink-0 border-l border-subtle pl-6">
+                        <EntityFieldsPanel
+                          entity={product.productId ? entityMap.get(product.productId) : undefined}
+                        />
+                      </div>
+                    </div>
                   </td>
                 </tr>
               )}

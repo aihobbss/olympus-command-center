@@ -115,8 +115,15 @@ function ExpandedAdCards({
   const removeCreative = useCreativeGeneratorStore((s) => s.removeCreative);
 
   const allProductCreatives = useMemo(
-    () => allCreatives.filter((c) => c.productName === campaign.productName && c.status === "completed"),
-    [allCreatives, campaign.productName]
+    () => allCreatives.filter((c) => {
+      if (c.status !== "completed") return false;
+      // Match by productId first, fall back to productName for legacy data
+      if (campaign.productId && c.productId) {
+        return c.productId === campaign.productId;
+      }
+      return c.productName === campaign.productName;
+    }),
+    [allCreatives, campaign.productId, campaign.productName]
   );
 
   // IDs of creatives currently selected for this campaign

@@ -272,6 +272,39 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
       timer: setTimeout(flush, 300),
       flush,
     };
+
+    // Cross-store name propagation: when productName changes, update all downstream modules
+    if (updates.productName) {
+      const newName = updates.productName;
+
+      // Update ProductCopy store — match by productId
+      useProductCopyStore.setState((s) => ({
+        copyProducts: s.copyProducts.map((p) =>
+          p.productId === id ? { ...p, productName: newName } : p
+        ),
+      }));
+
+      // Update CreativeGenerator batch queue — match by productId
+      useCreativeGeneratorStore.setState((s) => ({
+        batchQueue: s.batchQueue.map((p) =>
+          p.productId === id ? { ...p, productName: newName } : p
+        ),
+      }));
+
+      // Update CreativeGenerator product creatives — match by productId
+      useCreativeGeneratorStore.setState((s) => ({
+        productCreatives: s.productCreatives.map((p) =>
+          p.productId === id ? { ...p, productName: newName } : p
+        ),
+      }));
+
+      // Update AdCreator campaigns — match by productId
+      useAdCreatorStore.setState((s) => ({
+        campaigns: s.campaigns.map((c) =>
+          c.productId === id ? { ...c, productName: newName } : c
+        ),
+      }));
+    }
   },
 
   importAllUnimported: () => {
@@ -405,6 +438,12 @@ export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
         delete copyUpdateTimers[id];
       };
       copyUpdateTimers[id] = { timer: setTimeout(flush, 300), flush };
+    }
+
+    // Reverse name propagation: when productName changes on a copy product with a productId,
+    // propagate back to the Research/Products entity store
+    if (updates.productName && current?.productId) {
+      useProductsStore.getState().updateSheetProduct(current.productId, { productName: updates.productName });
     }
   },
 
@@ -887,6 +926,7 @@ export const useCreativeGeneratorStore = create<CreativeGeneratorStore>(
           for (let i = 0; i < alloc.count; i++) {
             newCreatives.push({
               id: `pcr-${Date.now()}-${idx}`,
+              productId: product.productId,
               productName: product.productName,
               productCopyId: product.productCopyId,
               concept: alloc.label,

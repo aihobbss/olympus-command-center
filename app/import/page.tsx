@@ -66,7 +66,7 @@ export default function ImportPage() {
 
     // Mark ALL research products as Imported first (optimistic batch update)
     for (const p of productsToImport) {
-      updateSheetProduct(p.id, { testingStatus: "Imported" });
+      updateSheetProduct(p.id, { testingStatus: "Imported", pipelineStatus: "imported" });
     }
 
     // Then create product_copies entries for each

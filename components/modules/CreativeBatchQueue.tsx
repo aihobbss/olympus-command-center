@@ -49,12 +49,13 @@ export function CreativeBatchQueue() {
 
   const selectedCount = selectedProductIds.size;
 
-  // Group creatives by product
+  // Group creatives by product — prefer productId for grouping, fall back to productName for legacy data
   const creativesByProduct = useMemo(() => {
-    const map = new Map<string, typeof productCreatives>();
+    const map = new Map<string, { label: string; items: typeof productCreatives }>();
     for (const c of productCreatives) {
-      if (!map.has(c.productName)) map.set(c.productName, []);
-      map.get(c.productName)!.push(c);
+      const key = c.productId ?? c.productName;
+      if (!map.has(key)) map.set(key, { label: c.productName, items: [] });
+      map.get(key)!.items.push(c);
     }
     return map;
   }, [productCreatives]);
@@ -458,8 +459,8 @@ export function CreativeBatchQueue() {
           </h3>
 
           {Array.from(creativesByProduct.entries()).map(
-            ([productName, creatives]) => (
-              <div key={productName} className="card p-4">
+            ([groupKey, { label: productName, items: creatives }]) => (
+              <div key={groupKey} className="card p-4">
                 <h4 className="text-xs font-medium text-text-secondary mb-3">
                   {productName}{" "}
                   <span className="text-text-muted font-jetbrains">

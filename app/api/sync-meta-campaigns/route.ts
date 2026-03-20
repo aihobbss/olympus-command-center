@@ -182,6 +182,23 @@ export async function POST(request: Request) {
           insightMap.set(insight.campaign_id, insight);
         }
 
+        // Query ad_creator_campaigns to find product_id mappings for these Meta campaigns
+        const metaCampaignIds = campaigns.map((c) => c.id);
+        const { data: creatorCampaigns } = await supabaseAdmin
+          .from("ad_creator_campaigns")
+          .select("meta_campaign_id, product_id")
+          .eq("store_id", storeId)
+          .in("meta_campaign_id", metaCampaignIds);
+
+        const productIdMap = new Map<string, string>();
+        if (creatorCampaigns) {
+          for (const cc of creatorCampaigns) {
+            if (cc.meta_campaign_id && cc.product_id) {
+              productIdMap.set(cc.meta_campaign_id, cc.product_id);
+            }
+          }
+        }
+
         // Build upsert rows
         const rows = campaigns.map((campaign) => {
           const insight = insightMap.get(campaign.id);
@@ -210,6 +227,7 @@ export async function POST(request: Request) {
             ad_account_id: adAccountId,
             campaign_name: campaign.name,
             product: campaign.name,
+            product_id: productIdMap.get(campaign.id) || null,
             spend,
             budget,
             cpc,

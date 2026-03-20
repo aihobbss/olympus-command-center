@@ -149,7 +149,7 @@ export async function POST(request: Request) {
 
       if (copyRow?.research_product_id) {
         const { data: researchRow } = await supabaseAdmin
-          .from("research_products")
+          .from("products")
           .select("product_type, pricing, discount_percent")
           .eq("id", copyRow.research_product_id)
           .single();

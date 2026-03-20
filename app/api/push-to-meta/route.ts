@@ -43,10 +43,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1. Get campaign details from ad_creator_campaigns
+    // 1. Get campaign details from ad_creator_campaigns (include product_id)
     const { data: campaign, error: campaignError } = await supabaseAdmin
       .from("ad_creator_campaigns")
-      .select("*")
+      .select("*, product_id")
       .eq("id", campaignId)
       .single();
 
@@ -257,7 +257,7 @@ export async function POST(request: Request) {
       })
       .eq("id", campaignId);
 
-    // Also insert into ad_campaigns for tracking
+    // Also insert into ad_campaigns for tracking (propagate product_id)
     await supabaseAdmin
       .from("ad_campaigns")
       .upsert({
@@ -266,6 +266,7 @@ export async function POST(request: Request) {
         ad_account_id: adAccountId,
         campaign_name: campaign.product_name || "Vantage Campaign",
         product: campaign.product_name,
+        product_id: campaign.product_id || null,
         budget: campaign.daily_budget || 30,
         status: "Paused", // Starts paused on Meta
         spend: 0,

@@ -126,6 +126,7 @@ export default function ProfitTrackerPage() {
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [cogs, setCogs] = useState<Record<string, number>>({});
+  const [cogsByProductId, setCogsByProductId] = useState<Record<string, number>>({});
   const [tableMonth, setTableMonth] = useState<Date>(() => new Date());
   const [profitLogs, setProfitLogs] = useState<ProfitLog[]>([]);
   const [liveCampaigns, setLiveCampaigns] = useState<AdCampaign[]>([]);
@@ -237,6 +238,7 @@ export default function ProfitTrackerPage() {
     setProfitLogs(logs);
     setLiveCampaigns(campaigns);
     setCogs(cogData.byName);
+    setCogsByProductId(cogData.byProductId);
 
     if (lastSync) setLastSynced(new Date(lastSync));
   }, [storeId]);
@@ -427,10 +429,13 @@ export default function ProfitTrackerPage() {
 
   // ── COG change (persisted to Supabase) ──
 
-  const handleCogChange = useCallback((productName: string, newCog: number) => {
+  const handleCogChange = useCallback((productName: string, newCog: number, productId?: string) => {
     setCogs((prev) => ({ ...prev, [productName]: newCog }));
+    if (productId) {
+      setCogsByProductId((prev) => ({ ...prev, [productId]: newCog }));
+    }
     if (storeId) {
-      upsertCog(storeId, productName, newCog);
+      upsertCog(storeId, productName, newCog, productId);
     }
   }, [storeId]);
 
@@ -1135,11 +1140,19 @@ export default function ProfitTrackerPage() {
                     budget: entry.snapshot.budgetPerDay,
                   };
 
+                  // Look up COG: prefer productId, then product name
+                  const campaignCog: number =
+                    (entry.campaign.productId != null && entry.campaign.productId in cogsByProductId)
+                      ? (cogsByProductId[entry.campaign.productId] || 0)
+                      : (entry.campaign.product in cogs)
+                        ? (cogs[entry.campaign.product] || 0)
+                        : 0;
+
                   return (
                     <PerAdCard
                       key={`${entry.campaign.id}-${entry.snapshot.budgetPerDay}-${idx}`}
                       campaign={snapshotCampaign}
-                      cog={cogs[entry.campaign.id] ?? 0}
+                      cog={campaignCog}
                       onCogChange={handleCogChange}
                       storeCurrency={storeCurrency}
                       market={selectedStore.market}

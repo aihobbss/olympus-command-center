@@ -256,7 +256,7 @@ export async function POST(request: Request) {
 
     const { data: cogRows } = await supabaseAdmin
       .from("product_cogs")
-      .select("product_name, cog_usd")
+      .select("product_id, product_name, cog_usd")
       .eq("store_id", storeId);
 
     // Average COG per order (simple approach until per-order COG is implemented)

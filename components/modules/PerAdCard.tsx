@@ -13,7 +13,7 @@ import type { AdCampaign } from "@/data/mock";
 interface PerAdCardProps {
   campaign: AdCampaign;
   cog: number;
-  onCogChange: (id: string, newCog: number) => void;
+  onCogChange: (productName: string, newCog: number, productId?: string) => void;
   storeCurrency: string;
   market: string;
   toLocal: (usdAmount: number) => number;
@@ -123,7 +123,7 @@ export function PerAdCard({
   ];
 
   function handleSave() {
-    onCogChange(campaign.id, editValue);
+    onCogChange(campaign.product, editValue, campaign.productId);
     setEditing(false);
   }
 
