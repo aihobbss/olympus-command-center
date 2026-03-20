@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Store, ArrowLeft, Clock, AlertTriangle, X } from "lucide-react";
@@ -67,7 +67,13 @@ function formatTimeLeft(hoursLeft: number): string {
 
 function TokenExpiryBanner() {
   const [dismissed, setDismissed] = useState(false);
-  const expiring = useConnectionsStore((s) => s.getExpiringServices(24));
+  const connections = useConnectionsStore((s) => s.connections);
+  const expiring = useMemo(
+    () => useConnectionsStore.getState().getExpiringServices(24),
+    // Re-derive when the connections array reference changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [connections]
+  );
 
   if (dismissed || expiring.length === 0) return null;
 
