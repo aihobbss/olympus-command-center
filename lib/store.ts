@@ -1134,6 +1134,7 @@ interface ConnectionsStore {
   isConnected: (service: ServiceId) => boolean;
   removeConnection: (service: ServiceId) => void;
   getExpiryDaysLeft: (service: ServiceId) => number | null;
+  getExpiringServices: (withinHours?: number) => { service: ServiceId; hoursLeft: number }[];
 }
 
 // AbortController for in-flight connections load
@@ -1176,6 +1177,22 @@ export const useConnectionsStore = create<ConnectionsStore>((set, get) => ({
     if (!conn?.expiresAt) return null;
     const diff = new Date(conn.expiresAt).getTime() - Date.now();
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  },
+
+  getExpiringServices: (withinHours = 24) => {
+    const now = Date.now();
+    const threshold = withinHours * 60 * 60 * 1000;
+    return get()
+      .connections
+      .filter((c) => {
+        if (!c.expiresAt) return false;
+        const diff = new Date(c.expiresAt).getTime() - now;
+        return diff <= threshold; // includes already-expired (diff <= 0)
+      })
+      .map((c) => ({
+        service: c.service,
+        hoursLeft: Math.max(0, Math.ceil((new Date(c.expiresAt!).getTime() - now) / (1000 * 60 * 60))),
+      }));
   },
 
   removeConnection: (service) => {

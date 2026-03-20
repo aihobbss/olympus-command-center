@@ -1,40 +1,28 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
 
 // Nanobanana Pro API key connection
 // User enters their API key in Settings, we validate + store it.
 
 export async function POST(request: Request) {
+  // Verify caller identity via JWT
+  const authResult = await verifyApiUser(request);
+  if ("error" in authResult) {
+    return NextResponse.json(
+      { error: "UNAUTHORIZED", message: authResult.error },
+      { status: authResult.status }
+    );
+  }
+  const userId = authResult.userId;
+
   const body = await request.json().catch(() => ({}));
   const apiKey = body.apiKey as string;
-  const userId = body.userId as string;
   const storeId = body.storeId as string | undefined;
 
   if (!apiKey || apiKey.length < 10) {
     return NextResponse.json(
       { error: "INVALID_KEY", message: "Provide a valid Nanobanana Pro API key." },
       { status: 400 }
-    );
-  }
-
-  if (!userId) {
-    return NextResponse.json(
-      { error: "UNAUTHORIZED", message: "You must be logged in." },
-      { status: 401 }
-    );
-  }
-
-  // Verify user exists (prevents spoofed userId)
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("id")
-    .eq("id", userId)
-    .single();
-
-  if (!profile) {
-    return NextResponse.json(
-      { error: "UNAUTHORIZED", message: "Invalid user." },
-      { status: 401 }
     );
   }
 

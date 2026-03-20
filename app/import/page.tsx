@@ -135,7 +135,7 @@ export default function ImportPage() {
             Import
           </h1>
           <p className="text-sm text-text-secondary">
-            Bridge products into your store via Kopy
+            Queue products from Research, then export a CSV to import via Kopy
           </p>
         </div>
       </div>
@@ -145,9 +145,9 @@ export default function ImportPage() {
         <EmptyState
           icon={Package}
           title="No products in queue"
-          description="Mark products as Import on the Research Sheet to add them here"
+          description='Use "Queue for Import" on the Research page to add products here, then generate a CSV for Kopy'
           action={{
-            label: "Go to Research Sheet",
+            label: "Go to Research",
             onClick: () => router.push("/research"),
           }}
         />

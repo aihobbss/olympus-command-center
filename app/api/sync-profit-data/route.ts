@@ -25,8 +25,7 @@ type DailyBucket = {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { userId, storeId, daysBack, adAccountIds } = body as {
-      userId: string;
+    const { storeId, daysBack, adAccountIds } = body as {
       storeId: string;
       daysBack?: number;
       adAccountIds?: string[];
@@ -34,9 +33,9 @@ export async function POST(request: Request) {
 
     console.log("[profit-sync API] adAccountIds received:", adAccountIds);
 
-    if (!userId || !storeId) {
+    if (!storeId) {
       return NextResponse.json(
-        { error: "userId and storeId are required" },
+        { error: "storeId is required" },
         { status: 400 }
       );
     }

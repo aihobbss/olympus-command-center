@@ -42,6 +42,13 @@ export const navItems: NavItem[] = [
     group: "main",
   },
   {
+    id: "creative-generator",
+    label: "Creative Generator",
+    href: "/creative-generator",
+    icon: Sparkles,
+    group: "main",
+  },
+  {
     id: "ad-manager",
     label: "Ad Manager",
     href: "/ad-manager",
@@ -53,13 +60,6 @@ export const navItems: NavItem[] = [
     label: "Profit Tracker",
     href: "/profit-tracker",
     icon: TrendingUp,
-    group: "main",
-  },
-  {
-    id: "creative-generator",
-    label: "Creative Generator",
-    href: "/creative-generator",
-    icon: Sparkles,
     group: "main",
   },
   {

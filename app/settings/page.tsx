@@ -14,6 +14,7 @@ import {
 } from "@/lib/services/connections";
 import { ServiceConnectionFull } from "@/components/modules/ServiceConnectionCard";
 import { cn } from "@/lib/utils";
+import { authFetch } from "@/lib/supabase";
 
 // Services that use API key entry (POST) vs OAuth redirect (GET)
 const API_KEY_SERVICES: ServiceId[] = ["anthropic", "nanobanana"];
@@ -84,8 +85,10 @@ export default function SettingsPage() {
       setShopifyError("");
       setShopifyModal(true);
     } else {
-      // OAuth (facebook) — redirect with userId
-      window.location.href = `${meta.connectUrl}?userId=${user.id}`;
+      // OAuth (facebook) — redirect with userId + storeId
+      const params = new URLSearchParams({ userId: user.id });
+      if (selectedStore?.id) params.set("storeId", selectedStore.id);
+      window.location.href = `${meta.connectUrl}?${params.toString()}`;
     }
   }, [loading, autoConnectHandled, user, searchParams, connections]);
 
@@ -111,10 +114,12 @@ export default function SettingsPage() {
         return;
       }
 
-      // OAuth services (facebook) — redirect with userId
-      window.location.href = `${meta.connectUrl}?userId=${user.id}`;
+      // OAuth services (facebook) — redirect with userId + storeId
+      const params = new URLSearchParams({ userId: user.id });
+      if (selectedStore?.id) params.set("storeId", selectedStore.id);
+      window.location.href = `${meta.connectUrl}?${params.toString()}`;
     },
-    [user]
+    [user, selectedStore?.id]
   );
 
   const handleApiKeySubmit = useCallback(async () => {
@@ -126,10 +131,10 @@ export default function SettingsPage() {
       const meta = SERVICE_REGISTRY.find((s) => s.id === apiKeyModal.service);
       if (!meta) return;
 
-      const res = await fetch(meta.connectUrl, {
+      const res = await authFetch(meta.connectUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: apiKeyInput, userId: user.id }),
+        body: JSON.stringify({ apiKey: apiKeyInput, storeId: selectedStore?.id }),
       });
 
       const data = await res.json();

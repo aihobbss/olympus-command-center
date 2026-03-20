@@ -22,6 +22,21 @@ export async function verifyApiUser(
   }
 
   const token = authHeader.slice(7);
+
+  // ── Internal cron bypass ──────────────────────────────────
+  // When the Bearer token matches CRON_SECRET and X-Internal-User-Id is present,
+  // trust the header-provided userId without JWT verification.
+  // This allows the cron-sync route to call other API routes on behalf of store owners.
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && token === cronSecret) {
+    const headerUserId = request.headers.get("x-internal-user-id");
+    if (headerUserId) {
+      // Skip store membership check for cron — the cron job is trusted
+      return { userId: headerUserId };
+    }
+    return { error: "CRON_SECRET used without X-Internal-User-Id header", status: 401 };
+  }
+
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
   if (error || !user) {

@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get("userId");
+  const storeId = searchParams.get("storeId");
 
   const appId = process.env.FACEBOOK_APP_ID || process.env.META_APP_ID;
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/meta/callback`;
@@ -34,9 +35,11 @@ export async function GET(request: Request) {
     );
   }
 
-  // Encode userId + CSRF token into state (base64 JSON)
+  // Encode userId + storeId + CSRF token into state (base64 JSON)
   const csrf = crypto.randomUUID();
-  const state = Buffer.from(JSON.stringify({ csrf, userId })).toString("base64url");
+  const statePayload: Record<string, string> = { csrf, userId };
+  if (storeId) statePayload.storeId = storeId;
+  const state = Buffer.from(JSON.stringify(statePayload)).toString("base64url");
 
   // Request permissions for ads management
   const permissions = [

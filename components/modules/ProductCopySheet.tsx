@@ -815,11 +815,13 @@ export function ProductCopySheet() {
         {copyProducts.some((p) => p.status === "" || p.status === "Pending") && (
           <button
             onClick={generateAll}
+            disabled={copyProducts.some((p) => p.status === "Generating")}
             className={cn(
               "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
               "bg-accent-indigo hover:bg-accent-indigo-hover text-white",
               "shadow-lg shadow-accent-indigo/20 hover:shadow-accent-indigo/30",
-              "transition-all duration-200"
+              "transition-all duration-200",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
             <Sparkles size={14} />
@@ -833,11 +835,13 @@ export function ProductCopySheet() {
         ) && (
           <button
             onClick={pushAllToStore}
+            disabled={copyProducts.some((p) => p.pushStatus === "pushing")}
             className={cn(
               "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
               "bg-[var(--accent-emerald)] hover:bg-[var(--accent-emerald)]/80 text-white",
               "shadow-lg shadow-[var(--accent-emerald)]/20",
-              "transition-all duration-200"
+              "transition-all duration-200",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
             <Upload size={14} />

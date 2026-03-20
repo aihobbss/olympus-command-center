@@ -53,15 +53,14 @@ function getActionValue(
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { userId, storeId, datePreset } = body as {
-      userId: string;
+    const { storeId, datePreset } = body as {
       storeId: string;
       datePreset?: string;
     };
 
-    if (!userId || !storeId) {
+    if (!storeId) {
       return NextResponse.json(
-        { error: "userId and storeId are required" },
+        { error: "storeId is required" },
         { status: 400 }
       );
     }

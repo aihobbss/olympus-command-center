@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
 
 const SYSTEM_PROMPT = `You are a precise data extraction assistant. Given an image of a size chart, extract all measurements and return them as a clean HTML table.
 
@@ -15,14 +15,21 @@ RULES:
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { imageUrl, userId, storeId } = body;
+    const { imageUrl, storeId } = body;
 
-    if (!imageUrl || !userId) {
+    if (!imageUrl) {
       return NextResponse.json(
-        { error: "Missing required fields: imageUrl, userId" },
+        { error: "Missing required field: imageUrl" },
         { status: 400 }
       );
     }
+
+    // Verify caller identity via JWT
+    const authResult = await verifyApiUser(request, storeId);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const userId = authResult.userId;
 
     // Fetch user's Claude API key (prefer store-scoped)
     let tokenQuery = supabaseAdmin

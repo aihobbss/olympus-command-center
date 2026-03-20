@@ -1,10 +1,18 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
-import { Bell, ChevronDown, LogOut } from "lucide-react";
+import { useRef, useEffect, useState, useMemo } from "react";
+import { Bell, ChevronDown, LogOut, AlertTriangle } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStoreContext, useAuthStore, useConnectionsStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+
+const SERVICE_LABELS: Record<string, string> = {
+  shopify: "Shopify",
+  facebook: "Meta Ads",
+  nanobanana: "Nanobanana Pro",
+  anthropic: "Claude AI",
+};
 
 const marketColors: Record<string, string> = {
   UK: "bg-accent-emerald/15 text-accent-emerald",
@@ -28,10 +36,11 @@ type TopBarProps = {
 };
 
 export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
+  const router = useRouter();
   const { stores, selectedStore, setSelectedStore, loadStores } = useStoreContext();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout) as () => void;
-  const { getExpiryDaysLeft, loadConnections } = useConnectionsStore();
+  const { getExpiryDaysLeft, getExpiringServices, loadConnections } = useConnectionsStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -46,6 +55,9 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
   }, [user, selectedStore?.id, loadConnections]);
 
   const metaDaysLeft = getExpiryDaysLeft("facebook");
+
+  // Services with tokens expiring within 24 hours (or already expired)
+  const expiringServices = useMemo(() => getExpiringServices(24), [getExpiringServices]);
 
   const hasMultipleStores = stores.length > 1;
 
@@ -65,6 +77,7 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
   if (!selectedStore) return null;
 
   return (
+    <>
     <header
       className={cn(
         "fixed right-0 h-16 z-30 flex items-center justify-between px-5",
@@ -253,5 +266,40 @@ export function TopBar({ sidebarCollapsed, bannerOffset = 0 }: TopBarProps) {
         </div>
       </div>
     </header>
+
+    {/* Token expiry warning banner — shown below TopBar for services expiring within 24h */}
+    {expiringServices.length > 0 && (
+      <div
+        className={cn(
+          "fixed right-0 z-29 flex items-center justify-center gap-3 px-4 py-2",
+          "bg-accent-amber/10 border-b border-accent-amber/20",
+          "transition-[left,top] duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
+          "left-0",
+          sidebarCollapsed ? "lg:left-[72px]" : "lg:left-[260px]"
+        )}
+        style={{ top: bannerOffset + 64 }}
+      >
+        <AlertTriangle size={14} className="text-accent-amber shrink-0" />
+        <span className="text-[11px] text-accent-amber font-medium">
+          {expiringServices.map((s) => SERVICE_LABELS[s.service] ?? s.service).join(", ")}{" "}
+          {expiringServices.length === 1 ? "token is" : "tokens are"}{" "}
+          {expiringServices.some((s) => s.hoursLeft <= 0) ? "expired" : "expiring soon"}
+        </span>
+        <button
+          onClick={() => {
+            const firstService = expiringServices[0]?.service;
+            router.push(`/settings?connect=${firstService}`);
+          }}
+          className={cn(
+            "px-2.5 py-1 rounded-md text-[11px] font-medium",
+            "bg-accent-amber/20 text-accent-amber hover:bg-accent-amber/30",
+            "transition-colors duration-150"
+          )}
+        >
+          Reconnect
+        </button>
+      </div>
+    )}
+    </>
   );
 }

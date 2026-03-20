@@ -521,11 +521,13 @@ export function AdCreatorSheet() {
         {readyCount > 0 && (
           <button
             onClick={() => pushAll(selectedAdAccountId || undefined)}
+            disabled={campaigns.some((c) => c.status === "Pushing")}
             className={cn(
               "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
               "bg-accent-indigo hover:bg-accent-indigo-hover text-white",
               "shadow-lg shadow-accent-indigo/20 hover:shadow-accent-indigo/30",
-              "transition-all duration-200"
+              "transition-all duration-200",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
             )}
           >
             <Rocket size={14} />

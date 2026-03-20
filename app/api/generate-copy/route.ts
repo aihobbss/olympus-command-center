@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
 
 // SSRF protection — only allow fetching images from known e-commerce CDNs
 const ALLOWED_IMAGE_HOSTS = new Set([
@@ -120,18 +120,24 @@ export async function POST(request: Request) {
       market,
       currency,
       storeName,
-      userId,
       storeId,
       productCopyId,
     } = body;
     let { productType, price, compareAtPrice } = body;
 
-    if (!productName || !userId) {
+    if (!productName) {
       return NextResponse.json(
-        { error: "Missing required fields: productName, userId" },
+        { error: "Missing required field: productName" },
         { status: 400 }
       );
     }
+
+    // Verify caller identity via JWT
+    const authResult = await verifyApiUser(request, storeId);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+    const userId = authResult.userId;
 
     // Look up pricing from linked research product if not provided
     if (productCopyId && (!price || !productType)) {

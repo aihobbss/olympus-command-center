@@ -22,11 +22,13 @@ export async function GET(request: Request) {
     );
   }
 
-  // Decode userId from state
+  // Decode userId + storeId from state
   let userId: string | null = null;
+  let storeId: string | null = null;
   try {
     const decoded = JSON.parse(Buffer.from(stateParam, "base64url").toString());
     userId = decoded.userId;
+    storeId = decoded.storeId || null;
   } catch {
     return NextResponse.redirect(
       new URL("/settings?error=meta_invalid_state", request.url)
@@ -86,18 +88,21 @@ export async function GET(request: Request) {
       Date.now() + (longLived.expires_in || expires_in || 5184000) * 1000
     ).toISOString();
 
-    // Store token in oauth_tokens
+    // Store token in oauth_tokens (store-scoped when storeId is available)
     const finalToken = longLived.access_token || access_token;
+    const tokenPayload: Record<string, unknown> = {
+      user_id: userId,
+      service: "facebook",
+      access_token: finalToken,
+      expires_at: expiresAt,
+    };
+    if (storeId) tokenPayload.store_id = storeId;
+
     const { error: upsertError } = await supabaseAdmin
       .from("oauth_tokens")
       .upsert(
-        {
-          user_id: userId,
-          service: "facebook",
-          access_token: finalToken,
-          expires_at: expiresAt,
-        },
-        { onConflict: "user_id,service" }
+        tokenPayload,
+        { onConflict: storeId ? "store_id,service" : "user_id,service" }
       );
 
     if (upsertError) {
@@ -109,13 +114,18 @@ export async function GET(request: Request) {
 
     // Auto-discover ad accounts after successful OAuth
     try {
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("active_store_id")
-        .eq("id", userId)
-        .single();
+      // Use storeId from OAuth state, fall back to user's active_store_id
+      let discoverStoreId = storeId;
+      if (!discoverStoreId) {
+        const { data: profile } = await supabaseAdmin
+          .from("profiles")
+          .select("active_store_id")
+          .eq("id", userId)
+          .single();
+        discoverStoreId = profile?.active_store_id || null;
+      }
 
-      if (profile?.active_store_id) {
+      if (discoverStoreId) {
         const meRes = await fetch(
           `https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_status,currency,business_name&limit=100`,
           { headers: { Authorization: `Bearer ${finalToken}` } }
@@ -128,7 +138,7 @@ export async function GET(request: Request) {
           if (accounts.length > 0) {
             const rows = accounts.map((acct: { id: string; name?: string; account_status?: number; business_name?: string }) => ({
               user_id: userId,
-              store_id: profile.active_store_id,
+              store_id: discoverStoreId,
               ad_account_id: acct.id,
               account_name: acct.name || acct.business_name || acct.id,
               account_status: acct.account_status ?? 1,

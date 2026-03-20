@@ -549,7 +549,7 @@ export function ResearchSheet() {
             )}
           >
             <PackageCheck size={14} />
-            Import All ({unimportedCount})
+            Queue for Import ({unimportedCount})
           </button>
         )}
 
