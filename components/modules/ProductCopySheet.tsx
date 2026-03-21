@@ -2,7 +2,18 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Search, SlidersHorizontal, Loader2, Sparkles, Eye, X, Upload, Check, ChevronRight, ImageIcon, Table2, Trash2, DollarSign, Tag, Percent, Image as ImageLucide, AlertTriangle } from "lucide-react";
-import { useProductCopyStore, useProductsStore, useStoreContext } from "@/lib/store";
+// Store context accessed via TanStack Query hooks internally
+import {
+  useProductCopiesQuery,
+  useUpdateCopyProduct,
+  useDeleteCopyProduct,
+  useGenerateCopy,
+  useGenerateAll,
+  usePushToStore,
+  usePushAllToStore,
+  useGenerateSizeChart,
+} from "@/lib/queries/use-product-copies";
+import { useProductsQuery, useUpdateProduct } from "@/lib/queries/use-products";
 import { type ProductCopy, type AdStatus, type ProductType, type SheetProduct } from "@/data/mock";
 import { cn } from "@/lib/utils";
 
@@ -707,10 +718,11 @@ const PRODUCT_TYPE_OPTIONS: ProductType[] = [
 
 function EntityFieldsPanel({
   entity,
+  updateEntity,
 }: {
   entity: SheetProduct | undefined;
+  updateEntity: (id: string, updates: Partial<SheetProduct>) => void;
 }) {
-  const updateEntity = useProductsStore.getState().updateSheetProduct;
 
   // If no matching entity, show a muted message
   if (!entity) {
@@ -870,18 +882,22 @@ type StatusFilter = "All" | "Pending" | "Generating" | "Completed" | "Blank";
 // ── Main sheet component ───────────────────────────────────
 
 export function ProductCopySheet() {
-  const { copyProducts, loading, error, loadProducts, updateCopyProduct, deleteCopyProduct, generateCopy, generateAll, pushToStore, pushAllToStore, generateSizeChart } =
-    useProductCopyStore();
-  const { sheetProducts } = useProductsStore();
-  const { selectedStore } = useStoreContext();
-  const storeId = selectedStore?.id;
+  const { data: copyProducts = [], isPending: loading, isError, error, refetch } = useProductCopiesQuery();
+  const { data: sheetProducts = [] } = useProductsQuery();
+  const updateCopyProduct = useUpdateCopyProduct();
+  const deleteCopyMutation = useDeleteCopyProduct();
+  const generateCopyMutation = useGenerateCopy();
+  const generateAll = useGenerateAll();
+  const pushToStoreMutation = usePushToStore();
+  const pushAllToStore = usePushAllToStore();
+  const generateSizeChartMutation = useGenerateSizeChart();
+  const updateEntity = useUpdateProduct();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Build a lookup map: productId → SheetProduct entity
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const entityMap = useMemo(() => {
     const map = new Map<string, SheetProduct>();
     for (const sp of sheetProducts) {
@@ -890,39 +906,18 @@ export function ProductCopySheet() {
     return map;
   }, [sheetProducts]);
 
-  // Load products from Supabase when store changes
+  // Listen for auto-generate-size-chart events (triggered by generateCopy onSuccess)
+  // Use ref to avoid re-registering listener on every render
+  const sizeChartMutationRef = useRef(generateSizeChartMutation);
+  sizeChartMutationRef.current = generateSizeChartMutation;
   useEffect(() => {
-    if (storeId) {
-      loadProducts(storeId).catch((err) =>
-        console.error("Failed to load product copies:", err)
-      );
-    }
-  }, [storeId, loadProducts]);
-
-  // Safety net: if loading stays true for 20s, force-reset with an error
-  useEffect(() => {
-    if (!loading) return;
-    const timer = setTimeout(() => {
-      if (useProductCopyStore.getState().loading) {
-        useProductCopyStore.setState({ loading: false, error: "Loading timed out. Please try again." });
-      }
-    }, 20_000);
-    return () => clearTimeout(timer);
-  }, [loading]);
-
-  // Auto-retry when browser tab regains focus if data is empty or errored
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible" && storeId) {
-        const state = useProductCopyStore.getState();
-        if (state.copyProducts.length === 0 || state.error) {
-          loadProducts(storeId);
-        }
-      }
+    const handler = (e: Event) => {
+      const { id } = (e as CustomEvent).detail;
+      sizeChartMutationRef.current.mutate(id);
     };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [storeId, loadProducts]);
+    window.addEventListener("auto-generate-size-chart", handler);
+    return () => window.removeEventListener("auto-generate-size-chart", handler);
+  }, []);
 
   const filtered = useMemo(() => {
     let items = copyProducts;
@@ -960,15 +955,15 @@ export function ProductCopySheet() {
     );
   }
 
-  if (error) {
+  if (isError) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="w-12 h-12 rounded-xl bg-accent-red/10 flex items-center justify-center mb-4">
           <AlertTriangle size={20} className="text-accent-red" />
         </div>
-        <p className="text-sm text-text-secondary mb-3">{error}</p>
+        <p className="text-sm text-text-secondary mb-3">{error?.message ?? "Failed to load product copies. Please try again."}</p>
         <button
-          onClick={() => storeId && loadProducts(storeId)}
+          onClick={() => refetch()}
           className="px-4 py-2 text-sm rounded-lg bg-accent-indigo/10 text-accent-indigo hover:bg-accent-indigo/20 transition-colors"
         >
           Retry Connection
@@ -1252,7 +1247,7 @@ export function ProductCopySheet() {
                 <td className="px-3 py-2.5">
                   <CopyStatusCell
                     status={product.status}
-                    onGenerate={() => generateCopy(product.id)}
+                    onGenerate={() => generateCopyMutation.mutate(product.id)}
                     onChange={(s) =>
                       updateCopyProduct(product.id, { status: s })
                     }
@@ -1263,7 +1258,7 @@ export function ProductCopySheet() {
                           ? "pushed"
                           : "idle"
                     }
-                    onPush={() => pushToStore(product.id)}
+                    onPush={() => pushToStoreMutation.mutate(product.id)}
                   />
                 </td>
 
@@ -1284,7 +1279,7 @@ export function ProductCopySheet() {
                       </button>
                     )}
                     <button
-                      onClick={() => deleteCopyProduct(product.id)}
+                      onClick={() => deleteCopyMutation.mutate(product.id)}
                       className={cn(
                         "w-7 h-7 rounded-lg flex items-center justify-center",
                         "text-text-muted hover:text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10",
@@ -1310,7 +1305,7 @@ export function ProductCopySheet() {
                           onImageChange={(url) =>
                             updateCopyProduct(product.id, { sizeChartImage: url })
                           }
-                          onGenerate={() => generateSizeChart(product.id)}
+                          onGenerate={() => generateSizeChartMutation.mutate(product.id)}
                           onTableChange={(html) =>
                             updateCopyProduct(product.id, { sizeChartTable: html })
                           }
@@ -1321,6 +1316,7 @@ export function ProductCopySheet() {
                       <div className="w-[220px] flex-shrink-0 border-l border-subtle pl-6">
                         <EntityFieldsPanel
                           entity={product.productId ? entityMap.get(product.productId) : undefined}
+                          updateEntity={updateEntity}
                         />
                       </div>
                     </div>

@@ -2,7 +2,6 @@ import { create } from "zustand";
 import {
   PROMPT_TEMPLATES,
   type SheetProduct,
-  type ProductCopy,
   type AdCreatorCampaign,
   type BatchQueueProduct,
   type ProductCreative,
@@ -191,568 +190,36 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   login: (user) => set({ user }),
 }));
 
-// ─── Products Store ──────────────────────────────────────
-// Manages the unified product entity (formerly Research Sheet).
-// Persisted to Supabase via lib/services/products.ts.
-// Products flow: Research → Import → Product Creation → Creative → Ad → Profit.
+// ─── Products Store (DEPRECATED — migrated to TanStack Query) ──────
+// Data fetching + mutations now live in lib/queries/use-products.ts.
+// This empty store is kept only for backward compatibility during migration.
 
-import {
-  fetchProducts as fetchResearchProducts,
-  createProduct as createResearchProduct,
-  updateProduct as updateResearchProductDB,
-  bulkUpdateStatus,
-} from "@/lib/services/products";
-
-// Debounce map for batching rapid edits before writing to DB
+// Debounce type used by non-migrated stores (AdCreator)
 type PendingWrite = {
   timer: ReturnType<typeof setTimeout>;
   flush: () => void;
   pendingUpdates?: Partial<SheetProduct>;
 };
-const updateTimers: Record<string, PendingWrite> = {};
-
-// Collect promises from in-flight DB writes so we can await them
-const _pendingWritePromises: Promise<unknown>[] = [];
-
-// Flush all pending product writes — call before loading from DB or navigating away
-// Returns a promise that resolves when all flushed writes have completed in DB
-export async function flushAllProductWrites(): Promise<void> {
-  for (const key of Object.keys(updateTimers)) {
-    clearTimeout(updateTimers[key].timer);
-    updateTimers[key].flush();
-  }
-  // Wait for all in-flight write promises to settle, but cap at 5s
-  // to prevent blocking loadProducts indefinitely if writes hang
-  if (_pendingWritePromises.length > 0) {
-    let timeoutId: ReturnType<typeof setTimeout>;
-    await Promise.race([
-      Promise.allSettled(_pendingWritePromises),
-      new Promise<void>((resolve) => { timeoutId = setTimeout(resolve, 5_000); }),
-    ]);
-    clearTimeout(timeoutId!);
-    _pendingWritePromises.length = 0;
-  }
-}
-
-// AbortController for in-flight research product loads — cancels stale fetches on rapid navigation
-let _researchLoadController: AbortController | null = null;
 
 interface ResearchStore {
-  // Research Sheet
-  sheetProducts: SheetProduct[];
-  loading: boolean;
-  adding: boolean;
-  error: string | null;
-  loadProducts: (storeId: string) => Promise<void>;
-  updateSheetProduct: (id: string, updates: Partial<SheetProduct>) => void;
-  importAllUnimported: () => void;
-  addSheetProduct: () => void;
-  deleteSheetProduct: (id: string) => void;
+  _deprecated: true;
 }
 
-export const useResearchStore = create<ResearchStore>((set, get) => ({
-  sheetProducts: [],
-  loading: false,
-  adding: false,
-  error: null,
-
-  loadProducts: async (storeId) => {
-    // Flush all pending debounced writes BEFORE fetching from DB
-    // This prevents stale DB data from overwriting optimistic local edits
-    await flushAllProductWrites();
-
-    // Abort any in-flight load to free the browser connection
-    _researchLoadController?.abort();
-    const controller = new AbortController();
-    _researchLoadController = controller;
-
-    // Only show loading spinner if we have no cached data yet
-    const hasData = get().sheetProducts.length > 0;
-    if (!hasData) {
-      set({ loading: true });
-    }
-    set({ error: null });
-    try {
-      const products = await fetchResearchProducts(storeId, controller.signal);
-      if (controller.signal.aborted) return; // stale — newer load in progress
-      set({ sheetProducts: products, loading: false, error: null });
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return; // cancelled, not an error
-      if (!controller.signal.aborted) {
-        set({ loading: false, error: "Failed to load products. Please try again." });
-      }
-    } finally {
-      // Safety net: if this controller is still the active one and loading is stuck, reset it
-      if (_researchLoadController === controller && get().loading) {
-        set({ loading: false });
-      }
-    }
-  },
-
-  updateSheetProduct: (id, updates) => {
-    // Optimistic local update
-    set((s) => ({
-      sheetProducts: s.sheetProducts.map((p) =>
-        p.id === id ? { ...p, ...updates } : p
-      ),
-    }));
-
-    // Debounced DB write (300ms) — accumulates rapid edits, flushable on store switch
-    const existing = updateTimers[id];
-    if (existing) clearTimeout(existing.timer);
-    // Merge new updates into any pending updates for this product
-    const accumulated = { ...(existing?.pendingUpdates ?? {}), ...updates };
-    const store = useStoreContext.getState().selectedStore;
-    const flush = () => {
-      if (store) {
-        const p = updateResearchProductDB(id, accumulated, store.id);
-        _pendingWritePromises.push(p);
-      }
-      delete updateTimers[id];
-    };
-    updateTimers[id] = {
-      timer: setTimeout(flush, 300),
-      flush,
-      pendingUpdates: accumulated,
-    };
-
-    // Cross-store name propagation: when productName changes, update all downstream modules
-    if (updates.productName) {
-      const newName = updates.productName;
-
-      // Update ProductCopy store — match by productId
-      useProductCopyStore.setState((s) => ({
-        copyProducts: s.copyProducts.map((p) =>
-          p.productId === id ? { ...p, productName: newName } : p
-        ),
-      }));
-
-      // Update CreativeGenerator batch queue — match by productId
-      useCreativeGeneratorStore.setState((s) => ({
-        batchQueue: s.batchQueue.map((p) =>
-          p.productId === id ? { ...p, productName: newName } : p
-        ),
-      }));
-
-      // Update CreativeGenerator product creatives — match by productId
-      useCreativeGeneratorStore.setState((s) => ({
-        productCreatives: s.productCreatives.map((p) =>
-          p.productId === id ? { ...p, productName: newName } : p
-        ),
-      }));
-
-      // Update AdCreator campaigns — match by productId
-      useAdCreatorStore.setState((s) => ({
-        campaigns: s.campaigns.map((c) =>
-          c.productId === id ? { ...c, productName: newName } : c
-        ),
-      }));
-    }
-  },
-
-  importAllUnimported: () => {
-    const unimported = get().sheetProducts.filter((p) => !p.testingStatus);
-    if (unimported.length === 0) return;
-
-    // Optimistic update
-    set((s) => ({
-      sheetProducts: s.sheetProducts.map((p) =>
-        !p.testingStatus ? { ...p, testingStatus: "Queued" as const } : p
-      ),
-    }));
-
-    // Persist to DB
-    const store = useStoreContext.getState().selectedStore;
-    const ids = unimported.map((p) => p.id);
-    bulkUpdateStatus(ids, "Queued", store?.id);
-  },
-
-  addSheetProduct: async () => {
-    if (get().adding) return;
-    const store = useStoreContext.getState().selectedStore;
-    if (!store) return;
-
-    set({ adding: true, error: null });
-    try {
-      const product = await createResearchProduct(store.id);
-      if (product) {
-        set((s) => ({
-          sheetProducts: [...s.sheetProducts, product],
-        }));
-      } else {
-        set({ error: "Failed to add product. Please try again." });
-      }
-    } catch (err) {
-      console.error("Failed to add product:", err);
-      set({ error: "Failed to add product. Please try again." });
-    } finally {
-      set({ adding: false });
-    }
-  },
-
-  deleteSheetProduct: async (id) => {
-    const store = useStoreContext.getState().selectedStore;
-    // Cancel any pending debounced writes for this product
-    if (updateTimers[id]) {
-      clearTimeout(updateTimers[id].timer);
-      delete updateTimers[id];
-    }
-    // Save snapshot for rollback
-    const snapshot = get().sheetProducts;
-    // Optimistic remove
-    set((s) => ({
-      sheetProducts: s.sheetProducts.filter((p) => p.id !== id),
-    }));
-    // Await DB delete — revert on failure
-    try {
-      const { deleteProduct } = await import("@/lib/services/products");
-      const ok = await deleteProduct(id, store?.id);
-      if (!ok) {
-        console.error("Delete failed for product", id, "— reverting");
-        set({ sheetProducts: snapshot });
-      }
-    } catch (err) {
-      console.error("Delete threw for product", id, "— reverting:", err);
-      set({ sheetProducts: snapshot });
-    }
-  },
+export const useResearchStore = create<ResearchStore>(() => ({
+  _deprecated: true as const,
 }));
 
-// Export alias: useProductsStore is the canonical name for the product entity store
 export const useProductsStore = useResearchStore;
 
-// ─── Product Copy Store ─────────────────────────────────
-// Manages the Product Creation / Copy Generation sheet.
-// Loads from Supabase, debounced writes on edits.
+// ─── Product Copy Store (DEPRECATED — migrated to TanStack Query) ──
+// Data fetching + mutations now live in lib/queries/use-product-copies.ts.
 
 interface ProductCopyStore {
-  copyProducts: ProductCopy[];
-  loading: boolean;
-  error: string | null;
-  loadProducts: (storeId: string) => Promise<void>;
-  updateCopyProduct: (id: string, updates: Partial<ProductCopy>) => void;
-  deleteCopyProduct: (id: string) => void;
-  generateCopy: (id: string) => Promise<void>;
-  generateAll: () => void;
-  pushToStore: (id: string) => Promise<void>;
-  pushAllToStore: () => void;
-  generateSizeChart: (id: string) => Promise<void>;
+  _deprecated: true;
 }
 
-// Debounce timers for product copy updates
-const copyUpdateTimers: Record<string, PendingWrite> = {};
-
-// AbortController for in-flight product copy loads
-let _copyLoadController: AbortController | null = null;
-
-async function updateProductCopyDB(id: string, updates: Partial<ProductCopy>, storeId: string) {
-  const { updateProductCopy } = await import("@/lib/services/product-copy");
-  await updateProductCopy(id, updates, storeId);
-}
-
-export const useProductCopyStore = create<ProductCopyStore>((set, get) => ({
-  copyProducts: [],
-  loading: false,
-  error: null,
-
-  loadProducts: async (storeId: string) => {
-    // Abort any in-flight load to free the browser connection
-    _copyLoadController?.abort();
-    const controller = new AbortController();
-    _copyLoadController = controller;
-
-    // Only show loading spinner if we have no cached data yet
-    const hasData = get().copyProducts.length > 0;
-    if (!hasData) {
-      set({ loading: true });
-    }
-    set({ error: null });
-    try {
-      const { fetchProductCopies } = await import("@/lib/services/product-copy");
-      const products = await fetchProductCopies(storeId, controller.signal);
-      if (controller.signal.aborted) return;
-      set({ copyProducts: products, loading: false, error: null });
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      if (!controller.signal.aborted) {
-        set({ loading: false, error: "Failed to load product copies. Please try again." });
-      }
-    } finally {
-      if (_copyLoadController === controller && get().loading) {
-        set({ loading: false });
-      }
-    }
-  },
-
-  updateCopyProduct: (id, updates) => {
-    // If any content field changes on a pushed product, reset pushStatus so it can be re-pushed
-    const contentFields = ["productName", "shopifyDescription", "facebookCopy", "productUrl", "sizeChartTable"];
-    const current = get().copyProducts.find((p) => p.id === id);
-    if (current?.pushStatus === "pushed" && contentFields.some((f) => f in updates)) {
-      updates = { ...updates, pushStatus: "" as const };
-    }
-
-    // Optimistic update
-    set((s) => ({
-      copyProducts: s.copyProducts.map((p) =>
-        p.id === id ? { ...p, ...updates } : p
-      ),
-    }));
-
-    // Debounced DB write — flushable on store switch
-    const store = useStoreContext.getState().selectedStore;
-    if (store) {
-      if (copyUpdateTimers[id]) clearTimeout(copyUpdateTimers[id].timer);
-      const flush = () => {
-        updateProductCopyDB(id, updates, store.id);
-        delete copyUpdateTimers[id];
-      };
-      copyUpdateTimers[id] = { timer: setTimeout(flush, 300), flush };
-    }
-
-    // Reverse name propagation: when productName changes on a copy product with a productId,
-    // propagate back to the Research/Products entity store
-    if (updates.productName && current?.productId) {
-      useProductsStore.getState().updateSheetProduct(current.productId, { productName: updates.productName });
-    }
-  },
-
-  deleteCopyProduct: (id) => {
-    const store = useStoreContext.getState().selectedStore;
-    set((s) => ({
-      copyProducts: s.copyProducts.filter((p) => p.id !== id),
-    }));
-    // Fire-and-forget DB delete
-    import("@/lib/services/product-copy").then((m) => m.deleteProductCopy(id, store?.id));
-  },
-
-  generateCopy: async (id) => {
-    // Guard: skip if already generating
-    const current = get().copyProducts.find((p) => p.id === id);
-    if (current?.status === "Generating") return;
-
-    const store = useStoreContext.getState().selectedStore;
-    // Set to Generating immediately
-    set((s) => ({
-      copyProducts: s.copyProducts.map((p) =>
-        p.id === id ? { ...p, status: "Generating" as const } : p
-      ),
-    }));
-    if (store) updateProductCopyDB(id, { status: "Generating" }, store.id);
-
-    const product = get().copyProducts.find((p) => p.id === id);
-
-    try {
-      const res = await authFetch("/api/generate-copy", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          productName: product?.productName || "Product",
-          productUrl: product?.productUrl || "",
-          imageUrl: product?.imageUrl || "",
-          market: store?.market || "AU",
-          currency: store?.currency || "AUD",
-          storeName: store?.name || "",
-          storeId: store?.id,
-          productCopyId: id, // API uses this to look up research product pricing
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const updates: Partial<ProductCopy> = {
-          status: "Completed" as const,
-          shopifyDescription: data.shopifyDescription || "",
-          facebookCopy: data.facebookCopy || "",
-          // Update product name if Claude cleaned it
-          ...(data.cleanedTitle && data.cleanedTitle !== product?.productName
-            ? { productName: data.cleanedTitle }
-            : {}),
-        };
-        set((s) => ({
-          copyProducts: s.copyProducts.map((p) =>
-            p.id === id ? { ...p, ...updates } : p
-          ),
-        }));
-        if (store) updateProductCopyDB(id, updates, store.id);
-
-        // Auto-generate size chart if image is attached and not yet generated
-        const latest = get().copyProducts.find((p) => p.id === id);
-        if (latest?.sizeChartImage && latest.sizeChartStatus !== "done" && latest.sizeChartStatus !== "generating") {
-          get().generateSizeChart(id);
-        }
-      } else {
-        const err = await res.json().catch(() => ({}));
-        console.error("Copy generation failed:", err.message || res.statusText);
-        const updates: Partial<ProductCopy> = { status: "Error" as const };
-        set((s) => ({
-          copyProducts: s.copyProducts.map((p) =>
-            p.id === id ? { ...p, ...updates } : p
-          ),
-        }));
-        if (store) updateProductCopyDB(id, updates, store.id);
-      }
-    } catch (error) {
-      console.error("Copy generation error:", error);
-      const updates: Partial<ProductCopy> = { status: "Error" as const };
-      set((s) => ({
-        copyProducts: s.copyProducts.map((p) =>
-          p.id === id ? { ...p, ...updates } : p
-        ),
-      }));
-      if (store) updateProductCopyDB(id, updates, store.id);
-    }
-  },
-
-  generateAll: () => {
-    const { copyProducts, generateCopy } = useProductCopyStore.getState();
-    const pending = copyProducts.filter(
-      (p) => p.status === "" || p.status === "Pending"
-    );
-    pending.forEach((p, i) => {
-      setTimeout(() => generateCopy(p.id), i * 400);
-    });
-  },
-
-  pushToStore: async (id) => {
-    // Guard: skip if already pushing or pushed
-    const current = get().copyProducts.find((p) => p.id === id);
-    if (current?.pushStatus === "pushing" || current?.pushStatus === "pushed") return;
-
-    const store = useStoreContext.getState().selectedStore;
-    const user = useAuthStore.getState().user;
-    set((s) => ({
-      copyProducts: s.copyProducts.map((p) =>
-        p.id === id ? { ...p, pushStatus: "pushing" as const } : p
-      ),
-    }));
-    if (store) updateProductCopyDB(id, { pushStatus: "pushing" }, store.id);
-
-    const product = get().copyProducts.find((p) => p.id === id);
-
-    try {
-      const res = await authFetch("/api/push-to-shopify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          productName: product?.productName || "Product",
-          shopifyDescription: product?.shopifyDescription || "",
-          sizeChartTable: product?.sizeChartTable || "",
-          productUrl: product?.productUrl || "",
-          imageUrl: product?.imageUrl || "",
-          userId: user?.id,
-          storeId: store?.id,
-          productCopyId: id,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const updates: Partial<ProductCopy> = {
-          pushStatus: "pushed" as const,
-          shopifyProductId: data.shopifyProductId || undefined,
-        };
-        set((s) => ({
-          copyProducts: s.copyProducts.map((p) =>
-            p.id === id ? { ...p, ...updates } : p
-          ),
-        }));
-        if (store) updateProductCopyDB(id, updates, store.id);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        console.error("Shopify push failed:", err.message || res.statusText);
-        const updates: Partial<ProductCopy> = { pushStatus: "error" as const };
-        set((s) => ({
-          copyProducts: s.copyProducts.map((p) =>
-            p.id === id ? { ...p, ...updates } : p
-          ),
-        }));
-        if (store) updateProductCopyDB(id, updates, store.id);
-      }
-    } catch (error) {
-      console.error("Shopify push error:", error);
-      const updates: Partial<ProductCopy> = { pushStatus: "error" as const };
-      set((s) => ({
-        copyProducts: s.copyProducts.map((p) =>
-          p.id === id ? { ...p, ...updates } : p
-        ),
-      }));
-      if (store) updateProductCopyDB(id, updates, store.id);
-    }
-  },
-
-  pushAllToStore: () => {
-    const { copyProducts, pushToStore } = useProductCopyStore.getState();
-    const ready = copyProducts.filter(
-      (p) => p.status === "Completed" && p.pushStatus === ""
-    );
-    ready.forEach((p, i) => {
-      setTimeout(() => pushToStore(p.id), i * 300);
-    });
-  },
-
-  generateSizeChart: async (id) => {
-    // Guard: skip if already generating
-    const current = get().copyProducts.find((p) => p.id === id);
-    if (current?.sizeChartStatus === "generating") return;
-
-    const store = useStoreContext.getState().selectedStore;
-    set((s) => ({
-      copyProducts: s.copyProducts.map((p) =>
-        p.id === id ? { ...p, sizeChartStatus: "generating" as const } : p
-      ),
-    }));
-    if (store) updateProductCopyDB(id, { sizeChartStatus: "generating" }, store.id);
-
-    const product = get().copyProducts.find((p) => p.id === id);
-
-    try {
-      const res = await authFetch("/api/generate-size-chart", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: product?.sizeChartImage || "",
-          storeId: store?.id,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        // Reset pushStatus so product can be re-pushed with the new size chart
-        const wasPushed = get().copyProducts.find((p) => p.id === id)?.pushStatus === "pushed";
-        const updates: Partial<ProductCopy> = {
-          sizeChartStatus: "done" as const,
-          sizeChartTable: data.sizeChartTable || "",
-          ...(wasPushed ? { pushStatus: "" as const } : {}),
-        };
-        set((s) => ({
-          copyProducts: s.copyProducts.map((p) =>
-            p.id === id ? { ...p, ...updates } : p
-          ),
-        }));
-        if (store) updateProductCopyDB(id, updates, store.id);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        console.error("Size chart generation failed:", err.message || res.statusText);
-        const updates: Partial<ProductCopy> = { sizeChartStatus: "error" as const };
-        set((s) => ({
-          copyProducts: s.copyProducts.map((p) =>
-            p.id === id ? { ...p, ...updates } : p
-          ),
-        }));
-        if (store) updateProductCopyDB(id, updates, store.id);
-      }
-    } catch (error) {
-      console.error("Size chart generation error:", error);
-      const updates: Partial<ProductCopy> = { sizeChartStatus: "error" as const };
-      set((s) => ({
-        copyProducts: s.copyProducts.map((p) =>
-          p.id === id ? { ...p, ...updates } : p
-        ),
-      }));
-      if (store) updateProductCopyDB(id, updates, store.id);
-    }
-  },
+export const useProductCopyStore = create<ProductCopyStore>(() => ({
+  _deprecated: true as const,
 }));
 
 // ─── Ad Creator Store ────────────────────────────────────
@@ -1074,34 +541,7 @@ export const useCreativeGeneratorStore = create<CreativeGeneratorStore>(
 );
 
 // ─── Cross-store subscription: ProductCopy → Creative Generator batch queue ──
-// Uses productId for matching (falls back to productCopyId for legacy data).
-// Guarded by selectedStore to prevent cross-store data leakage.
-useProductCopyStore.subscribe((state) => {
-  const selectedStore = useStoreContext.getState().selectedStore;
-  if (!selectedStore) return;
-
-  const pushed = state.copyProducts.filter((p) => p.pushStatus === "pushed");
-  const currentQueue = useCreativeGeneratorStore.getState().batchQueue;
-  const existingIds = new Set(currentQueue.map((q) => q.productCopyId));
-  const newProducts = pushed.filter((p) => !existingIds.has(p.id));
-
-  if (newProducts.length > 0) {
-    useCreativeGeneratorStore.setState((s) => ({
-      batchQueue: [
-        ...s.batchQueue,
-        ...newProducts.map((p) => ({
-          id: `bq-${Date.now()}-${p.id}`,
-          productId: p.productId,
-          productCopyId: p.id,
-          productName: p.productName,
-          productUrl: p.productUrl,
-          imageUrl: p.imageUrl,
-          status: "queued" as const,
-        })),
-      ],
-    }));
-  }
-});
+// REMOVED — migrated to usePushToStore mutation onSuccess in lib/queries/use-product-copies.ts
 
 // ─── Cross-store subscription: Creatives → Ad Creator auto-attach ──
 // Uses productId for matching (falls back to productName for legacy data).
@@ -1190,16 +630,14 @@ export const useStoreContext = create<StoreContext>((set) => ({
       console.error("Failed to load stores:", err);
     }
   },
-  setSelectedStore: (store) => {
-    // Flush all pending debounce writes to the OLD store before switching
-    for (const key of Object.keys(updateTimers)) {
-      clearTimeout(updateTimers[key].timer);
-      updateTimers[key].flush();
-    }
-    for (const key of Object.keys(copyUpdateTimers)) {
-      clearTimeout(copyUpdateTimers[key].timer);
-      copyUpdateTimers[key].flush();
-    }
+  setSelectedStore: async (store) => {
+    // Flush TanStack Query debounced writes (products + copies)
+    const { flushAllProductWrites } = await import("@/lib/queries/use-products");
+    const { flushAllCopyWrites } = await import("@/lib/queries/use-product-copies");
+    flushAllProductWrites();
+    flushAllCopyWrites();
+
+    // Flush non-migrated store timers (AdCreator)
     for (const key of Object.keys(adCreatorUpdateTimers)) {
       clearTimeout(adCreatorUpdateTimers[key].timer);
       adCreatorUpdateTimers[key].flush();
@@ -1209,21 +647,13 @@ export const useStoreContext = create<StoreContext>((set) => ({
 
     set({ selectedStore: store });
 
-    // Abort all in-flight loads to free browser connections
-    _researchLoadController?.abort();
-    _researchLoadController = null;
-    _copyLoadController?.abort();
-    _copyLoadController = null;
+    // Abort non-migrated in-flight loads
     _connectionsLoadController?.abort();
     _connectionsLoadController = null;
     _adCreatorLoadController?.abort();
     _adCreatorLoadController = null;
 
-    // Set loading: true BEFORE clearing data so skeleton loaders appear during reload
-    // (instead of a blank flash). Each module's loadProducts(storeId) useEffect will
-    // fire and replace skeletons with fresh data.
-    useResearchStore.setState({ sheetProducts: [], loading: true, error: null });
-    useProductCopyStore.setState({ copyProducts: [], loading: true, error: null });
+    // Clear non-migrated store data (TanStack Query handles products/copies via query key change)
     useAdCreatorStore.setState({ campaigns: [], loading: true, error: null });
     useCreativeGeneratorStore.setState({ batchQueue: [], productCreatives: [], loaded: false });
     useConnectionsStore.setState({ connections: [], loading: true, loaded: false });

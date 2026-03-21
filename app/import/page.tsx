@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -13,26 +13,25 @@ import {
   CheckCheck,
   Loader2,
 } from "lucide-react";
-import { useResearchStore, useStoreContext, useProductCopyStore } from "@/lib/store";
+import { useStoreContext } from "@/lib/store";
+import { useProductsQuery, useUpdateProduct } from "@/lib/queries/use-products";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui";
 import { ImportQueueCard } from "@/components/modules/ImportQueueCard";
 import { createProductCopy } from "@/lib/services/product-copy";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 
 export default function ImportPage() {
   const router = useRouter();
-  const { sheetProducts, updateSheetProduct, loadProducts } = useResearchStore();
+  const { data: sheetProducts = [] } = useProductsQuery();
+  const updateSheetProduct = useUpdateProduct();
+  const queryClient = useQueryClient();
   const { selectedStore } = useStoreContext();
   const [csvGenerated, setCsvGenerated] = useState(false);
   const [importing, setImporting] = useState(false);
 
-  // Ensure research products are loaded (user may navigate here directly)
   const storeId = selectedStore?.id;
-  useEffect(() => {
-    if (storeId) {
-      loadProducts(storeId);
-    }
-  }, [storeId, loadProducts]);
 
   const queuedProducts = useMemo(
     () => sheetProducts.filter((p) => p.testingStatus === "Queued"),
@@ -101,8 +100,8 @@ export default function ImportPage() {
         console.error("Failed to create product copy for", p.productName, "— product stays queued:", err);
       }
     }
-    // Reload product copies so Product Creation page picks them up
-    useProductCopyStore.getState().loadProducts(storeId);
+    // Invalidate product copies query so Product Creation page picks them up
+    queryClient.invalidateQueries({ queryKey: queryKeys.productCopies.list(storeId) });
     setCsvGenerated(false);
     setImporting(false);
   }

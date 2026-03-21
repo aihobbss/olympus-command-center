@@ -13,7 +13,15 @@ import {
   Trash2,
   AlertTriangle,
 } from "lucide-react";
-import { useResearchStore, useStoreContext, flushAllProductWrites } from "@/lib/store";
+import { useStoreContext } from "@/lib/store";
+import {
+  useProductsQuery,
+  useUpdateProduct,
+  useAddProduct,
+  useDeleteProduct,
+  useImportAllUnimported,
+  flushAllProductWrites,
+} from "@/lib/queries/use-products";
 import {
   type SheetProduct,
   type ProductType,
@@ -21,6 +29,8 @@ import {
   getDiscountForPrice,
 } from "@/data/mock";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 
 // ── Inline editable text/number cell ───────────────────────
 
@@ -345,20 +355,18 @@ type TestingStatusFilter =
 // ── Main sheet component ───────────────────────────────────
 
 export function ResearchSheet() {
-  const { sheetProducts, updateSheetProduct, importAllUnimported, addSheetProduct, deleteSheetProduct, loadProducts, loading, adding, error } =
-    useResearchStore();
+  const { data: sheetProducts = [], isPending: loading, isError, error, refetch } = useProductsQuery();
+  const updateSheetProduct = useUpdateProduct();
+  const addProductMutation = useAddProduct();
+  const deleteProductMutation = useDeleteProduct();
+  const importAllMutation = useImportAllUnimported();
+  const queryClient = useQueryClient();
   const { selectedStore } = useStoreContext();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TestingStatusFilter>("All");
   const [scrapingIds, setScrapingIds] = useState<Set<string>>(new Set());
 
-  // Load products from Supabase when store changes
   const storeId = selectedStore?.id;
-  useEffect(() => {
-    if (storeId) {
-      loadProducts(storeId);
-    }
-  }, [storeId, loadProducts]);
 
   // Flush any pending debounced writes when navigating away from this page
   useEffect(() => {
@@ -366,31 +374,6 @@ export function ResearchSheet() {
       flushAllProductWrites();
     };
   }, []);
-
-  // Safety net: if loading stays true for 20s, force-reset with an error
-  useEffect(() => {
-    if (!loading) return;
-    const timer = setTimeout(() => {
-      if (useResearchStore.getState().loading) {
-        useResearchStore.setState({ loading: false, error: "Loading timed out. Please try again." });
-      }
-    }, 20_000);
-    return () => clearTimeout(timer);
-  }, [loading]);
-
-  // Auto-retry when browser tab regains focus if data is empty or errored
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible" && storeId) {
-        const state = useResearchStore.getState();
-        if (state.sheetProducts.length === 0 || state.error) {
-          loadProducts(storeId);
-        }
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [storeId, loadProducts]);
 
   // Auto-fill product data when an afterlib/winninghunter link is pasted
   const handleAdLinkSave = useCallback(
@@ -446,8 +429,10 @@ export function ResearchSheet() {
 
         if (!data) return;
 
-        // Read latest state directly from Zustand to avoid stale closure
-        const currentProducts = useResearchStore.getState().sheetProducts;
+        // Read latest data from TanStack Query cache
+        const currentProducts = queryClient.getQueryData<SheetProduct[]>(
+          queryKeys.products.list(storeId!)
+        ) ?? [];
         const product = currentProducts.find((p) => p.id === productId);
         if (!product) {
           console.error("Product not found after scrape:", productId);
@@ -475,7 +460,7 @@ export function ResearchSheet() {
         });
       }
     },
-    [updateSheetProduct]
+    [updateSheetProduct, queryClient, storeId]
   );
 
   const filtered = useMemo(() => {
@@ -515,15 +500,15 @@ export function ResearchSheet() {
     );
   }
 
-  if (error) {
+  if (isError) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="w-12 h-12 rounded-xl bg-accent-red/10 flex items-center justify-center mb-4">
           <AlertTriangle size={20} className="text-accent-red" />
         </div>
-        <p className="text-sm text-text-secondary mb-3">{error}</p>
+        <p className="text-sm text-text-secondary mb-3">{error?.message ?? "Failed to load products. Please try again."}</p>
         <button
-          onClick={() => storeId && loadProducts(storeId)}
+          onClick={() => refetch()}
           className="px-4 py-2 text-sm rounded-lg bg-accent-indigo/10 text-accent-indigo hover:bg-accent-indigo/20 transition-colors"
         >
           Retry Connection
@@ -590,7 +575,10 @@ export function ResearchSheet() {
         {/* Import All button */}
         {unimportedCount > 0 && (
           <button
-            onClick={importAllUnimported}
+            onClick={() => {
+              const ids = sheetProducts.filter((p) => !p.testingStatus).map((p) => p.id);
+              if (ids.length > 0) importAllMutation.mutate(ids);
+            }}
             className={cn(
               "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
               "bg-accent-indigo hover:bg-accent-indigo-hover text-white",
@@ -833,7 +821,7 @@ export function ResearchSheet() {
               {/* Delete row */}
               <td className="px-2 py-2.5 w-8">
                 <button
-                  onClick={() => deleteSheetProduct(product.id)}
+                  onClick={() => deleteProductMutation.mutate(product.id)}
                   className="p-1 rounded text-text-muted hover:text-accent-red hover:bg-accent-red/10 opacity-0 group-hover:opacity-100 transition-all duration-150"
                   title="Delete product"
                 >
@@ -848,18 +836,18 @@ export function ResearchSheet() {
 
       {/* Add Row */}
       <button
-        onClick={addSheetProduct}
-        disabled={adding}
+        onClick={() => addProductMutation.mutate()}
+        disabled={addProductMutation.isPending}
         className={cn(
           "mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
           "text-text-muted hover:text-text-secondary",
           "border border-dashed border-subtle hover:border-text-muted",
           "transition-all duration-150",
-          adding && "opacity-50 pointer-events-none"
+          addProductMutation.isPending && "opacity-50 pointer-events-none"
         )}
       >
-        {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-        {adding ? "Adding…" : "Add Product"}
+        {addProductMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+        {addProductMutation.isPending ? "Adding…" : "Add Product"}
       </button>
 
       {/* No results */}

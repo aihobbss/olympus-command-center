@@ -41,3 +41,6 @@ export { StoreSetup } from "./StoreSetup";
 // ─── Demo Mode ──────────────────────────────────────────
 export { DemoBanner } from "./DemoBanner";
 export { TourOverlay } from "./TourOverlay";
+
+// ─── Providers ──────────────────────────────────────────
+export { QueryProvider } from "./QueryProvider";

@@ -16,7 +16,8 @@ import {
   Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStoreContext, useCreativeGeneratorStore, useProductCopyStore, useAuthStore, useConnectionsStore } from "@/lib/store";
+import { useStoreContext, useCreativeGeneratorStore, useAuthStore, useConnectionsStore } from "@/lib/store";
+import { useProductCopiesQuery } from "@/lib/queries/use-product-copies";
 import { ActionSlider } from "@/components/ui";
 import { PROMPT_TEMPLATES as SHARED_PROMPT_TEMPLATES } from "@/data/mock";
 import { CreativeBatchQueue } from "@/components/modules/CreativeBatchQueue";
@@ -76,20 +77,18 @@ export default function CreativeGeneratorPage() {
   const user = useAuthStore((s) => s.user);
   const { loadConnections, isConnected } = useConnectionsStore();
   const { loadBatchQueue } = useCreativeGeneratorStore();
-  const copyProducts = useProductCopyStore((s) => s.copyProducts);
-  const loadCopyProducts = useProductCopyStore((s) => s.loadProducts);
+  const { data: copyProducts = [] } = useProductCopiesQuery();
 
   useEffect(() => {
     if (user) loadConnections();
   }, [user, loadConnections]);
 
-  // Load product copies from Supabase to populate the product selector
+  // Load batch queue from Supabase
   useEffect(() => {
     if (selectedStore) {
-      loadCopyProducts(selectedStore.id);
       loadBatchQueue(selectedStore.id);
     }
-  }, [selectedStore, loadCopyProducts, loadBatchQueue]);
+  }, [selectedStore, loadBatchQueue]);
 
   // Build product options from Supabase product_copies (pushed products preferred)
   const products: ProductOption[] = useMemo(() => {
