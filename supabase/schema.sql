@@ -237,6 +237,33 @@ CREATE INDEX idx_ad_campaigns_store ON ad_campaigns(store_id);
 CREATE INDEX idx_ad_campaigns_ad_account ON ad_campaigns(ad_account_id);
 
 -- ============================================
+-- 8b. AD CAMPAIGN DAILY INSIGHTS (time-series metrics)
+-- ============================================
+-- One row per campaign per day — enables period filtering for spend, ATC, etc.
+-- ad_campaigns retains campaign metadata (status, budget, name).
+CREATE TABLE IF NOT EXISTS ad_campaign_daily_insights (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  store_id TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  meta_campaign_id TEXT NOT NULL,
+  ad_account_id TEXT NOT NULL,
+  date DATE NOT NULL,
+  spend NUMERIC DEFAULT 0,
+  impressions INTEGER DEFAULT 0,
+  clicks INTEGER DEFAULT 0,
+  cpc NUMERIC DEFAULT 0,
+  ctr NUMERIC DEFAULT 0,
+  atc INTEGER DEFAULT 0,
+  purchases INTEGER DEFAULT 0,
+  purchase_value NUMERIC DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(store_id, meta_campaign_id, date)
+);
+
+CREATE INDEX idx_daily_insights_store_date ON ad_campaign_daily_insights(store_id, date);
+CREATE INDEX idx_daily_insights_account ON ad_campaign_daily_insights(ad_account_id);
+CREATE INDEX idx_daily_insights_campaign ON ad_campaign_daily_insights(meta_campaign_id);
+
+-- ============================================
 -- 9. AD ACTIONS (audit trail)
 -- ============================================
 CREATE TABLE IF NOT EXISTS ad_actions (

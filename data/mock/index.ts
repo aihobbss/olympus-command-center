@@ -228,6 +228,7 @@ export type CampaignStatus = "Active" | "Paused" | "Killed" | "Scaling";
 
 export type AdCampaign = {
   id: string;
+  metaCampaignId?: string;
   productId?: string;
   campaignName: string;
   product: string;

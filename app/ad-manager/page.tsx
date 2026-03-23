@@ -20,6 +20,9 @@ import {
   scaleCampaign,
   passCampaign,
   getLastSyncedAt,
+  fetchDailyInsights,
+  aggregateDailyInsights,
+  type DailyInsightRow,
 } from "@/lib/services/meta-campaigns";
 import { fetchProfitLogsByDateRange, triggerProfitSync } from "@/lib/services/profit-tracker";
 import { fetchAdAccounts, discoverAdAccounts, type UserAdAccount } from "@/lib/services/ad-accounts";
@@ -32,6 +35,28 @@ const STORE_TO_USD: Record<string, number> = { UK: 1.27, AU: 0.63 };
 // ─── Cache staleness threshold (2 minutes) ─────────────────
 const CACHE_TTL_MS = 2 * 60 * 1000;
 
+// ─── Days back per period ──────────────────────────────────
+const DAYS_BACK: Record<TimePeriod, number> = {
+  today: 0,
+  "3d": 3,
+  "7d": 7,
+  "30d": 30,
+  all: 3650,
+};
+
+function getDateRange(p: TimePeriod): { start: string; end: string } {
+  const end = new Date();
+  if (p === "all") {
+    return { start: "2000-01-01", end: end.toISOString().split("T")[0] };
+  }
+  const start = new Date();
+  start.setDate(start.getDate() - DAYS_BACK[p]);
+  return {
+    start: start.toISOString().split("T")[0],
+    end: end.toISOString().split("T")[0],
+  };
+}
+
 function computeRecommendation(c: {
   spend: number;
   cpc: number;
@@ -41,54 +66,42 @@ function computeRecommendation(c: {
 }): { status: AdCampaign["status"]; recommendation: string } {
   const orders = c.orders ?? 0;
 
-  // Kill rules (check in order of spend threshold)
-  // CPC > $1 + 0 ATC + $10 spent → Kill
   if (c.spend >= 10 && c.cpc > 1 && c.atc === 0) {
     return {
       status: "Kill",
       recommendation: `$${Math.round(c.spend)} spent, CPC > $1, 0 ATC — SOP: Kill`,
     };
   }
-  // 0 ATC + $20 spent → Kill
   if (c.spend >= 20 && c.atc === 0) {
     return {
       status: "Kill",
       recommendation: `$${Math.round(c.spend)} spent, 0 ATC — SOP: Kill`,
     };
   }
-  // No sales + $30 spent → Kill
   if (c.spend >= 30 && orders === 0) {
     return {
       status: "Kill",
       recommendation: `$${Math.round(c.spend)} spent, 0 sales — SOP: Kill`,
     };
   }
-  // < 2 sales + $60 spent → Kill
   if (c.spend >= 60 && orders < 2) {
     return {
       status: "Kill",
       recommendation: `$${Math.round(c.spend)} spent, only ${orders} sale${orders === 1 ? "" : "s"} — SOP: Kill`,
     };
   }
-
-  // Scale rules
-  // ROAS >= 2.0 + ATC >= 5 → Scale
   if (c.roas >= 2.0 && c.atc >= 5) {
     return {
       status: "Scaling",
       recommendation: `ROAS ${c.roas.toFixed(1)}x with ${c.atc} ATC — SOP: Scale +100%`,
     };
   }
-
-  // Watch rules
-  // ROAS 1.0–2.0 → Watch
   if (c.roas >= 1.0 && c.roas < 2.0) {
     return {
       status: "Watch",
       recommendation: `ROAS ${c.roas.toFixed(1)}x — profitable but below scale threshold — SOP: Watch`,
     };
   }
-
   return {
     status: "Watch",
     recommendation: `Monitoring — data insufficient for a strong signal`,
@@ -121,8 +134,7 @@ export default function AdManagerPage() {
 
   const [activeTab, setActiveTab] = useState<AdTab>("live");
   const [period, setPeriod] = useState<TimePeriod>("7d");
-  const [selectedCampaign, setSelectedCampaign] =
-    useState<AdCampaign | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<AdCampaign | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
   const [syncing, setSyncing] = useState(false);
@@ -131,19 +143,20 @@ export default function AdManagerPage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"live" | "paused" | "all">("live");
   const [shopifyTotals, setShopifyTotals] = useState({ revenue: 0, orders: 0, profit: 0 });
-  // All profit logs loaded from Supabase (unfiltered) — used for local period filtering
   const [allProfitLogs, setAllProfitLogs] = useState<{ date: string; revenue: number; orders?: number; profit: number }[]>([]);
 
+  // All daily insight rows from Supabase (widest range) — filtered locally by period + account
+  const [allDailyInsights, setAllDailyInsights] = useState<DailyInsightRow[]>([]);
+
   const storeId = selectedStore?.id ?? "";
-  // Track which store we've loaded cached data for, to avoid redundant fetches
   const loadedStoreRef = useRef<string | null>(null);
 
-  // ── Ad account switcher state (multi-select, persisted per store) ──
+  // ── Ad account switcher state ──
   const [adAccounts, setAdAccounts] = useState<UserAdAccount[]>([]);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set()); // empty = all
+  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set());
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
 
-  // Restore saved selection from localStorage when storeId changes
+  // Restore saved selection from localStorage
   useEffect(() => {
     if (!storeId) return;
     try {
@@ -163,7 +176,6 @@ export default function AdManagerPage() {
     }
   }, [storeId]);
 
-  // Persist selection to localStorage whenever it changes
   const updateSelection = useCallback((next: Set<string>) => {
     setSelectedAccountIds(next);
     if (storeId) {
@@ -182,12 +194,11 @@ export default function AdManagerPage() {
     } else {
       next.add(accountId);
     }
-    // If all are now selected, reset to empty (= "all")
     updateSelection(next.size === adAccounts.length ? new Set() : next);
   }, [selectedAccountIds, adAccounts.length, updateSelection]);
 
   const toggleAll = useCallback(() => {
-    updateSelection(new Set()); // empty = all
+    updateSelection(new Set());
   }, [updateSelection]);
 
   const storeCurrency = selectedStore?.currency ?? "";
@@ -197,7 +208,8 @@ export default function AdManagerPage() {
     (localAmount: number) => Math.round(localAmount * rate),
     [rate]
   );
-  // ── Load ad accounts (discover from Meta to get real names + all accounts) ──
+
+  // ── Load ad accounts ──
   useEffect(() => {
     if (!user || !storeId || !metaConnected) return;
     let cancelled = false;
@@ -217,49 +229,36 @@ export default function AdManagerPage() {
     return () => { cancelled = true; };
   }, [user, storeId, metaConnected]);
 
-  // ── Map period to Meta date_preset + days back for profit sync ──
-  const DAYS_BACK: Record<TimePeriod, number> = {
-    today: 1,
-    "3d": 3,
-    "7d": 7,
-    "30d": 30,
-    all: 3650,
-  };
-
-  // Helper: compute date range string for the selected period
-  function getDateRange(p: TimePeriod): { start: string; end: string } {
-    const end = new Date();
-    if (p === "all") {
-      return { start: "2000-01-01", end: end.toISOString().split("T")[0] };
-    }
-    const start = new Date();
-    start.setDate(start.getDate() - DAYS_BACK[p]);
-    return {
-      start: start.toISOString().split("T")[0],
-      end: end.toISOString().split("T")[0],
-    };
-  }
-
-  // ── Load cached data from Supabase (no external API calls) ──
-  // Fetches all campaigns and the widest profit log range ("all") so period changes can filter locally
+  // ── Load cached data from Supabase (campaigns + daily insights + profit logs) ──
   const loadCachedData = useCallback(async () => {
     if (!storeId) return;
-    // Fetch all profit logs (widest range) so we can filter locally for any period
-    const [data, profitLogs, synced] = await Promise.all([
+    const todayStr = new Date().toISOString().split("T")[0];
+    const [campaignData, insights, profitLogs, synced] = await Promise.all([
       fetchLiveCampaigns(storeId),
-      fetchProfitLogsByDateRange(storeId, "2000-01-01", new Date().toISOString().split("T")[0]),
+      fetchDailyInsights(storeId, "2000-01-01", todayStr),
+      fetchProfitLogsByDateRange(storeId, "2000-01-01", todayStr),
       getLastSyncedAt(storeId),
     ]);
-    const withRecs = data.map((c) => {
-      const { status, recommendation } = computeRecommendation(c);
-      return { ...c, status, recommendation };
-    });
-    setCampaigns(withRecs);
-    setLastSynced(synced);
+    setCampaigns(campaignData);
+    setAllDailyInsights(insights);
     setAllProfitLogs(profitLogs);
+    setLastSynced(synced);
   }, [storeId]);
 
-  // ── Compute shopifyTotals from allProfitLogs filtered by the current period ──
+  // ── Filter daily insights by period + selected ad accounts ──
+  const filteredInsights = useMemo(() => {
+    const { start, end } = getDateRange(period);
+    let rows = allDailyInsights.filter((r) => r.date >= start && r.date <= end);
+    if (!allSelected) {
+      rows = rows.filter((r) => selectedAccountIds.has(r.ad_account_id));
+    }
+    return rows;
+  }, [allDailyInsights, period, selectedAccountIds, allSelected]);
+
+  // ── Aggregate filtered insights into store-wide + per-campaign metrics ──
+  const insightMetrics = useMemo(() => aggregateDailyInsights(filteredInsights), [filteredInsights]);
+
+  // ── Compute shopifyTotals from profit logs filtered by period ──
   useEffect(() => {
     if (allProfitLogs.length === 0) {
       setShopifyTotals({ revenue: 0, orders: 0, profit: 0 });
@@ -278,16 +277,56 @@ export default function AdManagerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allProfitLogs, period]);
 
-  // ── Background sync: pull fresh data from Meta + Shopify, then reload cache ──
+  // ── Enrich campaign objects with period-filtered metrics from daily insights ──
+  const enrichedCampaigns = useMemo(() => {
+    return campaigns.map((c) => {
+      // Match campaign to aggregated daily insights via metaCampaignId
+      const metrics = c.metaCampaignId
+        ? insightMetrics.byCampaign.get(c.metaCampaignId)
+        : undefined;
+
+      if (metrics) {
+        const roas = metrics.spend > 0
+          ? parseFloat((metrics.purchaseValue / metrics.spend).toFixed(2))
+          : 0;
+        const orders = metrics.purchases;
+        const { status, recommendation } = computeRecommendation({
+          spend: metrics.spend,
+          cpc: metrics.cpc,
+          atc: metrics.atc,
+          roas,
+          orders,
+        });
+        return {
+          ...c,
+          spend: metrics.spend,
+          cpc: metrics.cpc,
+          atc: metrics.atc,
+          roas,
+          revenue: metrics.purchaseValue,
+          orders,
+          profit: metrics.purchaseValue - metrics.spend,
+          status,
+          recommendation,
+        };
+      }
+
+      // No insights for this campaign in the selected period — zero out metrics
+      const { status, recommendation } = computeRecommendation({
+        spend: 0, cpc: 0, atc: 0, roas: 0, orders: 0,
+      });
+      return { ...c, spend: 0, cpc: 0, atc: 0, roas: 0, revenue: 0, orders: 0, profit: 0, status, recommendation };
+    });
+  }, [campaigns, insightMetrics]);
+
+  // ── Background sync ──
   const runBackgroundSync = useCallback(async () => {
     if (!user || !storeId) return;
     setBackgroundSyncing(true);
     setSyncError(null);
     try {
-      // Always sync Meta with "maximum" to get lifetime campaign spend
-      // (campaigns store cumulative spend; period filtering happens client-side via profit logs)
       const results = await Promise.allSettled([
-        triggerMetaSync(user.id, storeId, "maximum"),
+        triggerMetaSync(user.id, storeId),
         triggerProfitSync(user.id, storeId, 30),
       ]);
       if (results[0].status === "fulfilled" && results[0].value.error) {
@@ -295,26 +334,23 @@ export default function AdManagerPage() {
       } else if (results[0].status === "rejected") {
         setSyncError("Meta sync failed — check your connection");
       }
-      // Reload cached data from Supabase after sync
       await loadCachedData();
     } catch {
       setSyncError("Sync failed — check your connections in Settings");
-      try { await loadCachedData(); } catch { /* ignore reload errors */ }
+      try { await loadCachedData(); } catch { /* ignore */ }
     } finally {
       setBackgroundSyncing(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, storeId, period, loadCachedData]);
+  }, [user, storeId, loadCachedData]);
 
-  // ── Manual "Sync Now": always triggers a fresh Meta API call ──
+  // ── Manual "Sync Now" ──
   const handleSync = useCallback(async () => {
     if (!user || !storeId) return;
     setSyncing(true);
     setSyncError(null);
     try {
-      // Always sync Meta with "maximum" to get lifetime campaign spend
       const results = await Promise.allSettled([
-        triggerMetaSync(user.id, storeId, "maximum"),
+        triggerMetaSync(user.id, storeId),
         triggerProfitSync(user.id, storeId, 30),
       ]);
       if (results[0].status === "fulfilled" && results[0].value.error) {
@@ -325,36 +361,29 @@ export default function AdManagerPage() {
       await loadCachedData();
     } catch {
       setSyncError("Sync failed — check your connections in Settings");
-      try { await loadCachedData(); } catch { /* ignore reload errors */ }
+      try { await loadCachedData(); } catch { /* ignore */ }
     } finally {
       setSyncing(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, storeId, period, loadCachedData]);
+  }, [user, storeId, loadCachedData]);
 
-  // ── Cache-first load on page mount / store change ──
-  // 1. Show cached data from Supabase immediately
-  // 2. If last sync was >2 minutes ago, trigger a non-blocking background sync
+  // ── Cache-first load on mount / store change ──
   useEffect(() => {
     if (!metaConnected || !user || !storeId) return;
-    // Avoid redundant loads for the same store
     if (loadedStoreRef.current === storeId) return;
     loadedStoreRef.current = storeId;
 
     let cancelled = false;
 
     (async () => {
-      // Step 1: Load cached data immediately (fast — Supabase only)
       await loadCachedData();
       if (cancelled) return;
 
-      // Step 2: Check cache staleness — sync in background if stale
       const syncedAt = await getLastSyncedAt(storeId);
       if (cancelled) return;
 
       const isStale = !syncedAt || (Date.now() - new Date(syncedAt).getTime() > CACHE_TTL_MS);
       if (isStale) {
-        // Non-blocking background sync
         runBackgroundSync();
       }
     })();
@@ -363,20 +392,14 @@ export default function AdManagerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metaConnected, user, storeId]);
 
-  // ── Period changes: filter locally from cached data, do NOT re-sync from Meta ──
-  // shopifyTotals are recomputed via the useEffect above when `period` changes.
-  // Campaigns are not date-filtered (they represent current state), so no action needed.
-
   // ── Filter campaigns by account + status ──
   const isLive = (c: AdCampaign) => c.campaignStatus === "Active" || c.campaignStatus === "Scaling";
 
-  // First filter by selected ad accounts (empty set = all)
   const accountFilteredCampaigns = useMemo(() => {
-    if (allSelected) return campaigns;
-    return campaigns.filter((c) => c.adAccountId && selectedAccountIds.has(c.adAccountId));
-  }, [campaigns, selectedAccountIds, allSelected]);
+    if (allSelected) return enrichedCampaigns;
+    return enrichedCampaigns.filter((c) => c.adAccountId && selectedAccountIds.has(c.adAccountId));
+  }, [enrichedCampaigns, selectedAccountIds, allSelected]);
 
-  // Then filter by status
   const filteredCampaigns = useMemo(() => {
     if (statusFilter === "all") return accountFilteredCampaigns;
     if (statusFilter === "live") return accountFilteredCampaigns.filter(isLive);
@@ -386,23 +409,20 @@ export default function AdManagerPage() {
   const liveCount = useMemo(() => accountFilteredCampaigns.filter(isLive).length, [accountFilteredCampaigns]);
   const pausedCount = accountFilteredCampaigns.length - liveCount;
 
-  // ── Aggregated metrics ──
-
-  // Total ad spend from account-filtered campaigns (spend depends on selected account)
-  const totalSpend = useMemo(() => {
-    let spend = 0;
-    for (const c of accountFilteredCampaigns) spend += c.spend;
-    return spend;
-  }, [accountFilteredCampaigns]);
-
-  // Revenue, Orders, Profit come from Shopify profit logs (store-wide, NOT filtered by ad account)
+  // ── Aggregated metrics (spend from daily insights, revenue/profit from profit logs) ──
   const totals = useMemo(() => {
-    const roas = totalSpend > 0 ? parseFloat((shopifyTotals.revenue / totalSpend).toFixed(2)) : 0;
-    return { spend: totalSpend, revenue: shopifyTotals.revenue, profit: shopifyTotals.profit, orders: shopifyTotals.orders, roas };
-  }, [totalSpend, shopifyTotals]);
+    const spend = insightMetrics.totalSpend;
+    const roas = spend > 0 ? parseFloat((shopifyTotals.revenue / spend).toFixed(2)) : 0;
+    return {
+      spend,
+      revenue: shopifyTotals.revenue,
+      profit: shopifyTotals.profit,
+      orders: shopifyTotals.orders,
+      roas,
+    };
+  }, [insightMetrics, shopifyTotals]);
 
   // ── Card click → open panel ──
-
   const handleCardClick = useCallback((campaign: AdCampaign) => {
     setSelectedCampaign(campaign);
     setPanelOpen(true);
@@ -413,7 +433,6 @@ export default function AdManagerPage() {
   }, []);
 
   // ── Panel actions ──
-
   const handleScale = useCallback(async (id: string, newBudget: number) => {
     if (!user) return;
     setPanelOpen(false);
@@ -452,7 +471,6 @@ export default function AdManagerPage() {
     { key: "creator", label: "Ad Creator" },
   ];
 
-  // Selected account label for the switcher
   const selectedAccountLabel = allSelected
     ? "All Accounts"
     : selectedAccountIds.size === 1
@@ -510,7 +528,6 @@ export default function AdManagerPage() {
                       onClick={() => setAccountDropdownOpen(false)}
                     />
                     <div className="absolute right-0 top-full mt-1 z-50 w-64 rounded-lg bg-bg-card border border-subtle shadow-xl overflow-hidden">
-                      {/* All Accounts toggle */}
                       <button
                         onClick={toggleAll}
                         className={cn(
@@ -530,7 +547,6 @@ export default function AdManagerPage() {
                         <span className="ml-auto text-text-muted">({adAccounts.length})</span>
                       </button>
                       <div className="border-t border-subtle" />
-                      {/* Individual accounts */}
                       {adAccounts.map((acct) => {
                         const checked = allSelected || selectedAccountIds.has(acct.ad_account_id);
                         return (
@@ -584,7 +600,7 @@ export default function AdManagerPage() {
         )}
       </div>
 
-      {/* ─── Connection gate — require both Meta + Shopify ─── */}
+      {/* ─── Connection gate ─── */}
       {!allConnected ? (
         <ServiceConnectionOverlay
           moduleName="Ad Manager"
