@@ -263,6 +263,24 @@ export default function AdManagerPage() {
     setIsFirstSync(insights.length === 0 && campaignData.length === 0);
   }, [storeId]);
 
+  // ── Detect accounts that are selected but have no synced data ──
+  const accountsWithData = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of allDailyInsights) set.add(row.ad_account_id);
+    return set;
+  }, [allDailyInsights]);
+
+  // Which selected accounts have zero daily insights (need a full sync)?
+  const unsyncedAccountIds = useMemo(() => {
+    // Determine which accounts are "active" based on selection
+    const activeIds = allSelected
+      ? adAccounts.map((a) => a.ad_account_id)
+      : Array.from(selectedAccountIds);
+    return activeIds.filter((id) => !accountsWithData.has(id));
+  }, [allSelected, adAccounts, selectedAccountIds, accountsWithData]);
+
+  const needsResync = unsyncedAccountIds.length > 0 && !isFirstSync;
+
   // ── Filter daily insights by period + selected ad accounts ──
   const filteredInsights = useMemo(() => {
     const { start, end } = getDateRange(period);
@@ -337,15 +355,21 @@ export default function AdManagerPage() {
     });
   }, [campaigns, insightMetrics]);
 
+  // ── Resolve which account IDs to sync ──
+  const getSelectedAccountIdsArray = useCallback((): string[] | undefined => {
+    return selectedAccountIds.size > 0 ? Array.from(selectedAccountIds) : undefined;
+  }, [selectedAccountIds]);
+
   // ── Background sync ──
   const runBackgroundSync = useCallback(async () => {
     if (!user || !storeId) return;
     setBackgroundSyncing(true);
     setSyncError(null);
     try {
+      const accountIds = getSelectedAccountIdsArray();
       const results = await Promise.allSettled([
-        triggerMetaSync(user.id, storeId),
-        triggerProfitSync(user.id, storeId, 30, selectedAccountIds.size > 0 ? Array.from(selectedAccountIds) : undefined),
+        triggerMetaSync(user.id, storeId, { adAccountIds: accountIds }),
+        triggerProfitSync(user.id, storeId, 30, accountIds),
       ]);
       if (results[0].status === "fulfilled" && results[0].value.error) {
         setSyncError(results[0].value.error);
@@ -359,7 +383,7 @@ export default function AdManagerPage() {
     } finally {
       setBackgroundSyncing(false);
     }
-  }, [user, storeId, selectedAccountIds, loadCachedData]);
+  }, [user, storeId, getSelectedAccountIdsArray, loadCachedData]);
 
   // ── Manual "Sync Now" ──
   const handleSync = useCallback(async () => {
@@ -367,15 +391,14 @@ export default function AdManagerPage() {
     setSyncing(true);
     setSyncError(null);
 
-    // On first sync, persist the current account selection so future visits auto-sync
-    if (!localStorage.getItem(`ad-accounts-selection:${storeId}`)) {
-      localStorage.setItem(`ad-accounts-selection:${storeId}`, JSON.stringify(Array.from(selectedAccountIds)));
-    }
+    // Persist the current account selection
+    localStorage.setItem(`ad-accounts-selection:${storeId}`, JSON.stringify(Array.from(selectedAccountIds)));
 
     try {
+      const accountIds = getSelectedAccountIdsArray();
       const results = await Promise.allSettled([
-        triggerMetaSync(user.id, storeId),
-        triggerProfitSync(user.id, storeId, 30, selectedAccountIds.size > 0 ? Array.from(selectedAccountIds) : undefined),
+        triggerMetaSync(user.id, storeId, { adAccountIds: accountIds }),
+        triggerProfitSync(user.id, storeId, 30, accountIds),
       ]);
       if (results[0].status === "fulfilled" && results[0].value.error) {
         setSyncError(results[0].value.error);
@@ -390,7 +413,7 @@ export default function AdManagerPage() {
     } finally {
       setSyncing(false);
     }
-  }, [user, storeId, selectedAccountIds, loadCachedData]);
+  }, [user, storeId, selectedAccountIds, getSelectedAccountIdsArray, loadCachedData]);
 
   // ── Cache-first load on mount / store change ──
   // First-sync guard: if no daily insights exist yet, skip auto-sync entirely.
@@ -671,6 +694,18 @@ export default function AdManagerPage() {
                   <p className="text-sm font-medium text-text-primary mb-1">Select your ad accounts to get started</p>
                   <p className="text-xs text-text-secondary">
                     Choose which Meta ad accounts to track using the dropdown above, then click &quot;Sync Now&quot; to pull your campaign data.
+                  </p>
+                </div>
+              )}
+
+              {/* ─── Resync prompt for newly added accounts ─── */}
+              {needsResync && (
+                <div className="mb-6 p-4 rounded-xl bg-accent-amber/5 border border-accent-amber/20">
+                  <p className="text-sm font-medium text-text-primary mb-1">
+                    {unsyncedAccountIds.length === 1 ? "1 new account" : `${unsyncedAccountIds.length} new accounts`} selected
+                  </p>
+                  <p className="text-xs text-text-secondary">
+                    Click &quot;Sync Now&quot; to pull historical data for the newly added account{unsyncedAccountIds.length > 1 ? "s" : ""}.
                   </p>
                 </div>
               )}

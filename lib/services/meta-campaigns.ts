@@ -232,7 +232,7 @@ export function aggregateDailyInsights(rows: DailyInsightRow[]): StorePeriodMetr
 export async function triggerMetaSync(
   _userId: string,
   storeId: string,
-  forceFullSync?: boolean
+  options?: { forceFullSync?: boolean; adAccountIds?: string[] }
 ): Promise<{ synced: number; error?: string }> {
   // First sync pulls ~37 months in 90-day chunks across multiple accounts — can take a while
   const controller = new AbortController();
@@ -242,7 +242,11 @@ export async function triggerMetaSync(
     const res = await authFetch("/api/sync-meta-campaigns", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ storeId, forceFullSync }),
+      body: JSON.stringify({
+        storeId,
+        forceFullSync: options?.forceFullSync,
+        adAccountIds: options?.adAccountIds,
+      }),
       signal: controller.signal,
     });
 

@@ -94,12 +94,31 @@ async function fetchAllPages<T>(
   return { data: all };
 }
 
+// Build 90-day chunks for a date range (Meta API limit for time_increment=1)
+function buildDateChunks(start: string, end: string): { since: string; until: string }[] {
+  const CHUNK_DAYS = 90;
+  const chunks: { since: string; until: string }[] = [];
+  const startMs = new Date(start).getTime();
+  const endMs = new Date(end).getTime();
+  let chunkStart = startMs;
+  while (chunkStart < endMs) {
+    const chunkEnd = Math.min(chunkStart + CHUNK_DAYS * 86_400_000, endMs);
+    chunks.push({
+      since: new Date(chunkStart).toISOString().split("T")[0],
+      until: new Date(chunkEnd).toISOString().split("T")[0],
+    });
+    chunkStart = chunkEnd + 86_400_000;
+  }
+  return chunks;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { storeId, forceFullSync } = body as {
+    const { storeId, forceFullSync, adAccountIds: requestedAccountIds } = body as {
       storeId: string;
       forceFullSync?: boolean;
+      adAccountIds?: string[];
     };
 
     if (!storeId) {
@@ -178,54 +197,43 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Determine sync range: first sync = maximum, incremental = last 7 days
-    let isFirstSync = !!forceFullSync;
-
-    if (!isFirstSync) {
-      const { count } = await supabaseAdmin
-        .from("ad_campaign_daily_insights")
-        .select("id", { count: "exact", head: true })
-        .eq("store_id", storeId);
-
-      isFirstSync = (count ?? 0) === 0;
+    // If caller specified specific account IDs, only sync those
+    if (requestedAccountIds && requestedAccountIds.length > 0) {
+      const requestedSet = new Set(requestedAccountIds);
+      accountsToSync = accountsToSync.filter((a) => requestedSet.has(a.ad_account_id));
     }
 
-    // Build date range
+    // 3. Determine sync range PER ACCOUNT:
+    //    - Accounts with no data → full sync (~37 months in 90-day chunks)
+    //    - Accounts with existing data → incremental (last 7 days)
+    //    This allows adding a new account without re-syncing existing ones.
     const now = new Date();
-    const endStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const endStr = now.toISOString().split("T")[0];
+    const nowIso = now.toISOString();
 
-    let startStr: string;
-    if (isFirstSync) {
-      // ~37 months back (Meta's maximum reporting window)
-      const start = new Date(now);
-      start.setMonth(start.getMonth() - 37);
-      startStr = start.toISOString().split("T")[0];
-    } else {
-      // Last 7 days to capture attribution window updates
-      const start = new Date(now);
-      start.setDate(start.getDate() - 7);
-      startStr = start.toISOString().split("T")[0];
-    }
+    const fullSyncStart = new Date(now);
+    fullSyncStart.setMonth(fullSyncStart.getMonth() - 37);
+    const fullSyncStartStr = fullSyncStart.toISOString().split("T")[0];
 
-    // Meta API only supports time_increment=1 (daily breakdown) for ranges ≤ ~90 days.
-    // For longer ranges (first sync), we chunk into 90-day windows.
-    const CHUNK_DAYS = 90;
-    const dateChunks: { since: string; until: string }[] = [];
-    {
-      const startMs = new Date(startStr).getTime();
-      const endMs = new Date(endStr).getTime();
-      let chunkStart = startMs;
-      while (chunkStart < endMs) {
-        const chunkEnd = Math.min(chunkStart + CHUNK_DAYS * 86_400_000, endMs);
-        dateChunks.push({
-          since: new Date(chunkStart).toISOString().split("T")[0],
-          until: new Date(chunkEnd).toISOString().split("T")[0],
-        });
-        chunkStart = chunkEnd + 86_400_000; // next day after chunk end
+    const incrementalStart = new Date(now);
+    incrementalStart.setDate(incrementalStart.getDate() - 7);
+    const incrementalStartStr = incrementalStart.toISOString().split("T")[0];
+
+    // Check which accounts already have data
+    const accountDataCounts = new Map<string, number>();
+    for (const account of accountsToSync) {
+      if (forceFullSync) {
+        accountDataCounts.set(account.ad_account_id, 0);
+      } else {
+        const { count } = await supabaseAdmin
+          .from("ad_campaign_daily_insights")
+          .select("id", { count: "exact", head: true })
+          .eq("store_id", storeId)
+          .eq("ad_account_id", account.ad_account_id);
+        accountDataCounts.set(account.ad_account_id, count ?? 0);
       }
     }
 
-    const nowIso = now.toISOString();
     let totalInsightRows = 0;
     let totalCampaignRows = 0;
     const errors: string[] = [];
@@ -295,9 +303,11 @@ export async function POST(request: Request) {
         }
 
         // ── Phase B: Fetch daily insights for ALL campaigns (no status filter) ──
-        // This captures spend from deleted/archived campaigns too.
-        // Meta only supports time_increment=1 with ranges ≤ ~90 days,
-        // so we iterate over dateChunks for the full range.
+        // Per-account: full sync (37 months) for new accounts, incremental (7 days) for existing.
+        const accountHasData = (accountDataCounts.get(adAccountId) ?? 0) > 0;
+        const accountStartStr = accountHasData ? incrementalStartStr : fullSyncStartStr;
+        const dateChunks = buildDateChunks(accountStartStr, endStr);
+
         for (const chunk of dateChunks) {
           const chunkTimeRange = JSON.stringify(chunk);
           const insightsUrl =
@@ -381,16 +391,19 @@ export async function POST(request: Request) {
       }
     }
 
+    const fullSyncAccounts = accountsToSync.filter((a) => (accountDataCounts.get(a.ad_account_id) ?? 0) === 0).length;
+    const incrementalAccounts = accountsToSync.length - fullSyncAccounts;
+
     return NextResponse.json({
       synced: totalInsightRows,
       campaignsSynced: totalCampaignRows,
       insightRows: totalInsightRows,
       accountsSynced: accountsToSync.length,
-      isFirstSync,
-      dateRange: { start: startStr, end: endStr },
+      fullSyncAccounts,
+      incrementalAccounts,
       lastSyncedAt: nowIso,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Synced ${totalCampaignRows} campaigns + ${totalInsightRows} daily insight rows from ${accountsToSync.length} account${accountsToSync.length !== 1 ? "s" : ""}`,
+      message: `Synced ${totalCampaignRows} campaigns + ${totalInsightRows} daily insight rows (${fullSyncAccounts} full, ${incrementalAccounts} incremental)`,
     });
   } catch (err) {
     console.error("Meta sync error:", err);
