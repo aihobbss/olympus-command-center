@@ -8,6 +8,7 @@ type ProfitLogRow = {
   store_id: string;
   date: string;
   revenue_usd: number;
+  refunds_usd: number;
   cog_usd: number;
   ad_spend_usd: number;
   transaction_fee_usd: number;
@@ -28,7 +29,7 @@ type ProductCogRow = {
 };
 
 const LOG_COLS =
-  "id, store_id, date, revenue_usd, cog_usd, ad_spend_usd, transaction_fee_usd, profit_usd, roas, profit_percent, orders, synced_from, created_at";
+  "id, store_id, date, revenue_usd, refunds_usd, cog_usd, ad_spend_usd, transaction_fee_usd, profit_usd, roas, profit_percent, orders, synced_from, created_at";
 
 // ── Mappers ────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ function rowToLog(row: ProfitLogRow): ProfitLog {
   return {
     date: row.date,
     revenue: row.revenue_usd,
+    refunds: row.refunds_usd || 0,
     cog: row.cog_usd,
     adSpend: row.ad_spend_usd,
     transactionFee: row.transaction_fee_usd,

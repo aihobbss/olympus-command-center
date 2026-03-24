@@ -372,6 +372,7 @@ export async function POST(request: Request) {
         store_id: storeId,
         date,
         revenue_usd: Math.round(netRevenue * 100) / 100,
+        refunds_usd: Math.round(bucket.returns * 100) / 100,
         cog_usd: Math.round(cogLocal * 100) / 100,
         ad_spend_usd: Math.round(adSpendLocal * 100) / 100,
         transaction_fee_usd: Math.round(transactionFeeLocal * 100) / 100,

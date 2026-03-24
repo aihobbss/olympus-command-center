@@ -271,11 +271,13 @@ export default function ProfitTrackerPage() {
 
   const totals = useMemo(() => {
     let revenue = 0,
+      refunds = 0,
       adSpend = 0,
       cog = 0,
       profit = 0;
     for (const log of filteredLogs) {
       revenue += log.revenue;
+      refunds += log.refunds;
       adSpend += log.adSpend;
       cog += log.cog;
       profit += log.profit;
@@ -285,7 +287,7 @@ export default function ProfitTrackerPage() {
     const profitPercent = revenue !== 0
       ? parseFloat(((profit / revenue) * 100).toFixed(1))
       : profit < 0 ? -100.0 : 0;
-    return { revenue, adSpend, cog, profit, roas, profitPercent };
+    return { revenue, refunds, adSpend, cog, profit, roas, profitPercent };
   }, [filteredLogs]);
 
   // ── Month-filtered logs (feeds table) ──
@@ -301,12 +303,14 @@ export default function ProfitTrackerPage() {
 
   const monthTotals = useMemo(() => {
     let revenue = 0,
+      refunds = 0,
       cog = 0,
       adSpend = 0,
       transactionFee = 0,
       profit = 0;
     for (const log of monthLogs) {
       revenue += log.revenue;
+      refunds += log.refunds;
       cog += log.cog;
       adSpend += log.adSpend;
       transactionFee += log.transactionFee;
@@ -317,7 +321,7 @@ export default function ProfitTrackerPage() {
     const profitPercent = revenue !== 0
       ? parseFloat(((profit / revenue) * 100).toFixed(1))
       : profit < 0 ? -100.0 : 0;
-    return { revenue, cog, adSpend, transactionFee, profit, roas, profitPercent };
+    return { revenue, refunds, cog, adSpend, transactionFee, profit, roas, profitPercent };
   }, [monthLogs]);
 
   const monthLabel = tableMonth.toLocaleDateString("en-GB", {
@@ -468,11 +472,12 @@ export default function ProfitTrackerPage() {
     // Sort oldest → newest for the CSV
     const sorted = [...logsToExport].sort((a, b) => a.date.localeCompare(b.date));
 
-    const headers = ["Date", `Revenue (${currencyCode})`, "Revenue (USD)", "COG", "Ad Spend", "Transaction Fee", "Orders", "Profit", "ROAS", "Profit %"];
+    const headers = ["Date", `Revenue (${currencyCode})`, "Revenue (USD)", `Refunds (${currencyCode})`, "COG", "Ad Spend", "Transaction Fee", "Orders", "Profit", "ROAS", "Profit %"];
     const rows = sorted.map((log) => [
       `"${log.date}"`,
-      log.revenue,
-      toUsdMonthly(log.revenue, log.date).toFixed(2),
+      (log.revenue + log.refunds).toFixed(2),
+      toUsdMonthly(log.revenue + log.refunds, log.date).toFixed(2),
+      log.refunds.toFixed(2),
       log.cog,
       log.adSpend,
       log.transactionFee,
@@ -809,12 +814,12 @@ export default function ProfitTrackerPage() {
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-2">
         <MetricCard
           label="Total Revenue"
-          value={swappedCards.has("revenue") ? Math.round(localToUsd(totals.revenue)) : Math.round(totals.revenue)}
+          value={swappedCards.has("revenue") ? Math.round(localToUsd(totals.revenue + totals.refunds)) : Math.round(totals.revenue + totals.refunds)}
           format="currency"
           currency={swappedCards.has("revenue") ? "$" : storeCurrency}
           subtitle={swappedCards.has("revenue")
-            ? `${fmtCurrency(Math.round(totals.revenue), storeCurrency)} ${currencyCode}`
-            : `$${Math.round(localToUsd(totals.revenue)).toLocaleString("en-GB")} USD`
+            ? `${fmtCurrency(Math.round(totals.revenue + totals.refunds), storeCurrency)} ${currencyCode}`
+            : `$${Math.round(localToUsd(totals.revenue + totals.refunds)).toLocaleString("en-GB")} USD`
           }
           onClick={() => toggleCard("revenue")}
         />
@@ -929,6 +934,7 @@ export default function ProfitTrackerPage() {
                     "Date",
                     `Revenue (${currencyCode})`,
                     "Revenue (USD)",
+                    "Refunds",
                     "COG",
                     "Ad Spend",
                     "Transaction",
@@ -958,10 +964,16 @@ export default function ProfitTrackerPage() {
                       {fmtDate(log.date)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
-                      {fmtCurrency(log.revenue, storeCurrency, 2)}
+                      {fmtCurrency(log.revenue + log.refunds, storeCurrency, 2)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
-                      {fmtCurrency(toUsdMonthly(log.revenue, log.date), "$", 2)}
+                      {fmtCurrency(toUsdMonthly(log.revenue + log.refunds, log.date), "$", 2)}
+                    </td>
+                    <td className={cn(
+                      "px-4 py-3 text-right font-jetbrains tabular-nums",
+                      log.refunds > 0 ? "text-accent-red" : "text-text-muted"
+                    )}>
+                      {log.refunds > 0 ? fmtCurrency(log.refunds, storeCurrency, 2) : "—"}
                     </td>
                     <td
                       className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums cursor-pointer hover:bg-white/[0.03]"
@@ -1046,10 +1058,16 @@ export default function ProfitTrackerPage() {
                     {monthLabel} Total
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
-                    {fmtCurrency(monthTotals.revenue, storeCurrency, 2)}
+                    {fmtCurrency(monthTotals.revenue + monthTotals.refunds, storeCurrency, 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
-                    {fmtCurrency(monthLogs.reduce((sum, l) => sum + toUsdMonthly(l.revenue, l.date), 0), "$", 2)}
+                    {fmtCurrency(monthLogs.reduce((sum, l) => sum + toUsdMonthly(l.revenue + l.refunds, l.date), 0), "$", 2)}
+                  </td>
+                  <td className={cn(
+                    "px-4 py-3 text-right font-jetbrains font-semibold tabular-nums",
+                    monthTotals.refunds > 0 ? "text-accent-red" : "text-text-muted"
+                  )}>
+                    {monthTotals.refunds > 0 ? fmtCurrency(monthTotals.refunds, storeCurrency, 2) : "—"}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
                     {fmtCurrency(monthTotals.cog, storeCurrency, 2)}

@@ -254,6 +254,7 @@ export type AdCampaign = {
 export type ProfitLog = {
   date: string;
   revenue: number;
+  refunds: number;
   cog: number;
   adSpend: number;
   transactionFee: number;
