@@ -32,13 +32,10 @@ CREATE INDEX idx_daily_insights_campaign ON ad_campaign_daily_insights(meta_camp
 ALTER TABLE ad_campaign_daily_insights ENABLE ROW LEVEL SECURITY;
 
 -- Users can read insights for stores they belong to
+-- Uses get_user_store_ids() (SECURITY DEFINER) to bypass user_stores RLS
 CREATE POLICY "Users can read own store daily insights"
   ON ad_campaign_daily_insights FOR SELECT
-  USING (
-    store_id IN (
-      SELECT store_id FROM user_stores WHERE user_id = auth.uid()
-    )
-  );
+  USING (store_id = ANY(get_user_store_ids()));
 
 -- Service role handles all writes (via API routes)
 -- No INSERT/UPDATE/DELETE policies needed for anon — writes go through supabaseAdmin

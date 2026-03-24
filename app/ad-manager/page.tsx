@@ -148,6 +148,20 @@ export default function AdManagerPage() {
   // All daily insight rows from Supabase (widest range) — filtered locally by period + account
   const [allDailyInsights, setAllDailyInsights] = useState<DailyInsightRow[]>([]);
 
+  // First-sync flag: true when no account selection saved AND no insights exist
+  const [isFirstSync, setIsFirstSync] = useState(false);
+
+  // ── Multi-currency toggle state (matches profit-tracker pattern) ──
+  const [swappedCards, setSwappedCards] = useState<Set<string>>(new Set());
+  const toggleCard = useCallback((key: string) => {
+    setSwappedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
   const storeId = selectedStore?.id ?? "";
   const loadedStoreRef = useRef<string | null>(null);
 
@@ -204,6 +218,7 @@ export default function AdManagerPage() {
   const storeCurrency = selectedStore?.currency ?? "";
   const rate = STORE_TO_USD[selectedStore?.market ?? ""] ?? 1;
   const currencySymbol = storeCurrency === "AUD" ? "A$" : storeCurrency === "GBP" ? "£" : "$";
+  const currencyCode = selectedStore?.market === "UK" ? "GBP" : selectedStore?.market === "AU" ? "AUD" : "USD";
   const toUsd = useCallback(
     (localAmount: number) => Math.round(localAmount * rate),
     [rate]
@@ -243,6 +258,10 @@ export default function AdManagerPage() {
     setAllDailyInsights(insights);
     setAllProfitLogs(profitLogs);
     setLastSynced(synced);
+
+    // Detect first-sync: no saved account selection AND no insights data
+    const hasSavedSelection = localStorage.getItem(`ad-accounts-selection:${storeId}`) !== null;
+    setIsFirstSync(!hasSavedSelection && insights.length === 0);
   }, [storeId]);
 
   // ── Filter daily insights by period + selected ad accounts ──
@@ -327,7 +346,7 @@ export default function AdManagerPage() {
     try {
       const results = await Promise.allSettled([
         triggerMetaSync(user.id, storeId),
-        triggerProfitSync(user.id, storeId, 30),
+        triggerProfitSync(user.id, storeId, 30, selectedAccountIds.size > 0 ? Array.from(selectedAccountIds) : undefined),
       ]);
       if (results[0].status === "fulfilled" && results[0].value.error) {
         setSyncError(results[0].value.error);
@@ -341,17 +360,23 @@ export default function AdManagerPage() {
     } finally {
       setBackgroundSyncing(false);
     }
-  }, [user, storeId, loadCachedData]);
+  }, [user, storeId, selectedAccountIds, loadCachedData]);
 
   // ── Manual "Sync Now" ──
   const handleSync = useCallback(async () => {
     if (!user || !storeId) return;
     setSyncing(true);
     setSyncError(null);
+
+    // On first sync, persist the current account selection so future visits auto-sync
+    if (!localStorage.getItem(`ad-accounts-selection:${storeId}`)) {
+      localStorage.setItem(`ad-accounts-selection:${storeId}`, JSON.stringify(Array.from(selectedAccountIds)));
+    }
+
     try {
       const results = await Promise.allSettled([
         triggerMetaSync(user.id, storeId),
-        triggerProfitSync(user.id, storeId, 30),
+        triggerProfitSync(user.id, storeId, 30, selectedAccountIds.size > 0 ? Array.from(selectedAccountIds) : undefined),
       ]);
       if (results[0].status === "fulfilled" && results[0].value.error) {
         setSyncError(results[0].value.error);
@@ -359,15 +384,18 @@ export default function AdManagerPage() {
         setSyncError("Meta sync failed — check your connection");
       }
       await loadCachedData();
+      setIsFirstSync(false);
     } catch {
       setSyncError("Sync failed — check your connections in Settings");
       try { await loadCachedData(); } catch { /* ignore */ }
     } finally {
       setSyncing(false);
     }
-  }, [user, storeId, loadCachedData]);
+  }, [user, storeId, selectedAccountIds, loadCachedData]);
 
   // ── Cache-first load on mount / store change ──
+  // First-sync guard: if user hasn't selected accounts yet AND no insights exist,
+  // skip auto-sync so they can choose accounts first, then manually click "Sync Now".
   useEffect(() => {
     if (!metaConnected || !user || !storeId) return;
     if (loadedStoreRef.current === storeId) return;
@@ -379,8 +407,15 @@ export default function AdManagerPage() {
       await loadCachedData();
       if (cancelled) return;
 
+      // Skip auto-sync if first-sync (user needs to select accounts first)
+      const hasSavedSelection = localStorage.getItem(`ad-accounts-selection:${storeId}`) !== null;
       const syncedAt = await getLastSyncedAt(storeId);
       if (cancelled) return;
+
+      if (!hasSavedSelection && !syncedAt) {
+        // First visit — let user pick accounts before syncing
+        return;
+      }
 
       const isStale = !syncedAt || (Date.now() - new Date(syncedAt).getTime() > CACHE_TTL_MS);
       if (isStale) {
@@ -632,6 +667,16 @@ export default function AdManagerPage() {
           {/* ─── Live Campaigns Tab ─── */}
           {activeTab === "live" && (
             <>
+              {/* ─── First-sync prompt ─── */}
+              {isFirstSync && adAccounts.length > 0 && (
+                <div className="mb-6 p-4 rounded-xl bg-accent-indigo/5 border border-accent-indigo/20">
+                  <p className="text-sm font-medium text-text-primary mb-1">Select your ad accounts to get started</p>
+                  <p className="text-xs text-text-secondary">
+                    Choose which Meta ad accounts to track using the dropdown above, then click &quot;Sync Now&quot; to pull your campaign data.
+                  </p>
+                </div>
+              )}
+
               {/* ─── Status Filter + Sync Status ─── */}
               <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
                 <div className="flex items-center gap-1.5">
@@ -673,27 +718,40 @@ export default function AdManagerPage() {
                 </div>
               </div>
 
-              {/* ─── Metric Cards ─── */}
+              {/* ─── Metric Cards (click to toggle currency) ─── */}
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
                 <MetricCard
                   label="Total Spend"
-                  value={totals.spend}
+                  value={swappedCards.has("spend") ? Math.round(toUsd(totals.spend)) : totals.spend}
                   format="currency"
-                  currency={currencySymbol}
+                  currency={swappedCards.has("spend") ? "$" : currencySymbol}
+                  subtitle={swappedCards.has("spend")
+                    ? `${currencySymbol}${Math.round(totals.spend).toLocaleString("en-GB")} ${currencyCode}`
+                    : `$${Math.round(toUsd(totals.spend)).toLocaleString("en-GB")} USD`
+                  }
+                  onClick={() => toggleCard("spend")}
                 />
                 <MetricCard
                   label="Revenue"
-                  value={totals.revenue}
+                  value={swappedCards.has("revenue") ? Math.round(toUsd(totals.revenue)) : totals.revenue}
                   format="currency"
-                  currency={currencySymbol}
-                  subtitle={`$${Math.round(toUsd(totals.revenue)).toLocaleString()} USD`}
+                  currency={swappedCards.has("revenue") ? "$" : currencySymbol}
+                  subtitle={swappedCards.has("revenue")
+                    ? `${currencySymbol}${Math.round(totals.revenue).toLocaleString("en-GB")} ${currencyCode}`
+                    : `$${Math.round(toUsd(totals.revenue)).toLocaleString("en-GB")} USD`
+                  }
+                  onClick={() => toggleCard("revenue")}
                 />
                 <MetricCard
                   label="Profit"
-                  value={totals.profit}
+                  value={swappedCards.has("profit") ? Math.round(toUsd(totals.profit)) : totals.profit}
                   format="currency"
-                  currency={currencySymbol}
-                  subtitle={`$${Math.round(toUsd(totals.profit)).toLocaleString()} USD`}
+                  currency={swappedCards.has("profit") ? "$" : currencySymbol}
+                  subtitle={swappedCards.has("profit")
+                    ? `${currencySymbol}${Math.round(totals.profit).toLocaleString("en-GB")} ${currencyCode}`
+                    : `$${Math.round(toUsd(totals.profit)).toLocaleString("en-GB")} USD`
+                  }
+                  onClick={() => toggleCard("profit")}
                 />
                 <MetricCard label="Orders" value={totals.orders} format="number" />
                 <MetricCard

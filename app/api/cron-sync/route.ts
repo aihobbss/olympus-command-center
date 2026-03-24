@@ -90,7 +90,7 @@ export async function GET(request: Request) {
       try {
         // Run Meta campaign sync and Profit sync in parallel for this store
         const [metaRes, profitRes] = await Promise.allSettled([
-          // Meta campaign sync (last 7 days)
+          // Meta campaign sync (auto-detects first vs incremental — last 7 days if data exists)
           (async () => {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 60_000);
@@ -104,7 +104,6 @@ export async function GET(request: Request) {
                 },
                 body: JSON.stringify({
                   storeId: store.id,
-                  datePreset: "last_7d",
                 }),
                 signal: controller.signal,
               });

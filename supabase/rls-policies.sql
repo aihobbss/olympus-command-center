@@ -169,6 +169,15 @@ CREATE POLICY "Users can update ad campaigns for their stores"
   USING (store_id = ANY(get_user_store_ids()));
 
 -- ============================================
+-- AD_CAMPAIGN_DAILY_INSIGHTS
+-- ============================================
+ALTER TABLE ad_campaign_daily_insights ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own store daily insights"
+  ON ad_campaign_daily_insights FOR SELECT
+  USING (store_id = ANY(get_user_store_ids()));
+
+-- ============================================
 -- AD_ACTIONS
 -- ============================================
 ALTER TABLE ad_actions ENABLE ROW LEVEL SECURITY;
