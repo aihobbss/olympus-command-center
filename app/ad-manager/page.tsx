@@ -32,11 +32,8 @@ type AdTab = "live" | "creator";
 // ─── Exchange rates (store currency → USD) ─────────────────
 const STORE_TO_USD: Record<string, number> = { UK: 1.27, AU: 0.63 };
 
-// ─── Cache staleness threshold (1 hour) ─────────────────────
-// Data loads instantly from Supabase on every visit. Background sync only
-// triggers if last sync was >1 hour ago. Daily cron handles overnight sync.
-// User can always click "Sync Now" for a manual refresh (last 7 days).
-const CACHE_TTL_MS = 60 * 60 * 1000;
+// ─── Cache staleness threshold (3 minutes) ──────────────────
+const CACHE_TTL_MS = 3 * 60 * 1000;
 
 // ─── Days back per period ──────────────────────────────────
 const DAYS_BACK: Record<TimePeriod, number> = {
