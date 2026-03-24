@@ -259,9 +259,8 @@ export default function AdManagerPage() {
     setAllProfitLogs(profitLogs);
     setLastSynced(synced);
 
-    // Detect first-sync: no saved account selection AND no insights data
-    const hasSavedSelection = localStorage.getItem(`ad-accounts-selection:${storeId}`) !== null;
-    setIsFirstSync(!hasSavedSelection && insights.length === 0);
+    // First sync = no insights data yet. User must select accounts and click "Sync Now".
+    setIsFirstSync(insights.length === 0 && campaignData.length === 0);
   }, [storeId]);
 
   // ── Filter daily insights by period + selected ad accounts ──
@@ -394,8 +393,8 @@ export default function AdManagerPage() {
   }, [user, storeId, selectedAccountIds, loadCachedData]);
 
   // ── Cache-first load on mount / store change ──
-  // First-sync guard: if user hasn't selected accounts yet AND no insights exist,
-  // skip auto-sync so they can choose accounts first, then manually click "Sync Now".
+  // First-sync guard: if no daily insights exist yet, skip auto-sync entirely.
+  // User must select ad accounts and manually click "Sync Now" for the first pull.
   useEffect(() => {
     if (!metaConnected || !user || !storeId) return;
     if (loadedStoreRef.current === storeId) return;
@@ -407,17 +406,16 @@ export default function AdManagerPage() {
       await loadCachedData();
       if (cancelled) return;
 
-      // Skip auto-sync if first-sync (user needs to select accounts first)
-      const hasSavedSelection = localStorage.getItem(`ad-accounts-selection:${storeId}`) !== null;
+      // If no insights data exists, this is a first sync — user must pick accounts first
       const syncedAt = await getLastSyncedAt(storeId);
       if (cancelled) return;
 
-      if (!hasSavedSelection && !syncedAt) {
-        // First visit — let user pick accounts before syncing
+      if (!syncedAt) {
+        // No data yet — wait for user to select accounts and click "Sync Now"
         return;
       }
 
-      const isStale = !syncedAt || (Date.now() - new Date(syncedAt).getTime() > CACHE_TTL_MS);
+      const isStale = Date.now() - new Date(syncedAt).getTime() > CACHE_TTL_MS;
       if (isStale) {
         runBackgroundSync();
       }
