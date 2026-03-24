@@ -59,17 +59,26 @@ function getActionValue(
 }
 
 // Fetch all pages of a paginated Meta API response
-async function fetchAllPages<T>(url: string, accessToken: string): Promise<T[]> {
+async function fetchAllPages<T>(
+  url: string,
+  accessToken: string,
+  label?: string
+): Promise<{ data: T[]; error?: string }> {
   const all: T[] = [];
   let nextUrl: string | null = url;
+  let pageNum = 0;
 
   while (nextUrl) {
+    pageNum++;
     const res: Response = await fetch(nextUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     if (!res.ok) {
-      break;
+      const errBody = await res.json().catch(() => ({}));
+      const errMsg = (errBody as { error?: { message?: string } })?.error?.message || `HTTP ${res.status}`;
+      console.error(`[fetchAllPages] ${label || "unknown"} page ${pageNum} failed:`, errMsg);
+      return { data: all, error: errMsg };
     }
 
     const json: { data?: T[]; paging?: { next?: string } } = await res.json();
@@ -79,7 +88,7 @@ async function fetchAllPages<T>(url: string, accessToken: string): Promise<T[]> 
     nextUrl = json.paging?.next || null;
   }
 
-  return all;
+  return { data: all };
 }
 
 export async function POST(request: Request) {
@@ -212,7 +221,11 @@ export async function POST(request: Request) {
           `&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]` +
           `&limit=500`;
 
-        const campaigns = await fetchAllPages<MetaCampaign>(campaignsUrl, accessToken);
+        const campaignsResult = await fetchAllPages<MetaCampaign>(campaignsUrl, accessToken, `${account.account_name} campaigns`);
+        if (campaignsResult.error) {
+          errors.push(`${account.account_name}: campaigns fetch failed (${campaignsResult.error})`);
+        }
+        const campaigns = campaignsResult.data;
 
         if (campaigns.length > 0) {
           // Look up product_id mappings from ad_creator_campaigns
@@ -271,10 +284,15 @@ export async function POST(request: Request) {
           `&time_increment=1` +
           `&limit=500`;
 
-        const dailyInsights = await fetchAllPages<MetaDailyInsight>(
+        const insightsResult = await fetchAllPages<MetaDailyInsight>(
           insightsUrl,
-          accessToken
+          accessToken,
+          `${account.account_name} insights`
         );
+        if (insightsResult.error) {
+          errors.push(`${account.account_name}: insights fetch failed (${insightsResult.error})`);
+        }
+        const dailyInsights = insightsResult.data;
 
         if (dailyInsights.length > 0) {
           // Build daily insight rows

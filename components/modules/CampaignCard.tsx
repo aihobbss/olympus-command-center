@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { AdCampaign } from "@/data/mock";
@@ -117,15 +116,6 @@ export function CampaignCard({
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-indigo/50"
       )}
     >
-      {/* Creative Thumbnail Placeholder */}
-      <div className="w-full h-[120px] bg-white/[0.02] flex items-center justify-center shrink-0">
-        <ImageIcon
-          size={24}
-          strokeWidth={1.4}
-          className="text-text-muted/50"
-        />
-      </div>
-
       {/* Card Body */}
       <div className="p-4 flex flex-col gap-3 flex-1">
         {/* Header: Campaign Name + Status */}
