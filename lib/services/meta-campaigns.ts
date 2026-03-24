@@ -234,8 +234,9 @@ export async function triggerMetaSync(
   storeId: string,
   forceFullSync?: boolean
 ): Promise<{ synced: number; error?: string }> {
+  // First sync pulls ~37 months in 90-day chunks across multiple accounts — can take a while
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
+  const timeout = setTimeout(() => controller.abort(), 300_000);
 
   try {
     const res = await authFetch("/api/sync-meta-campaigns", {

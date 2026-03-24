@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
 import { apiError } from "@/lib/api-error";
 
+// Allow up to 5 minutes for first sync (37 months in 90-day chunks across multiple accounts)
+export const maxDuration = 300;
+
 // Meta Graph API v19.0 — Campaign sync
 // Two-phase sync:
 //   Phase A: Upsert campaign metadata into ad_campaigns (name, status, budget)
@@ -204,7 +207,24 @@ export async function POST(request: Request) {
       startStr = start.toISOString().split("T")[0];
     }
 
-    const timeRange = JSON.stringify({ since: startStr, until: endStr });
+    // Meta API only supports time_increment=1 (daily breakdown) for ranges ≤ ~90 days.
+    // For longer ranges (first sync), we chunk into 90-day windows.
+    const CHUNK_DAYS = 90;
+    const dateChunks: { since: string; until: string }[] = [];
+    {
+      const startMs = new Date(startStr).getTime();
+      const endMs = new Date(endStr).getTime();
+      let chunkStart = startMs;
+      while (chunkStart < endMs) {
+        const chunkEnd = Math.min(chunkStart + CHUNK_DAYS * 86_400_000, endMs);
+        dateChunks.push({
+          since: new Date(chunkStart).toISOString().split("T")[0],
+          until: new Date(chunkEnd).toISOString().split("T")[0],
+        });
+        chunkStart = chunkEnd + 86_400_000; // next day after chunk end
+      }
+    }
+
     const nowIso = now.toISOString();
     let totalInsightRows = 0;
     let totalCampaignRows = 0;
@@ -275,26 +295,32 @@ export async function POST(request: Request) {
         }
 
         // ── Phase B: Fetch daily insights for ALL campaigns (no status filter) ──
-        // This captures spend from deleted/archived campaigns too
-        const insightsUrl =
-          `${META_API}/${adAccountId}/insights` +
-          `?fields=${INSIGHT_FIELDS}` +
-          `&level=campaign` +
-          `&time_range=${encodeURIComponent(timeRange)}` +
-          `&time_increment=1` +
-          `&limit=500`;
+        // This captures spend from deleted/archived campaigns too.
+        // Meta only supports time_increment=1 with ranges ≤ ~90 days,
+        // so we iterate over dateChunks for the full range.
+        for (const chunk of dateChunks) {
+          const chunkTimeRange = JSON.stringify(chunk);
+          const insightsUrl =
+            `${META_API}/${adAccountId}/insights` +
+            `?fields=${INSIGHT_FIELDS}` +
+            `&level=campaign` +
+            `&time_range=${encodeURIComponent(chunkTimeRange)}` +
+            `&time_increment=1` +
+            `&limit=500`;
 
-        const insightsResult = await fetchAllPages<MetaDailyInsight>(
-          insightsUrl,
-          accessToken,
-          `${account.account_name} insights`
-        );
-        if (insightsResult.error) {
-          errors.push(`${account.account_name}: insights fetch failed (${insightsResult.error})`);
-        }
-        const dailyInsights = insightsResult.data;
+          const insightsResult = await fetchAllPages<MetaDailyInsight>(
+            insightsUrl,
+            accessToken,
+            `${account.account_name} insights ${chunk.since}→${chunk.until}`
+          );
+          if (insightsResult.error) {
+            errors.push(`${account.account_name}: insights ${chunk.since}→${chunk.until} failed (${insightsResult.error})`);
+            continue;
+          }
+          const dailyInsights = insightsResult.data;
 
-        if (dailyInsights.length > 0) {
+          if (dailyInsights.length === 0) continue;
+
           // Build daily insight rows
           const insightRows = dailyInsights.map((insight) => {
             const spend = parseFloat(insight.spend || "0");
@@ -341,7 +367,7 @@ export async function POST(request: Request) {
 
             if (insightUpsertError) {
               errors.push(
-                `${account.account_name}: daily insights upsert failed batch ${Math.floor(i / BATCH_SIZE) + 1} (${insightUpsertError.message})`
+                `${account.account_name}: upsert failed ${chunk.since}→${chunk.until} batch ${Math.floor(i / BATCH_SIZE) + 1} (${insightUpsertError.message})`
               );
             } else {
               totalInsightRows += batch.length;
