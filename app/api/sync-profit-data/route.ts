@@ -349,8 +349,8 @@ export async function POST(request: Request) {
       // Net revenue in store currency — exactly what Shopify reports show.
       const netRevenue = bucket.revenue - bucket.returns;
 
-      // Convert Meta ad spend from USD to store currency
-      const adSpendLocal = usdToStoreCurrency(bucket.adSpend, date);
+      // Keep ad spend in USD (as received from Meta)
+      const adSpendLocal = bucket.adSpend;
 
       // COG: preserve user-entered value, or estimate from avg
       const cogLocal = existingCogMap.has(date)
