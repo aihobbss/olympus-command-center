@@ -602,13 +602,13 @@ export default function ProfitTrackerPage() {
 
         const result = await uploadProfitLogsCsv(storeId, logs);
         if (result.success > 0) {
-          await loadData();
+          try { await loadData(); } catch { /* reload on next visit */ }
         } else {
-          setSyncError("Failed to upload CSV data.");
+          setSyncError(result.error || "Failed to upload CSV data.");
         }
       } catch (err) {
         console.error("CSV import error:", err);
-        setSyncError("Failed to parse CSV file.");
+        setSyncError("Failed to parse or upload CSV file.");
       } finally {
         setUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = "";

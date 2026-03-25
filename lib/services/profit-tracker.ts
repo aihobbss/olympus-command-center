@@ -246,7 +246,7 @@ export async function uploadProfitLogsCsv(
     transactionFee: number;
     orders: number;
   }>
-): Promise<{ success: number; failed: number }> {
+): Promise<{ success: number; failed: number; error?: string }> {
   const rows = logs.map((log) => {
     const profit = log.revenue - log.cog - log.adSpend - log.transactionFee;
     const roas = log.adSpend > 0 ? parseFloat((log.revenue / log.adSpend).toFixed(2)) : 0;
@@ -258,6 +258,7 @@ export async function uploadProfitLogsCsv(
       store_id: storeId,
       date: log.date,
       revenue_usd: Math.round(log.revenue * 100) / 100,
+      refunds_usd: 0,
       cog_usd: Math.round(log.cog * 100) / 100,
       ad_spend_usd: Math.round(log.adSpend * 100) / 100,
       transaction_fee_usd: Math.round(log.transactionFee * 100) / 100,
@@ -269,13 +270,17 @@ export async function uploadProfitLogsCsv(
     };
   });
 
-  const { error } = await supabase
-    .from("profit_logs")
-    .upsert(rows, { onConflict: "store_id,date" });
+  // Batch in chunks of 50 to avoid request size / timeout issues
+  for (let i = 0; i < rows.length; i += 50) {
+    const chunk = rows.slice(i, i + 50);
+    const { error } = await supabase
+      .from("profit_logs")
+      .upsert(chunk, { onConflict: "store_id,date" });
 
-  if (error) {
-    console.error("Failed to upload profit logs:", error.message);
-    return { success: 0, failed: rows.length };
+    if (error) {
+      console.error("Failed to upload profit logs:", error.message);
+      return { success: i, failed: rows.length - i, error: error.message };
+    }
   }
 
   return { success: rows.length, failed: 0 };
