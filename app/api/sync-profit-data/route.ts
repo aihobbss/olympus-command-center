@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   const diag = {
     shopify: { tokenFound: false, domain: "", shopTimezone: "", ordersFetched: 0, pagesFetched: 0, error: "" },
     meta: { tokenFound: false, accountsQueried: 0, accountIds: [] as string[], insightRows: 0, errors: [] as string[] },
-    exchange: { monthsFetched: 0, monthsFailed: 0, currency: "" },
+    exchange: { monthsFetched: 0, monthsFailed: 0, currency: "", staticRate: 0, liveRate: 0, note: "" },
     result: { totalBuckets: 0, nonEmptyBuckets: 0, rowsWritten: 0, upsertError: "" },
   };
 
@@ -301,62 +301,44 @@ export async function POST(request: Request) {
       avgCogPerOrder = totalCog / cogRows.length;
     }
 
-    // ── 4. Fetch monthly average exchange rates (USD → store currency) ──
-    // Only needed to convert Meta ad spend (USD) into store currency.
-    // Uses monthly averages — close enough and avoids daily rate complexity.
+    // ── 4. Get USD → store currency exchange rate ──────────
+    // Uses the store's exchange_rate_to_usd from the DB (always available, fast).
+    // Optionally tries a single Frankfurter API call for a fresher rate, but
+    // never blocks sync on it. Previous approach fired 37 parallel API requests
+    // which overwhelmed the free API, causing 130s+ of rate-limit errors that
+    // killed the Vercel function before it could write any data.
 
-    const monthlyUsdToLocal = new Map<string, number>(); // "YYYY-MM" → rate
+    let usdToLocalRate: number = fallbackRate > 0 ? 1 / fallbackRate : 1;
     diag.exchange.currency = storeCurrency;
+    diag.exchange.staticRate = usdToLocalRate;
     if (storeCurrency !== "USD") {
       try {
-        // Collect unique months from the data
-        const months = new Set<string>();
-        for (const [date] of Array.from(dailyData.entries())) {
-          months.add(date.slice(0, 7)); // "YYYY-MM"
-        }
-
-        // Fetch one rate per month (use 1st of each month)
-        await Promise.all(
-          Array.from(months).map(async (ym) => {
-            // Use the first and last day of the month to get an average
-            const [y, m] = ym.split("-").map(Number);
-            const lastDay = new Date(y, m, 0).getDate(); // last day of month
-            const from = `${ym}-01`;
-            const to = `${ym}-${String(lastDay).padStart(2, "0")}`;
-            try {
-              const res = await fetch(
-                `https://api.frankfurter.app/${from}..${to}?from=USD&to=${storeCurrency}`
-              );
-              if (res.ok) {
-                const data = await res.json();
-                const rates = data.rates || {};
-                const values = Object.values(rates).map(
-                  (r) => (r as Record<string, number>)[storeCurrency]
-                ).filter(Boolean);
-                if (values.length > 0) {
-                  const avg = values.reduce((a, b) => a + b, 0) / values.length;
-                  monthlyUsdToLocal.set(ym, avg);
-                  diag.exchange.monthsFetched += 1;
-                }
-              }
-            } catch {
-              diag.exchange.monthsFailed += 1;
-            }
-          })
+        const fxRes = await fetch(
+          `https://api.frankfurter.app/latest?from=USD&to=${storeCurrency}`,
+          { signal: AbortSignal.timeout(3_000) }
         );
-      } catch (err) {
-        console.error("Monthly exchange rate fetch error:", err);
+        if (fxRes.ok) {
+          const fxData = await fxRes.json();
+          const liveRate = fxData.rates?.[storeCurrency];
+          if (liveRate) {
+            usdToLocalRate = liveRate;
+            diag.exchange.monthsFetched = 1;
+            diag.exchange.liveRate = liveRate;
+          }
+        } else {
+          diag.exchange.monthsFailed = 1;
+        }
+      } catch {
+        diag.exchange.monthsFailed = 1;
+        diag.exchange.note = "Frankfurter API unreachable — using stored rate";
       }
     }
 
-    // Helper: convert USD to store currency using monthly average
+    // Helper: convert USD to store currency
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const usdToStoreCurrency = (usdAmount: number, date: string): number => {
       if (storeCurrency === "USD") return usdAmount;
-      const ym = date.slice(0, 7);
-      const rate = monthlyUsdToLocal.get(ym);
-      if (rate) return usdAmount * rate;
-      // Fallback: use inverse of store's static rate
-      return fallbackRate > 0 ? usdAmount / fallbackRate : usdAmount;
+      return usdAmount * usdToLocalRate;
     };
 
     // ── 5. Compute daily P&L and upsert ─────────────────────
