@@ -995,7 +995,7 @@ export default function ProfitTrackerPage() {
                         />
                       ) : (
                         <span className="hover:text-accent-indigo transition-colors">
-                          {fmtCurrency(log.cog, "$", 2)}
+                          {fmtCurrency(log.cog, storeCurrency, 2)}
                         </span>
                       )}
                     </td>
@@ -1017,12 +1017,12 @@ export default function ProfitTrackerPage() {
                         />
                       ) : (
                         <span className="hover:text-accent-indigo transition-colors">
-                          {fmtCurrency(log.adSpend, "$", 2)}
+                          {fmtCurrency(log.adSpend, storeCurrency, 2)}
                         </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
-                      {fmtCurrency(log.transactionFee, "$", 2)}
+                      {fmtCurrency(log.transactionFee, storeCurrency, 2)}
                     </td>
                     <td
                       className={cn(
@@ -1032,7 +1032,7 @@ export default function ProfitTrackerPage() {
                           : "text-accent-red"
                       )}
                     >
-                      {fmtCurrency(log.profit, "$", 2)}
+                      {fmtCurrency(log.profit, storeCurrency, 2)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
                       {log.roas.toFixed(2)}
