@@ -248,8 +248,7 @@ export async function uploadProfitLogsCsv(
   }>
 ): Promise<{ success: number; failed: number; error?: string }> {
   const rows = logs.map((log) => {
-    const txnFee = Math.max(0, log.revenue) * 0.05;
-    const profit = log.revenue - log.cog - log.adSpend - txnFee;
+    const profit = log.revenue - log.cog - log.adSpend - log.transactionFee;
     const roas = log.adSpend > 0 ? parseFloat((log.revenue / log.adSpend).toFixed(2)) : 0;
     const profitPercent = log.revenue > 0
       ? parseFloat(((profit / log.revenue) * 100).toFixed(1))
@@ -262,7 +261,7 @@ export async function uploadProfitLogsCsv(
       refunds_usd: 0,
       cog_usd: Math.round(log.cog * 100) / 100,
       ad_spend_usd: Math.round(log.adSpend * 100) / 100,
-      transaction_fee_usd: Math.round(txnFee * 100) / 100,
+      transaction_fee_usd: Math.round(log.transactionFee * 100) / 100,
       profit_usd: Math.round(profit * 100) / 100,
       roas,
       profit_percent: profitPercent,
