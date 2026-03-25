@@ -995,7 +995,7 @@ export default function ProfitTrackerPage() {
                         />
                       ) : (
                         <span className="hover:text-accent-indigo transition-colors">
-                          {fmtCurrency(log.cog, storeCurrency, 2)}
+                          {fmtCurrency(log.cog, "$", 2)}
                         </span>
                       )}
                     </td>
@@ -1017,12 +1017,12 @@ export default function ProfitTrackerPage() {
                         />
                       ) : (
                         <span className="hover:text-accent-indigo transition-colors">
-                          {fmtCurrency(log.adSpend, storeCurrency, 2)}
+                          {fmtCurrency(log.adSpend, "$", 2)}
                         </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
-                      {fmtCurrency(log.transactionFee, storeCurrency, 2)}
+                      {fmtCurrency(toUsdMonthly(log.transactionFee, log.date), "$", 2)}
                     </td>
                     <td
                       className={cn(
@@ -1032,7 +1032,7 @@ export default function ProfitTrackerPage() {
                           : "text-accent-red"
                       )}
                     >
-                      {fmtCurrency(log.profit, storeCurrency, 2)}
+                      {fmtCurrency(toUsdMonthly(log.profit, log.date), "$", 2)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
                       {log.roas.toFixed(2)}
@@ -1078,7 +1078,7 @@ export default function ProfitTrackerPage() {
                     {fmtCurrency(monthTotals.adSpend, storeCurrency, 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
-                    {fmtCurrency(monthTotals.transactionFee, storeCurrency, 2)}
+                    {fmtCurrency(monthLogs.reduce((sum, l) => sum + toUsdMonthly(l.transactionFee, l.date), 0), "$", 2)}
                   </td>
                   <td
                     className={cn(
@@ -1088,7 +1088,7 @@ export default function ProfitTrackerPage() {
                         : "text-accent-red"
                     )}
                   >
-                    {fmtCurrency(monthTotals.profit, storeCurrency, 2)}
+                    {fmtCurrency(monthLogs.reduce((sum, l) => sum + toUsdMonthly(l.profit, l.date), 0), "$", 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
                     {monthTotals.roas.toFixed(2)}

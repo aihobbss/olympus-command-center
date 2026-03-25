@@ -357,9 +357,8 @@ export async function POST(request: Request) {
         ? existingCogMap.get(date)!
         : usdToStoreCurrency(bucket.orders * avgCogPerOrder, date);
 
-      // Transaction fee: 2.9% + $0.30 per order (converted to store currency)
-      const feePerOrder = usdToStoreCurrency(0.3, date);
-      const transactionFeeLocal = netRevenue * 0.029 + bucket.orders * feePerOrder;
+      // Transaction fee: 5% of revenue
+      const transactionFeeLocal = Math.max(0, netRevenue) * 0.05;
 
       // Profit in store currency
       const profit = netRevenue - cogLocal - adSpendLocal - transactionFeeLocal;
