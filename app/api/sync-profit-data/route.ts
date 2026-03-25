@@ -3,6 +3,10 @@ import { supabaseAdmin, verifyApiUser } from "@/lib/supabase-server";
 import { getShopifyToken } from "@/lib/shopify-token";
 import { apiError } from "@/lib/api-error";
 
+// Allow up to 60s on Vercel (Hobby max). Without this, the default is ~10s
+// and first-sync (1095 days) gets killed before it finishes.
+export const maxDuration = 60;
+
 // Profit Data Sync — pulls Shopify orders + Meta ad spend, computes daily P&L
 // All values stored in the STORE'S CURRENCY (e.g. AUD, GBP).
 // Column names still say "_usd" (legacy) but values are in store currency.

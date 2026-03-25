@@ -420,7 +420,10 @@ export default function ProfitTrackerPage() {
       }
       // Always reload data — even on timeout (synced === -1), server may have written data
       await loadData();
-      setLastSynced(new Date());
+      // Only mark as synced if data was actually written
+      if (result.synced > 0 || result.synced === -1) {
+        setLastSynced(new Date());
+      }
     } catch (err) {
       setSyncError("Sync failed — check your connections and try again.");
       console.error("Profit sync error:", err);
@@ -472,12 +475,11 @@ export default function ProfitTrackerPage() {
     // Sort oldest → newest for the CSV
     const sorted = [...logsToExport].sort((a, b) => a.date.localeCompare(b.date));
 
-    const headers = ["Date", `Revenue (${currencyCode})`, "Revenue (USD)", `Refunds (${currencyCode})`, "COG", "Ad Spend", "Transaction Fee", "Orders", "Profit", "ROAS", "Profit %"];
+    const headers = ["Date", `Revenue (${currencyCode})`, "Revenue (USD)", "COG", "Ad Spend", "Transaction Fee", "Orders", "Profit", "ROAS", "Profit %"];
     const rows = sorted.map((log) => [
       `"${log.date}"`,
-      (log.revenue + log.refunds).toFixed(2),
-      toUsdMonthly(log.revenue + log.refunds, log.date).toFixed(2),
-      log.refunds.toFixed(2),
+      log.revenue.toFixed(2),
+      toUsdMonthly(log.revenue, log.date).toFixed(2),
       log.cog,
       log.adSpend,
       log.transactionFee,
