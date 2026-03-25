@@ -158,12 +158,19 @@ export default function ProfitTrackerPage() {
   const fallbackRate = FALLBACK_RATES[selectedStore?.market ?? ""] ?? 1;
   const currencyCode = selectedStore?.market === "UK" ? "GBP" : selectedStore?.market === "AU" ? "AUD" : "USD";
 
-  // DB now stores everything in store currency (AUD/GBP).
-  // localToUsd is only needed for the USD toggle on metric cards.
+  // DB stores revenue/refunds/txn in store currency (AUD/GBP), COG/adSpend in USD.
   const localToUsd = useCallback(
     (localAmount: number) => {
       if (currencyCode === "USD") return localAmount;
       return localAmount * fallbackRate;
+    },
+    [fallbackRate, currencyCode]
+  );
+
+  const usdToLocal = useCallback(
+    (usdAmount: number) => {
+      if (currencyCode === "USD") return usdAmount;
+      return fallbackRate > 0 ? usdAmount / fallbackRate : usdAmount;
     },
     [fallbackRate, currencyCode]
   );
@@ -270,25 +277,24 @@ export default function ProfitTrackerPage() {
   // USD totals for P&L calculations + local currency totals for display
 
   const totals = useMemo(() => {
-    let revenue = 0,
-      refunds = 0,
-      adSpend = 0,
-      cog = 0,
-      profit = 0;
+    let revenue = 0, refunds = 0, adSpend = 0, cog = 0;
+    let revenueUsd = 0, profitUsd = 0;
     for (const log of filteredLogs) {
       revenue += log.revenue;
       refunds += log.refunds;
       adSpend += log.adSpend;
       cog += log.cog;
-      profit += log.profit;
+      const dayRevUsd = toUsdMonthly(log.revenue, log.date);
+      const dayTxnUsd = toUsdMonthly(log.transactionFee, log.date);
+      revenueUsd += dayRevUsd;
+      profitUsd += (dayRevUsd - dayTxnUsd - log.cog - log.adSpend);
     }
-    const roas =
-      adSpend > 0 ? parseFloat((revenue / adSpend).toFixed(2)) : 0;
-    const profitPercent = revenue !== 0
-      ? parseFloat(((profit / revenue) * 100).toFixed(1))
-      : profit < 0 ? -100.0 : 0;
-    return { revenue, refunds, adSpend, cog, profit, roas, profitPercent };
-  }, [filteredLogs]);
+    const roas = adSpend > 0 ? parseFloat((revenueUsd / adSpend).toFixed(2)) : 0;
+    const profitPercent = revenueUsd !== 0
+      ? parseFloat(((profitUsd / revenueUsd) * 100).toFixed(1))
+      : profitUsd < 0 ? -100.0 : 0;
+    return { revenue, refunds, adSpend, cog, profit: profitUsd, roas, profitPercent };
+  }, [filteredLogs, toUsdMonthly]);
 
   // ── Month-filtered logs (feeds table) ──
 
@@ -813,7 +819,7 @@ export default function ProfitTrackerPage() {
       <>
 
       {/* ─── Metric Cards ─── */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-2">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-3 mb-2">
         <MetricCard
           label="Total Revenue"
           value={swappedCards.has("revenue") ? Math.round(localToUsd(totals.revenue)) : Math.round(totals.revenue)}
@@ -826,35 +832,47 @@ export default function ProfitTrackerPage() {
           onClick={() => toggleCard("revenue")}
         />
         <MetricCard
-          label="Total Ad Spend"
-          value={swappedCards.has("adSpend") ? Math.round(localToUsd(totals.adSpend)) : Math.round(totals.adSpend)}
+          label="Total Refunds"
+          value={swappedCards.has("refunds") ? Math.round(localToUsd(totals.refunds)) : Math.round(totals.refunds)}
           format="currency"
-          currency={swappedCards.has("adSpend") ? "$" : storeCurrency}
+          currency={swappedCards.has("refunds") ? "$" : storeCurrency}
+          subtitle={swappedCards.has("refunds")
+            ? `${fmtCurrency(Math.round(totals.refunds), storeCurrency)} ${currencyCode}`
+            : `$${Math.round(localToUsd(totals.refunds)).toLocaleString("en-GB")} USD`
+          }
+          valueClassName="text-accent-red"
+          onClick={() => toggleCard("refunds")}
+        />
+        <MetricCard
+          label="Total Ad Spend"
+          value={swappedCards.has("adSpend") ? Math.round(usdToLocal(totals.adSpend)) : Math.round(totals.adSpend)}
+          format="currency"
+          currency={swappedCards.has("adSpend") ? storeCurrency : "$"}
           subtitle={swappedCards.has("adSpend")
-            ? `${fmtCurrency(Math.round(totals.adSpend), storeCurrency)} ${currencyCode}`
-            : `$${Math.round(localToUsd(totals.adSpend)).toLocaleString("en-GB")} USD`
+            ? `$${Math.round(totals.adSpend).toLocaleString("en-GB")} USD`
+            : `${fmtCurrency(Math.round(usdToLocal(totals.adSpend)), storeCurrency)} ${currencyCode}`
           }
           onClick={() => toggleCard("adSpend")}
         />
         <MetricCard
           label="Total COG"
-          value={swappedCards.has("cog") ? Math.round(localToUsd(totals.cog)) : Math.round(totals.cog)}
+          value={swappedCards.has("cog") ? Math.round(usdToLocal(totals.cog)) : Math.round(totals.cog)}
           format="currency"
-          currency={swappedCards.has("cog") ? "$" : storeCurrency}
+          currency={swappedCards.has("cog") ? storeCurrency : "$"}
           subtitle={swappedCards.has("cog")
-            ? `${fmtCurrency(Math.round(totals.cog), storeCurrency)} ${currencyCode}`
-            : `$${Math.round(localToUsd(totals.cog)).toLocaleString("en-GB")} USD`
+            ? `$${Math.round(totals.cog).toLocaleString("en-GB")} USD`
+            : `${fmtCurrency(Math.round(usdToLocal(totals.cog)), storeCurrency)} ${currencyCode}`
           }
           onClick={() => toggleCard("cog")}
         />
         <MetricCard
           label="Net Profit"
-          value={swappedCards.has("profit") ? Math.round(localToUsd(totals.profit)) : Math.round(totals.profit)}
+          value={swappedCards.has("profit") ? Math.round(usdToLocal(totals.profit)) : Math.round(totals.profit)}
           format="currency"
-          currency={swappedCards.has("profit") ? "$" : storeCurrency}
+          currency={swappedCards.has("profit") ? storeCurrency : "$"}
           subtitle={swappedCards.has("profit")
-            ? `${fmtCurrency(Math.round(totals.profit), storeCurrency)} ${currencyCode}`
-            : `$${Math.round(localToUsd(totals.profit)).toLocaleString("en-GB")} USD`
+            ? `$${Math.round(totals.profit).toLocaleString("en-GB")} USD`
+            : `${fmtCurrency(Math.round(usdToLocal(totals.profit)), storeCurrency)} ${currencyCode}`
           }
           onClick={() => toggleCard("profit")}
         />
@@ -936,11 +954,11 @@ export default function ProfitTrackerPage() {
                     "Date",
                     `Revenue (${currencyCode})`,
                     "Revenue (USD)",
-                    "Refunds",
-                    "COG",
-                    "Ad Spend",
-                    "Transaction",
-                    "Profit",
+                    `Refunds (${currencyCode})`,
+                    "COG (USD)",
+                    "Ad Spend (USD)",
+                    "Transaction (USD)",
+                    "Profit (USD)",
                     "ROAS",
                     "Profit %",
                   ].map((col) => (
@@ -1024,32 +1042,36 @@ export default function ProfitTrackerPage() {
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
                       {fmtCurrency(toUsdMonthly(log.transactionFee, log.date), "$", 2)}
                     </td>
-                    <td
-                      className={cn(
-                        "px-4 py-3 text-right font-jetbrains font-medium tabular-nums",
-                        log.profit >= 0
-                          ? "text-accent-emerald"
-                          : "text-accent-red"
-                      )}
-                    >
-                      {fmtCurrency(toUsdMonthly(log.profit, log.date), "$", 2)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
-                      {log.roas.toFixed(2)}
-                    </td>
-                    <td
-                      className={cn(
-                        "px-4 py-3 text-right font-jetbrains font-medium tabular-nums",
-                        log.profitPercent > 0
-                          ? "text-accent-emerald"
-                          : log.profitPercent < 0
-                          ? "text-accent-red"
-                          : "text-text-secondary"
-                      )}
-                    >
-                      {log.profitPercent > 0 ? "+" : ""}
-                      {log.profitPercent.toFixed(1)}%
-                    </td>
+                    {(() => {
+                      const revUsd = toUsdMonthly(log.revenue, log.date);
+                      const txnUsd = toUsdMonthly(log.transactionFee, log.date);
+                      const profitUsd = revUsd - txnUsd - log.cog - log.adSpend;
+                      const roas = log.adSpend > 0 ? revUsd / log.adSpend : 0;
+                      const profitPct = revUsd !== 0 ? (profitUsd / revUsd) * 100 : profitUsd < 0 ? -100 : 0;
+                      return (
+                        <>
+                          <td
+                            className={cn(
+                              "px-4 py-3 text-right font-jetbrains font-medium tabular-nums",
+                              profitUsd >= 0 ? "text-accent-emerald" : "text-accent-red"
+                            )}
+                          >
+                            {fmtCurrency(profitUsd, "$", 2)}
+                          </td>
+                          <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
+                            {roas.toFixed(2)}
+                          </td>
+                          <td
+                            className={cn(
+                              "px-4 py-3 text-right font-jetbrains font-medium tabular-nums",
+                              profitPct > 0 ? "text-accent-emerald" : profitPct < 0 ? "text-accent-red" : "text-text-secondary"
+                            )}
+                          >
+                            {profitPct > 0 ? "+" : ""}{profitPct.toFixed(1)}%
+                          </td>
+                        </>
+                      );
+                    })()}
                   </tr>
                 ))}
               </tbody>
@@ -1072,40 +1094,39 @@ export default function ProfitTrackerPage() {
                     {monthTotals.refunds > 0 ? fmtCurrency(monthTotals.refunds, storeCurrency, 2) : "—"}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
-                    {fmtCurrency(monthTotals.cog, storeCurrency, 2)}
+                    {fmtCurrency(monthTotals.cog, "$", 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
                     {fmtCurrency(monthTotals.adSpend, "$", 2)}
                   </td>
-                  <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
-                    {fmtCurrency(monthLogs.reduce((sum, l) => sum + toUsdMonthly(l.transactionFee, l.date), 0), "$", 2)}
-                  </td>
-                  <td
-                    className={cn(
-                      "px-4 py-3 text-right font-jetbrains font-semibold tabular-nums",
-                      monthTotals.profit >= 0
-                        ? "text-accent-emerald"
-                        : "text-accent-red"
-                    )}
-                  >
-                    {fmtCurrency(monthLogs.reduce((sum, l) => sum + toUsdMonthly(l.profit, l.date), 0), "$", 2)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
-                    {monthTotals.roas.toFixed(2)}
-                  </td>
-                  <td
-                    className={cn(
-                      "px-4 py-3 text-right font-jetbrains font-semibold tabular-nums",
-                      monthTotals.profitPercent > 0
-                        ? "text-accent-emerald"
-                        : monthTotals.profitPercent < 0
-                        ? "text-accent-red"
-                        : "text-text-secondary"
-                    )}
-                  >
-                    {monthTotals.profitPercent > 0 ? "+" : ""}
-                    {monthTotals.profitPercent.toFixed(1)}%
-                  </td>
+                  {(() => {
+                    let mRevUsd = 0, mTxnUsd = 0, mCog = 0, mAdSpend = 0;
+                    for (const l of monthLogs) {
+                      mRevUsd += toUsdMonthly(l.revenue, l.date);
+                      mTxnUsd += toUsdMonthly(l.transactionFee, l.date);
+                      mCog += l.cog;
+                      mAdSpend += l.adSpend;
+                    }
+                    const mProfitUsd = mRevUsd - mTxnUsd - mCog - mAdSpend;
+                    const mRoas = mAdSpend > 0 ? mRevUsd / mAdSpend : 0;
+                    const mProfitPct = mRevUsd !== 0 ? (mProfitUsd / mRevUsd) * 100 : mProfitUsd < 0 ? -100 : 0;
+                    return (
+                      <>
+                        <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
+                          {fmtCurrency(mTxnUsd, "$", 2)}
+                        </td>
+                        <td className={cn("px-4 py-3 text-right font-jetbrains font-semibold tabular-nums", mProfitUsd >= 0 ? "text-accent-emerald" : "text-accent-red")}>
+                          {fmtCurrency(mProfitUsd, "$", 2)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
+                          {mRoas.toFixed(2)}
+                        </td>
+                        <td className={cn("px-4 py-3 text-right font-jetbrains font-semibold tabular-nums", mProfitPct > 0 ? "text-accent-emerald" : mProfitPct < 0 ? "text-accent-red" : "text-text-secondary")}>
+                          {mProfitPct > 0 ? "+" : ""}{mProfitPct.toFixed(1)}%
+                        </td>
+                      </>
+                    );
+                  })()}
                 </tr>
               </tfoot>
             </table>
