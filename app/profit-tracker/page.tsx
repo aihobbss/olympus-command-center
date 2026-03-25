@@ -1075,7 +1075,7 @@ export default function ProfitTrackerPage() {
                     {fmtCurrency(monthTotals.cog, storeCurrency, 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
-                    {fmtCurrency(monthTotals.adSpend, storeCurrency, 2)}
+                    {fmtCurrency(monthTotals.adSpend, "$", 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
                     {fmtCurrency(monthLogs.reduce((sum, l) => sum + toUsdMonthly(l.transactionFee, l.date), 0), "$", 2)}
