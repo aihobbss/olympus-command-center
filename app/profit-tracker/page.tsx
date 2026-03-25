@@ -816,12 +816,12 @@ export default function ProfitTrackerPage() {
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-2">
         <MetricCard
           label="Total Revenue"
-          value={swappedCards.has("revenue") ? Math.round(localToUsd(totals.revenue + totals.refunds)) : Math.round(totals.revenue + totals.refunds)}
+          value={swappedCards.has("revenue") ? Math.round(localToUsd(totals.revenue)) : Math.round(totals.revenue)}
           format="currency"
           currency={swappedCards.has("revenue") ? "$" : storeCurrency}
           subtitle={swappedCards.has("revenue")
-            ? `${fmtCurrency(Math.round(totals.revenue + totals.refunds), storeCurrency)} ${currencyCode}`
-            : `$${Math.round(localToUsd(totals.revenue + totals.refunds)).toLocaleString("en-GB")} USD`
+            ? `${fmtCurrency(Math.round(totals.revenue), storeCurrency)} ${currencyCode}`
+            : `$${Math.round(localToUsd(totals.revenue)).toLocaleString("en-GB")} USD`
           }
           onClick={() => toggleCard("revenue")}
         />
@@ -966,10 +966,10 @@ export default function ProfitTrackerPage() {
                       {fmtDate(log.date)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-primary tabular-nums">
-                      {fmtCurrency(log.revenue + log.refunds, storeCurrency, 2)}
+                      {fmtCurrency(log.revenue, storeCurrency, 2)}
                     </td>
                     <td className="px-4 py-3 text-right font-jetbrains text-text-secondary tabular-nums">
-                      {fmtCurrency(toUsdMonthly(log.revenue + log.refunds, log.date), "$", 2)}
+                      {fmtCurrency(toUsdMonthly(log.revenue, log.date), "$", 2)}
                     </td>
                     <td className={cn(
                       "px-4 py-3 text-right font-jetbrains tabular-nums",
@@ -1060,10 +1060,10 @@ export default function ProfitTrackerPage() {
                     {monthLabel} Total
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-primary font-semibold tabular-nums">
-                    {fmtCurrency(monthTotals.revenue + monthTotals.refunds, storeCurrency, 2)}
+                    {fmtCurrency(monthTotals.revenue, storeCurrency, 2)}
                   </td>
                   <td className="px-4 py-3 text-right font-jetbrains text-text-secondary font-semibold tabular-nums">
-                    {fmtCurrency(monthLogs.reduce((sum, l) => sum + toUsdMonthly(l.revenue + l.refunds, l.date), 0), "$", 2)}
+                    {fmtCurrency(monthLogs.reduce((sum, l) => sum + toUsdMonthly(l.revenue, l.date), 0), "$", 2)}
                   </td>
                   <td className={cn(
                     "px-4 py-3 text-right font-jetbrains font-semibold tabular-nums",
