@@ -28,6 +28,15 @@ type DailyBucket = {
 };
 
 export async function POST(request: Request) {
+  // Diagnostics object — returned in every response so the client knows exactly
+  // what happened at each step. Failures are no longer silent.
+  const diag = {
+    shopify: { tokenFound: false, domain: "", shopTimezone: "", ordersFetched: 0, pagesFetched: 0, error: "" },
+    meta: { tokenFound: false, accountsQueried: 0, accountIds: [] as string[], insightRows: 0, errors: [] as string[] },
+    exchange: { monthsFetched: 0, monthsFailed: 0, currency: "" },
+    result: { totalBuckets: 0, nonEmptyBuckets: 0, rowsWritten: 0, upsertError: "" },
+  };
+
   try {
     const body = await request.json();
     const { storeId, daysBack, adAccountIds } = body as {
@@ -96,6 +105,8 @@ export async function POST(request: Request) {
     const shopify = await getShopifyToken(verifiedUserId, storeId);
 
     if (shopify) {
+      diag.shopify.tokenFound = true;
+      diag.shopify.domain = shopify.shopifyDomain;
       try {
         // ── 1a. Fetch the Shopify store's actual IANA timezone ──
         // This ensures dates match Shopify's own reports exactly.
@@ -107,6 +118,7 @@ export async function POST(request: Request) {
           const shopData = await shopRes.json();
           if (shopData.shop?.iana_timezone) {
             storeTimezone = shopData.shop.iana_timezone;
+            diag.shopify.shopTimezone = storeTimezone;
             // Re-initialize buckets and date range with the correct timezone
             dailyData.clear();
             endStr = toLocalDate(now.toISOString());
@@ -121,6 +133,8 @@ export async function POST(request: Request) {
               d.setTime(d.getTime() + 86_400_000);
             }
           }
+        } else {
+          diag.shopify.error = `shop.json failed: ${shopRes.status} ${shopRes.statusText}`;
         }
 
         // ── 1b. Fetch orders — pad query window ±1 day for timezone safety ──
@@ -141,10 +155,15 @@ export async function POST(request: Request) {
             },
           });
 
-          if (!ordersRes.ok) break;
+          if (!ordersRes.ok) {
+            diag.shopify.error = `orders fetch failed: ${ordersRes.status} ${ordersRes.statusText}`;
+            break;
+          }
 
           const ordersData = await ordersRes.json();
           const orders = ordersData.orders || [];
+          diag.shopify.pagesFetched += 1;
+          diag.shopify.ordersFetched += orders.length;
 
           for (const order of orders) {
             if (!order.created_at) continue;
@@ -181,7 +200,10 @@ export async function POST(request: Request) {
         }
       } catch (err) {
         console.error("Shopify orders fetch error:", err);
+        diag.shopify.error = `Exception: ${err instanceof Error ? err.message : String(err)}`;
       }
+    } else {
+      diag.shopify.error = "No Shopify token found for this user/store";
     }
 
     // ── 2. Pull Meta ad spend (from selected ad accounts) ─────
@@ -194,6 +216,8 @@ export async function POST(request: Request) {
       .single();
 
     if (metaToken?.access_token) {
+      diag.meta.tokenFound = true;
+
       // Use explicitly passed account IDs (from user's UI selection), or fall back to all active
       let accountIds: string[] = adAccountIds && adAccountIds.length > 0
         ? adAccountIds
@@ -218,6 +242,8 @@ export async function POST(request: Request) {
         }
       }
 
+      diag.meta.accountsQueried = accountIds.length;
+      diag.meta.accountIds = accountIds;
       console.log("[profit-sync API] final accountIds:", accountIds);
 
       // Fetch spend from each active ad account
@@ -237,6 +263,7 @@ export async function POST(request: Request) {
           if (insightsRes.ok) {
             const insightsData = await insightsRes.json();
             const insights = insightsData.data || [];
+            diag.meta.insightRows += insights.length;
 
             for (const insight of insights) {
               const date = insight.date_start;
@@ -247,11 +274,17 @@ export async function POST(request: Request) {
               // converted to store currency below using monthly average.
               bucket.adSpend += parseFloat(insight.spend || "0");
             }
+          } else {
+            const errBody = await insightsRes.text().catch(() => "");
+            diag.meta.errors.push(`${adAccountId}: ${insightsRes.status} ${insightsRes.statusText} — ${errBody.slice(0, 200)}`);
           }
         } catch (err) {
           console.error(`Meta insights fetch error for ${adAccountId}:`, err);
+          diag.meta.errors.push(`${adAccountId}: Exception — ${err instanceof Error ? err.message : String(err)}`);
         }
       }
+    } else {
+      diag.meta.errors.push("No Meta access token found for this user");
     }
 
     // ── 3. Get COGs for this store ──────────────────────────
@@ -273,6 +306,7 @@ export async function POST(request: Request) {
     // Uses monthly averages — close enough and avoids daily rate complexity.
 
     const monthlyUsdToLocal = new Map<string, number>(); // "YYYY-MM" → rate
+    diag.exchange.currency = storeCurrency;
     if (storeCurrency !== "USD") {
       try {
         // Collect unique months from the data
@@ -302,9 +336,12 @@ export async function POST(request: Request) {
                 if (values.length > 0) {
                   const avg = values.reduce((a, b) => a + b, 0) / values.length;
                   monthlyUsdToLocal.set(ym, avg);
+                  diag.exchange.monthsFetched += 1;
                 }
               }
-            } catch { /* skip month */ }
+            } catch {
+              diag.exchange.monthsFailed += 1;
+            }
           })
         );
       } catch (err) {
@@ -388,10 +425,14 @@ export async function POST(request: Request) {
       });
     }
 
+    diag.result.totalBuckets = dailyData.size;
+    diag.result.nonEmptyBuckets = rows.length;
+
     if (rows.length === 0) {
       return NextResponse.json({
         synced: 0,
-        message: "No data found for the sync period. Connect Shopify and/or Meta first.",
+        message: "No data found for the sync period. Check diagnostics for details.",
+        diagnostics: diag,
       });
     }
 
@@ -402,16 +443,26 @@ export async function POST(request: Request) {
 
     if (upsertError) {
       console.error("Failed to upsert profit logs:", upsertError.message);
-      return apiError("save_profit_data_failed", "Failed to save profit data", 500, true);
+      diag.result.upsertError = upsertError.message;
+      return NextResponse.json(
+        { synced: 0, error: "Failed to save profit data", message: upsertError.message, diagnostics: diag },
+        { status: 500 }
+      );
     }
+
+    diag.result.rowsWritten = rows.length;
 
     return NextResponse.json({
       synced: rows.length,
       dateRange: { start: startStr, end: endStr },
       message: `Synced ${rows.length} days of profit data`,
+      diagnostics: diag,
     });
   } catch (err) {
     console.error("Profit sync error:", err);
-    return apiError("server_error", "Internal server error during profit sync", 500, true);
+    return NextResponse.json(
+      { synced: 0, error: "Internal server error during profit sync", message: err instanceof Error ? err.message : String(err), diagnostics: diag },
+      { status: 500 }
+    );
   }
 }

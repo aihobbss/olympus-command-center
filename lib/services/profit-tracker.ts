@@ -142,12 +142,22 @@ export async function upsertCog(
 
 // ── Sync trigger (calls API route) ────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type SyncDiagnostics = Record<string, any>;
+
+export type SyncResult = {
+  synced: number;
+  error?: string;
+  message?: string;
+  diagnostics?: SyncDiagnostics;
+};
+
 export async function triggerProfitSync(
   _userId: string,
   storeId: string,
   daysBack?: number,
   adAccountIds?: string[]
-): Promise<{ synced: number; error?: string }> {
+): Promise<SyncResult> {
   // 60s timeout — large syncs (365 days) can take a while
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60_000);
@@ -164,15 +174,15 @@ export async function triggerProfitSync(
     const data = await res.json();
 
     if (!res.ok) {
-      return { synced: 0, error: data.error || "Sync failed" };
+      return { synced: 0, error: data.error || "Sync failed", message: data.message, diagnostics: data.diagnostics };
     }
 
-    return { synced: data.synced };
+    return { synced: data.synced, message: data.message, diagnostics: data.diagnostics };
   } catch (err) {
     clearTimeout(timeout);
     // If the request timed out, the server may still have written data
     if (err instanceof DOMException && err.name === "AbortError") {
-      return { synced: -1 }; // signal to caller: data may exist, reload
+      return { synced: -1, error: "Request timed out after 60s — server may still be processing" };
     }
     throw err;
   }

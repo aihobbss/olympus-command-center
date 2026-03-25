@@ -34,6 +34,7 @@ import {
   getLastProfitSync,
   updateProfitLogFields,
   uploadProfitLogsCsv,
+  type SyncDiagnostics,
 } from "@/lib/services/profit-tracker";
 import { fetchLiveCampaigns } from "@/lib/services/meta-campaigns";
 
@@ -131,6 +132,7 @@ export default function ProfitTrackerPage() {
   const [profitLogs, setProfitLogs] = useState<ProfitLog[]>([]);
   const [liveCampaigns, setLiveCampaigns] = useState<AdCampaign[]>([]);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncDiagnostics, setSyncDiagnostics] = useState<SyncDiagnostics | null>(null);
 
   // CSV export/import state
   const [showExportModal, setShowExportModal] = useState(false);
@@ -400,6 +402,7 @@ export default function ProfitTrackerPage() {
     if (syncing || !user || !storeId) return;
     setSyncing(true);
     setSyncError(null);
+    setSyncDiagnostics(null);
 
     try {
       // First sync: pull full history. After that: just pull today (cron handles daily).
@@ -421,9 +424,18 @@ export default function ProfitTrackerPage() {
       } catch { /* ignore parse errors */ }
 
       const result = await triggerProfitSync(user.id, storeId, daysToSync, selectedAccounts);
-      if (result.error) {
-        setSyncError(result.error);
+
+      // Always capture diagnostics
+      if (result.diagnostics) {
+        setSyncDiagnostics(result.diagnostics);
       }
+
+      if (result.error) {
+        setSyncError(result.error + (result.message ? ` — ${result.message}` : ""));
+      } else if (result.synced === 0 && result.message) {
+        setSyncError(result.message);
+      }
+
       // Always reload data — even on timeout (synced === -1), server may have written data
       await loadData();
       // Only mark as synced if data was actually written
@@ -438,7 +450,7 @@ export default function ProfitTrackerPage() {
     } finally {
       setSyncing(false);
     }
-  }, [syncing, user, storeId, loadData]);
+  }, [syncing, user, storeId, profitLogs.length, loadData]);
 
   // ── COG change (persisted to Supabase) ──
 
@@ -808,6 +820,31 @@ export default function ProfitTrackerPage() {
           )}
         </div>
       </div>
+
+      {/* ─── Sync Error + Diagnostics Panel ─── */}
+      {(syncError || syncDiagnostics) && (
+        <div className="mb-4 rounded-xl border border-accent-red/30 bg-accent-red/5 p-4">
+          {syncError && (
+            <p className="text-sm text-accent-red font-medium mb-2">{syncError}</p>
+          )}
+          {syncDiagnostics && (
+            <details open={!hasData} className="text-xs text-text-secondary">
+              <summary className="cursor-pointer font-medium text-text-primary mb-2 select-none">
+                Sync Diagnostics (copy this and share for debugging)
+              </summary>
+              <pre className="bg-bg-primary rounded-lg p-3 overflow-x-auto font-mono-metric text-[11px] leading-relaxed whitespace-pre-wrap break-all select-all">
+{JSON.stringify(syncDiagnostics, null, 2)}
+              </pre>
+            </details>
+          )}
+          <button
+            onClick={() => { setSyncError(null); setSyncDiagnostics(null); }}
+            className="mt-2 text-[11px] text-text-muted hover:text-text-secondary underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {!hasData ? (
         <EmptyState
