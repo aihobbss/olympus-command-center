@@ -39,10 +39,12 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { storeId, daysBack, adAccountIds } = body as {
+    const { storeId, daysBack, adAccountIds, startDate, endDate } = body as {
       storeId: string;
       daysBack?: number;
       adAccountIds?: string[];
+      startDate?: string; // YYYY-MM-DD — if provided with endDate, overrides daysBack
+      endDate?: string;   // YYYY-MM-DD
     };
 
     console.log("[profit-sync API] adAccountIds received:", adAccountIds);
@@ -79,18 +81,30 @@ export async function POST(request: Request) {
       return d.toLocaleDateString("en-CA", { timeZone: storeTimezone });
     };
 
-    // Compute date range in the store's local timezone
+    // Compute date range — use explicit startDate/endDate if provided (chunked sync),
+    // otherwise fall back to daysBack from now (legacy / incremental sync).
     const now = new Date();
-    let endStr = toLocalDate(now.toISOString());
-    const startMs = now.getTime() - days * 86_400_000;
-    let startStr = toLocalDate(new Date(startMs).toISOString());
+    let endStr: string;
+    let startStr: string;
+    let startMs: number;
+
+    if (startDate && endDate) {
+      // Client sent explicit date range (chunked sync)
+      startStr = startDate;
+      endStr = endDate;
+      startMs = new Date(startDate + "T00:00:00Z").getTime();
+    } else {
+      startMs = now.getTime() - days * 86_400_000;
+      endStr = toLocalDate(now.toISOString());
+      startStr = toLocalDate(new Date(startMs).toISOString());
+    }
 
     // Initialize daily buckets using store-local dates
     const dailyData = new Map<string, DailyBucket>();
     {
       const d = new Date(startMs);
       // Iterate with some padding to cover timezone edges
-      const endMs = now.getTime() + 86_400_000;
+      const endMs = new Date(endStr + "T23:59:59Z").getTime() + 86_400_000;
       while (d.getTime() <= endMs) {
         const localDate = toLocalDate(d.toISOString());
         if (!dailyData.has(localDate)) {
@@ -121,10 +135,13 @@ export async function POST(request: Request) {
             diag.shopify.shopTimezone = storeTimezone;
             // Re-initialize buckets and date range with the correct timezone
             dailyData.clear();
-            endStr = toLocalDate(now.toISOString());
-            startStr = toLocalDate(new Date(startMs).toISOString());
+            if (!startDate) {
+              // Only recompute date strings if not using explicit range
+              endStr = toLocalDate(now.toISOString());
+              startStr = toLocalDate(new Date(startMs).toISOString());
+            }
             const d = new Date(startMs);
-            const endMs = now.getTime() + 86_400_000;
+            const endMs = new Date(endStr + "T23:59:59Z").getTime() + 86_400_000;
             while (d.getTime() <= endMs) {
               const localDate = toLocalDate(d.toISOString());
               if (!dailyData.has(localDate)) {
@@ -246,37 +263,43 @@ export async function POST(request: Request) {
       diag.meta.accountIds = accountIds;
       console.log("[profit-sync API] final accountIds:", accountIds);
 
-      // Fetch spend from each active ad account
+      // Fetch spend from each active ad account (with pagination for >500 days)
       for (const adAccountId of accountIds) {
         try {
-          const insightsUrl =
+          let insightsUrl: string | null =
             `${META_API}/${adAccountId}/insights` +
             `?fields=spend,actions,action_values` +
             `&time_range={"since":"${startStr}","until":"${endStr}"}` +
             `&time_increment=1` + // Daily breakdown
             `&limit=500`;
 
-          const insightsRes = await fetch(insightsUrl, {
-            headers: { Authorization: `Bearer ${metaToken.access_token}` },
-          });
+          while (insightsUrl) {
+            const insightsRes: Response = await fetch(insightsUrl, {
+              headers: { Authorization: `Bearer ${metaToken.access_token}` },
+            });
 
-          if (insightsRes.ok) {
-            const insightsData = await insightsRes.json();
-            const insights = insightsData.data || [];
-            diag.meta.insightRows += insights.length;
+            if (insightsRes.ok) {
+              const insightsData = await insightsRes.json();
+              const insights = insightsData.data || [];
+              diag.meta.insightRows += insights.length;
 
-            for (const insight of insights) {
-              const date = insight.date_start;
-              if (!date || !dailyData.has(date)) continue;
+              for (const insight of insights) {
+                const date = insight.date_start;
+                if (!date || !dailyData.has(date)) continue;
 
-              const bucket = dailyData.get(date)!;
-              // Ad spend is in USD from Meta — stored as USD for now,
-              // converted to store currency below using monthly average.
-              bucket.adSpend += parseFloat(insight.spend || "0");
+                const bucket = dailyData.get(date)!;
+                // Ad spend is in USD from Meta — stored as USD for now,
+                // converted to store currency below using monthly average.
+                bucket.adSpend += parseFloat(insight.spend || "0");
+              }
+
+              // Follow pagination if there are more pages
+              insightsUrl = insightsData.paging?.next ?? null;
+            } else {
+              const errBody = await insightsRes.text().catch(() => "");
+              diag.meta.errors.push(`${adAccountId}: ${insightsRes.status} ${insightsRes.statusText} — ${errBody.slice(0, 200)}`);
+              insightsUrl = null;
             }
-          } else {
-            const errBody = await insightsRes.text().catch(() => "");
-            diag.meta.errors.push(`${adAccountId}: ${insightsRes.status} ${insightsRes.statusText} — ${errBody.slice(0, 200)}`);
           }
         } catch (err) {
           console.error(`Meta insights fetch error for ${adAccountId}:`, err);

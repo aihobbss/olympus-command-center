@@ -155,18 +155,23 @@ export type SyncResult = {
 export async function triggerProfitSync(
   _userId: string,
   storeId: string,
-  daysBack?: number,
-  adAccountIds?: string[]
+  opts?: {
+    daysBack?: number;
+    adAccountIds?: string[];
+    startDate?: string; // YYYY-MM-DD
+    endDate?: string;   // YYYY-MM-DD
+  }
 ): Promise<SyncResult> {
-  // 60s timeout — large syncs (365 days) can take a while
+  const { daysBack, adAccountIds, startDate, endDate } = opts || {};
+  // 55s timeout — slightly under Vercel's 60s limit so we get a clean error
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
+  const timeout = setTimeout(() => controller.abort(), 55_000);
 
   try {
     const res = await authFetch("/api/sync-profit-data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ storeId, daysBack, adAccountIds }),
+      body: JSON.stringify({ storeId, daysBack, adAccountIds, startDate, endDate }),
       signal: controller.signal,
     });
 
@@ -182,7 +187,7 @@ export async function triggerProfitSync(
     clearTimeout(timeout);
     // If the request timed out, the server may still have written data
     if (err instanceof DOMException && err.name === "AbortError") {
-      return { synced: -1, error: "Request timed out after 60s — server may still be processing" };
+      return { synced: -1, error: "Request timed out after 55s — server may still be processing" };
     }
     throw err;
   }

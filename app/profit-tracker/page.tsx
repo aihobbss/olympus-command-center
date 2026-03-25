@@ -133,6 +133,7 @@ export default function ProfitTrackerPage() {
   const [liveCampaigns, setLiveCampaigns] = useState<AdCampaign[]>([]);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncDiagnostics, setSyncDiagnostics] = useState<SyncDiagnostics | null>(null);
+  const [syncProgress, setSyncProgress] = useState<string | null>(null);
 
   // CSV export/import state
   const [showExportModal, setShowExportModal] = useState(false);
@@ -403,52 +404,96 @@ export default function ProfitTrackerPage() {
     setSyncing(true);
     setSyncError(null);
     setSyncDiagnostics(null);
+    setSyncProgress(null);
+
+    // Use the same ad account selection saved by Ad Manager
+    let selectedAccounts: string[] | undefined;
+    try {
+      const key = `ad-accounts-selection:${storeId}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const ids: string[] = JSON.parse(saved);
+        if (Array.isArray(ids) && ids.length > 0) selectedAccounts = ids;
+      }
+    } catch { /* ignore parse errors */ }
+
+    const isFirstSync = profitLogs.length === 0;
 
     try {
-      // First sync: pull full history. After that: just pull today (cron handles daily).
-      const daysToSync = profitLogs.length === 0 ? 1095 : 1;
+      if (!isFirstSync) {
+        // ── Incremental sync: just pull today ──
+        setSyncProgress("Syncing today...");
+        const result = await triggerProfitSync(user.id, storeId, {
+          daysBack: 1,
+          adAccountIds: selectedAccounts,
+        });
+        if (result.diagnostics) setSyncDiagnostics(result.diagnostics);
+        if (result.error) {
+          setSyncError(result.error + (result.message ? ` — ${result.message}` : ""));
+        }
+        await loadData();
+        if (result.synced > 0 || result.synced === -1) setLastSynced(new Date());
+      } else {
+        // ── First sync: chunked — 90-day windows, newest first ──
+        const CHUNK_DAYS = 90;
+        const TOTAL_DAYS = 1095;
+        const today = new Date();
+        const chunks: { startDate: string; endDate: string }[] = [];
 
-      // Use the same ad account selection saved by Ad Manager
-      let selectedAccounts: string[] | undefined;
-      try {
-        const key = `ad-accounts-selection:${storeId}`;
-        const saved = localStorage.getItem(key);
-        console.log("[profit-sync] localStorage key:", key, "value:", saved);
-        if (saved) {
-          const ids: string[] = JSON.parse(saved);
-          if (Array.isArray(ids) && ids.length > 0) {
-            selectedAccounts = ids;
+        // Build non-overlapping 90-day chunks from newest to oldest
+        for (let offset = 0; offset < TOTAL_DAYS; offset += CHUNK_DAYS) {
+          const chunkEnd = new Date(today.getTime() - offset * 86_400_000);
+          const chunkStart = new Date(today.getTime() - Math.min(offset + CHUNK_DAYS, TOTAL_DAYS) * 86_400_000);
+          chunks.push({
+            startDate: chunkStart.toISOString().split("T")[0],
+            endDate: chunkEnd.toISOString().split("T")[0],
+          });
+        }
+
+        let totalSynced = 0;
+        let lastDiag: SyncDiagnostics | null = null;
+        let chunkError: string | null = null;
+
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          setSyncProgress(`Syncing chunk ${i + 1}/${chunks.length} (${chunk.startDate} → ${chunk.endDate})...`);
+
+          const result = await triggerProfitSync(user.id, storeId, {
+            adAccountIds: selectedAccounts,
+            startDate: chunk.startDate,
+            endDate: chunk.endDate,
+          });
+
+          if (result.diagnostics) lastDiag = result.diagnostics;
+          totalSynced += Math.max(result.synced, 0);
+
+          if (result.error) {
+            chunkError = `Chunk ${i + 1} (${chunk.startDate}→${chunk.endDate}): ${result.error}`;
+            // Don't abort — continue with remaining chunks so partial data is saved
+          }
+
+          // Reload data after each chunk so user sees progress
+          if (result.synced > 0 || result.synced === -1) {
+            await loadData();
+            setLastSynced(new Date());
           }
         }
-        console.log("[profit-sync] selectedAccounts:", selectedAccounts);
-      } catch { /* ignore parse errors */ }
 
-      const result = await triggerProfitSync(user.id, storeId, daysToSync, selectedAccounts);
+        if (lastDiag) setSyncDiagnostics(lastDiag);
+        if (chunkError) setSyncError(chunkError);
+        else if (totalSynced === 0) setSyncError("No data found across any period. Check diagnostics.");
 
-      // Always capture diagnostics
-      if (result.diagnostics) {
-        setSyncDiagnostics(result.diagnostics);
-      }
-
-      if (result.error) {
-        setSyncError(result.error + (result.message ? ` — ${result.message}` : ""));
-      } else if (result.synced === 0 && result.message) {
-        setSyncError(result.message);
-      }
-
-      // Always reload data — even on timeout (synced === -1), server may have written data
-      await loadData();
-      // Only mark as synced if data was actually written
-      if (result.synced > 0 || result.synced === -1) {
-        setLastSynced(new Date());
+        // Final reload to get complete picture
+        await loadData();
+        if (totalSynced > 0) setLastSynced(new Date());
       }
     } catch (err) {
       setSyncError("Sync failed — check your connections and try again.");
       console.error("Profit sync error:", err);
-      // Still try to reload — partial data may have been written
       try { await loadData(); } catch { /* ignore reload errors */ }
     } finally {
       setSyncing(false);
+      setSyncProgress(null);
     }
   }, [syncing, user, storeId, profitLogs.length, loadData]);
 
@@ -783,7 +828,7 @@ export default function ProfitTrackerPage() {
             {syncing ? (
               <>
                 <Loader2 size={13} className="animate-spin" />
-                Syncing...
+                {syncProgress || "Syncing..."}
               </>
             ) : (
               <>

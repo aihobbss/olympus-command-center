@@ -369,7 +369,7 @@ export default function AdManagerPage() {
       const accountIds = getSelectedAccountIdsArray();
       const results = await Promise.allSettled([
         triggerMetaSync(user.id, storeId, { adAccountIds: accountIds }),
-        triggerProfitSync(user.id, storeId, 30, accountIds),
+        triggerProfitSync(user.id, storeId, { daysBack: 30, adAccountIds: accountIds }),
       ]);
       if (results[0].status === "fulfilled" && results[0].value.error) {
         setSyncError(results[0].value.error);
@@ -398,7 +398,7 @@ export default function AdManagerPage() {
       const accountIds = getSelectedAccountIdsArray();
       const results = await Promise.allSettled([
         triggerMetaSync(user.id, storeId, { adAccountIds: accountIds }),
-        triggerProfitSync(user.id, storeId, 30, accountIds),
+        triggerProfitSync(user.id, storeId, { daysBack: 30, adAccountIds: accountIds }),
       ]);
       if (results[0].status === "fulfilled" && results[0].value.error) {
         setSyncError(results[0].value.error);
