@@ -434,58 +434,75 @@ export default function ProfitTrackerPage() {
         await loadData();
         if (result.synced > 0 || result.synced === -1) setLastSynced(new Date());
       } else {
-        // ── First sync: chunked — 90-day windows, newest first ──
-        const CHUNK_DAYS = 90;
+        // ── First sync: single-pass first, chunked fallback ──
+        // Single-pass produces perfectly accurate values (refunds correctly
+        // attributed across all dates). Chunking loses refunds that cross
+        // chunk boundaries, so it's only used as a fallback for huge stores.
         const TOTAL_DAYS = 1095;
-        const today = new Date();
-        const chunks: { startDate: string; endDate: string }[] = [];
 
-        // Build non-overlapping 90-day chunks from newest to oldest
-        for (let offset = 0; offset < TOTAL_DAYS; offset += CHUNK_DAYS) {
-          const chunkEnd = new Date(today.getTime() - offset * 86_400_000);
-          const chunkStart = new Date(today.getTime() - Math.min(offset + CHUNK_DAYS, TOTAL_DAYS) * 86_400_000);
-          chunks.push({
-            startDate: chunkStart.toISOString().split("T")[0],
-            endDate: chunkEnd.toISOString().split("T")[0],
-          });
-        }
+        setSyncProgress("Syncing full history...");
+        const singleResult = await triggerProfitSync(user.id, storeId, {
+          daysBack: TOTAL_DAYS,
+          adAccountIds: selectedAccounts,
+        });
 
-        let totalSynced = 0;
-        let lastDiag: SyncDiagnostics | null = null;
-        let chunkError: string | null = null;
+        if (singleResult.synced > 0) {
+          // Single-pass succeeded — values are perfectly accurate
+          if (singleResult.diagnostics) setSyncDiagnostics(singleResult.diagnostics);
+          await loadData();
+          setLastSynced(new Date());
+        } else if (singleResult.synced === -1) {
+          // Timed out — fall back to chunked mode for large stores
+          setSyncProgress("Single-pass timed out, switching to chunked sync...");
+          await loadData(); // server may have written partial data
 
-        for (let i = 0; i < chunks.length; i++) {
-          const chunk = chunks[i];
-          setSyncProgress(`Syncing chunk ${i + 1}/${chunks.length} (${chunk.startDate} → ${chunk.endDate})...`);
+          const CHUNK_DAYS = 90;
+          const today = new Date();
+          const chunks: { startDate: string; endDate: string }[] = [];
 
-          const result = await triggerProfitSync(user.id, storeId, {
-            adAccountIds: selectedAccounts,
-            startDate: chunk.startDate,
-            endDate: chunk.endDate,
-          });
-
-          if (result.diagnostics) lastDiag = result.diagnostics;
-          totalSynced += Math.max(result.synced, 0);
-
-          if (result.error) {
-            chunkError = `Chunk ${i + 1} (${chunk.startDate}→${chunk.endDate}): ${result.error}`;
-            // Don't abort — continue with remaining chunks so partial data is saved
+          for (let offset = 0; offset < TOTAL_DAYS; offset += CHUNK_DAYS) {
+            const chunkEnd = new Date(today.getTime() - offset * 86_400_000);
+            const chunkStart = new Date(today.getTime() - Math.min(offset + CHUNK_DAYS, TOTAL_DAYS) * 86_400_000);
+            chunks.push({
+              startDate: chunkStart.toISOString().split("T")[0],
+              endDate: chunkEnd.toISOString().split("T")[0],
+            });
           }
 
-          // Reload data after each chunk so user sees progress
-          if (result.synced > 0 || result.synced === -1) {
-            await loadData();
-            setLastSynced(new Date());
+          let totalSynced = 0;
+          let lastDiag: SyncDiagnostics | null = null;
+
+          for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            setSyncProgress(`Syncing chunk ${i + 1}/${chunks.length} (${chunk.startDate} → ${chunk.endDate})...`);
+
+            const result = await triggerProfitSync(user.id, storeId, {
+              adAccountIds: selectedAccounts,
+              startDate: chunk.startDate,
+              endDate: chunk.endDate,
+            });
+
+            if (result.diagnostics) lastDiag = result.diagnostics;
+            totalSynced += Math.max(result.synced, 0);
+
+            if (result.synced > 0 || result.synced === -1) {
+              await loadData();
+              setLastSynced(new Date());
+            }
           }
+
+          if (lastDiag) setSyncDiagnostics(lastDiag);
+          if (totalSynced === 0) setSyncError("No data found across any period. Check diagnostics.");
+        } else {
+          // synced === 0 — no data found or error
+          if (singleResult.diagnostics) setSyncDiagnostics(singleResult.diagnostics);
+          if (singleResult.error) {
+            setSyncError(singleResult.error + (singleResult.message ? ` — ${singleResult.message}` : ""));
+          } else if (singleResult.message) {
+            setSyncError(singleResult.message);
+          }
+          await loadData();
         }
-
-        if (lastDiag) setSyncDiagnostics(lastDiag);
-        if (chunkError) setSyncError(chunkError);
-        else if (totalSynced === 0) setSyncError("No data found across any period. Check diagnostics.");
-
-        // Final reload to get complete picture
-        await loadData();
-        if (totalSynced > 0) setLastSynced(new Date());
       }
     } catch (err) {
       setSyncError("Sync failed — check your connections and try again.");
